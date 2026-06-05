@@ -94,13 +94,14 @@ export function fightCampaign (nodeId) {
   const enemies = enemyTeam(node, game.seed);
   const result = simulate(mine, enemies, nodeBattleSeed(mine, node, game.seed));
   const win = result.winner === 'A';
+  const winXp = 18 + node.diff * 4;
   const payload = { result, win, node: node.id, level: node.diff, boss: node.boss };
   if (win) {
     const firstClear = !game.cleared.includes(node.id);
     const rw = reward(node);
     game.wallet.coins += rw.coins; game.wallet.frags += rw.frags;
     payload.reward = rw;
-    for (const x of ti) awardXp(x.instance, 18 + node.diff * 4);
+    for (const x of ti) awardXp(x.instance, winXp);
     if (firstClear) {
       game.cleared.push(node.id);
       payload.firstClear = true;
@@ -111,9 +112,9 @@ export function fightCampaign (nodeId) {
     if (nb) payload.nextNode = nb;
     persist();
   } else {
-    // Red de seguridad anti-softlock: al perder, el equipo igual entrena un poco
-    // (gana algo de XP) → eventualmente sube de nivel y puede ganar el nodo.
-    for (const x of ti) awardXp(x.instance, 8 + node.diff);
+    // Red de seguridad anti-softlock: al perder, el equipo entrena igual pero gana
+    // un CUARTO de la XP que daría ganar → eventualmente sube y puede ganar el nodo.
+    for (const x of ti) awardXp(x.instance, Math.max(1, Math.round(winXp / 4)));
     persist();
   }
   return payload;
