@@ -3,7 +3,7 @@ import { computed } from 'vue';
 import { critterById } from '../game/state.js';
 import { statsAtLevel, RARITY_BY_KEY, pointsFree } from '../critter/forge.js';
 import { critterSvg } from '../critter/svg.js';
-import { ELEMENT_INFO } from '../critter/types.js';
+import { elementInfo } from '../critter/types.js';
 import { ROLE_INFO } from '../critter/roles.js';
 import { t, loc } from '../i18n.js';
 
@@ -13,7 +13,7 @@ const svg = computed(() => critterSvg(critter.value, props.size));
 const st = computed(() => statsAtLevel(critter.value, props.instance.level || 1, props.instance.alloc));
 const free = computed(() => pointsFree(props.instance.level || 1, props.instance.alloc));
 const rar = computed(() => RARITY_BY_KEY[critter.value.rarity]);
-const el = computed(() => ELEMENT_INFO[critter.value.element]);
+const el = computed(() => elementInfo(critter.value.element));
 const role = computed(() => ROLE_INFO[critter.value.role]);
 
 const CAP = { HP: 1400, ATK: 320, DEF: 320, SPD: 220 };

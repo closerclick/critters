@@ -10,6 +10,7 @@ import CampaignView from './components/CampaignView.vue';
 import CollectionView from './components/CollectionView.vue';
 import TeamView from './components/TeamView.vue';
 import SummonView from './components/SummonView.vue';
+import FusionView from './components/FusionView.vue';
 import BattleView from './components/BattleView.vue';
 import CritterDetail from './components/CritterDetail.vue';
 import StarterView from './components/StarterView.vue';
@@ -85,6 +86,7 @@ watch(() => ui.detailUid, (v) => { if (v && !detailNav) detailNav = nav.open(() 
     <button :class="{ on: tab === 'campana' }" @click="goTab('campana')">{{ t('campana') }}</button>
     <button :class="{ on: tab === 'equipo' }" @click="goTab('equipo')">{{ t('equipo') }}</button>
     <button :class="{ on: tab === 'coleccion' }" @click="goTab('coleccion')">{{ t('coleccion') }}</button>
+    <button :class="{ on: tab === 'fusion' }" @click="goTab('fusion')">{{ t('fusion') }}</button>
     <button :class="{ on: tab === 'invocar' }" @click="goTab('invocar')">{{ t('invocar') }}</button>
   </nav>
 
@@ -92,6 +94,7 @@ watch(() => ui.detailUid, (v) => { if (v && !detailNav) detailNav = nav.open(() 
     <CampaignView v-if="tab === 'campana'" @fight="fight" />
     <TeamView v-else-if="tab === 'equipo'" />
     <CollectionView v-else-if="tab === 'coleccion'" />
+    <FusionView v-else-if="tab === 'fusion'" />
     <SummonView v-else-if="tab === 'invocar'" />
   </main>
   <main class="view center" v-else><p class="hint">…</p></main>

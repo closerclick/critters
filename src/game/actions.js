@@ -1,9 +1,10 @@
 // Acciones del juego: invocación (gacha), XP/nivel, gestión del equipo 3×3 y
 // batalla de campaña. Operan sobre el estado reactivo y persisten.
-import { game, persist, newUid, instanceByUid } from './state.js';
+import { game, persist, newUid, instanceByUid, critterById } from './state.js';
 import { neighbors, nodeById, enemyTeam, reward, captureDrop, nodeBattleSeed } from './campaign.js';
 import { simulate } from '../battle/engine.js';
 import { xpForNext, pointsFree } from '../critter/forge.js';
+import { canFuse, fuse } from './fusion.js';
 
 export const SUMMON_COST = 100;   // monedas por invocación
 export const FEED_XP = 60;        // XP por alimentar
@@ -91,6 +92,31 @@ export function adjustAlloc (uid, stat, delta) {
   i.alloc[stat] = next; persist();
 }
 export function resetAlloc (uid) { const i = instanceByUid(uid); if (i) { i.alloc = {}; persist(); } }
+
+// ---- fusión ----
+/** uids de la colección que se pueden fusionar con `uid` (difieren en una pieza). */
+export function fusablePartners (uid) {
+  const a = instanceByUid(uid); if (!a) return [];
+  const ca = critterById(a.id);
+  return game.collection.filter(b => b.uid !== uid && canFuse(ca, critterById(b.id))).map(b => b.uid);
+}
+/** Vista previa del descriptor resultante (no consume nada). */
+export function fusePreview (uidA, uidB) {
+  const a = instanceByUid(uidA), b = instanceByUid(uidB);
+  return (a && b) ? fuse(critterById(a.id), critterById(b.id)) : null;
+}
+/** Fusiona dos instancias: crea la hija (nivel 1) y CONSUME ambas (colección y equipo). */
+export function fuseCritters (uidA, uidB) {
+  const a = instanceByUid(uidA), b = instanceByUid(uidB);
+  if (!a || !b || uidA === uidB) return { error: 'pick' };
+  const child = fuse(critterById(a.id), critterById(b.id));
+  if (!child) return { error: 'incompat' };
+  for (let i = 0; i < game.team.length; i++) if (game.team[i] === uidA || game.team[i] === uidB) game.team[i] = null;
+  game.collection = game.collection.filter(x => x.uid !== uidA && x.uid !== uidB);
+  const inst = addCritter(child.id, 1);
+  persist();
+  return { instance: inst, critter: child };
+}
 
 // ---- telaraña de campaña ----
 export function isUnlocked (id) { return id === 'core' || neighbors(game.seed, id).some(nb => game.cleared.includes(nb)); }

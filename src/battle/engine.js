@@ -35,7 +35,7 @@ function buildUnits (team, side, terrain) {
       policy: (m.policy === 'cazador' || m.policy === 'guardian') ? 'agresiva' : (m.policy || defaultPolicy(critter.role)),
       target: normalizeTarget(m.target, critter.role),   // prioridad ordenada de objetivos
       flanks: !!critter.flanks,
-      terrainFav: !!terrain && critter.element === terrain,   // el terreno de la zona favorece su elemento
+      terrainFav: !!terrain && String(critter.element).split('+').includes(terrain),   // el terreno favorece su(s) elemento(s)
       energy: 0, charge: 0, stunTurns: 0, buffs: [], alive: true, passive: critter.passive, active: critter.active,
     };
   });

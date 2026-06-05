@@ -26,15 +26,58 @@ export function partsOf (a) { return 1 + (a.thorax >= 0 ? 1 : 0) + (a.abdomen >=
 export function rarityIndexFromParts (parts) { return parts >= 9 ? 4 : parts >= 7 ? 3 : parts >= 5 ? 2 : parts >= 3 ? 1 : 0; }
 export function rarityFromParts (parts) { return RARITIES[rarityIndexFromParts(parts)]; }
 
+// Estilo de combate (rasgo): probabilidad de flanquear según el rol.
+const FLANK = { dps: 0.7, distancia: 0.7, control: 0.6, soporte: 0.5, peleador: 0.4, tanque: 0.2 };
+
+// "Genoma-id" de una criatura FUSIONADA: codifica apariencia+elemento+rol en el id
+// para que makeCritter la reconstruya EXACTA (snapshot/PvP siguen siendo solo un id).
+export function genomeId (g) {
+  const a = g.appearance;
+  return ['g', g.element, g.role, a.head, a.thorax, a.abdomen, a.legs, a.legStyle, a.antennae ? 1 : 0, a.hue, a.pattern].join(':');
+}
+function parseGenome (id) {
+  const p = id.split(':');   // g:el:role:head:thorax:abdomen:legs:legStyle:antennae:hue:pattern
+  return {
+    element: p[1] || 'fuego',
+    role: ROLES.includes(p[2]) ? p[2] : ROLES[0],
+    appearance: { head: +p[3] || 0, thorax: p[4] == null ? -1 : +p[4], abdomen: p[5] == null ? -1 : +p[5], legs: +p[6] || 0, legStyle: +p[7] || 0, antennae: p[8] === '1', hue: +p[9] || 0, pattern: +p[10] || 0 },
+  };
+}
+
+// Cuerpo común: dados elemento/rol/apariencia, deriva rareza (por partes), stats,
+// pasiva/activa, flanqueo y nombre con el rng del id. Comparte salvajes y genomas.
+function buildBody (id, rng, element, role, appearance) {
+  const rarityIndex = rarityIndexFromParts(partsOf(appearance));
+  const rarity = RARITIES[rarityIndex];
+  const w = ROLE_WEIGHTS[role] || ROLE_WEIGHTS[ROLES[0]];
+  const budget = BASE_BUDGET * rarity.budget;
+  const j = () => 0.85 + rng() * 0.30;   // jitter por stat
+  const base = {
+    HP: Math.round(budget * w.HP * j() * HP_FACTOR),
+    ATK: Math.round(budget * w.ATK * j()),
+    DEF: Math.round(budget * w.DEF * j()),
+    SPD: Math.round(budget * w.SPD * j()),
+  };
+  base.HP = Math.max(20, base.HP);
+  base.ATK = Math.max(5, base.ATK);
+  base.DEF = Math.max(1, base.DEF);
+  base.SPD = Math.max(5, base.SPD);
+  const passive = pick(rng, ROLE_PASSIVE_POOL[role]);
+  const active = pick(rng, ROLE_ACTIVE_POOL[role]);
+  const flanks = rng() < (FLANK[role] ?? 0.5);
+  const name = makeName(rng, rarityIndex);
+  return { id, name, element, role, rarity: rarity.key, rarityIndex, base, passive, active, flanks, appearance };
+}
+
 /** Crea la criatura completa a partir de su id. Puro y determinista. */
 export function makeCritter (id) {
   const rng = rngFrom('critter:' + id);
+  if (typeof id === 'string' && id.startsWith('g:')) { const g = parseGenome(id); return buildBody(id, rng, g.element, g.role, g.appearance); }
+
+  // SALVAJES/invocadas: pocas partes → rareza 0/1; la rareza alta (hasta 9 =
+  // legendaria) se consigue FUSIONANDO. Cabeza obligatoria; tórax/abdomen opcionales.
   const element = pick(rng, ELEMENTS);
   const role = pick(rng, ROLES);
-
-  // Anatomía por PARTES (la rareza sale de cuántas hay). SALVAJES/invocadas: pocas
-  // partes → rareza 0/1; la rareza alta (hasta 9 = legendaria) se consigue FUSIONANDO.
-  // Cabeza obligatoria; tórax/abdomen opcionales (-1 = ausente); patas en la cabeza.
   const appearance = {
     head: rint(rng, 0, 3),                         // 4 tipos de cabeza
     thorax: rng() < 0.35 ? rint(rng, 0, 2) : -1,   // tórax opcional
@@ -51,32 +94,7 @@ export function makeCritter (id) {
     else if (appearance.thorax >= 0) appearance.thorax = -1;
     else appearance.legs--;
   }
-  const rarityIndex = rarityIndexFromParts(partsOf(appearance));
-  const rarity = RARITIES[rarityIndex];
-  const w = ROLE_WEIGHTS[role];
-  const budget = BASE_BUDGET * rarity.budget;
-
-  const j = () => 0.85 + rng() * 0.30;   // jitter por stat
-  const base = {
-    HP: Math.round(budget * w.HP * j() * HP_FACTOR),
-    ATK: Math.round(budget * w.ATK * j()),
-    DEF: Math.round(budget * w.DEF * j()),
-    SPD: Math.round(budget * w.SPD * j()),
-  };
-  base.HP = Math.max(20, base.HP);
-  base.ATK = Math.max(5, base.ATK);
-  base.DEF = Math.max(1, base.DEF);
-  base.SPD = Math.max(5, base.SPD);
-
-  const passive = pick(rng, ROLE_PASSIVE_POOL[role]);
-  const active = pick(rng, ROLE_ACTIVE_POOL[role]);
-  // Estilo de combate (rasgo de la especie): ¿flanquea (rodea, incl. por detrás)
-  // o pelea de FRENTE (forma línea)? Determinista por semilla, sesgado por rol.
-  const FLANK = { dps: 0.7, distancia: 0.7, control: 0.6, soporte: 0.5, peleador: 0.4, tanque: 0.2 };
-  const flanks = rng() < (FLANK[role] ?? 0.5);
-
-  const name = makeName(rng, rarityIndex);
-  return { id, name, element, role, rarity: rarity.key, rarityIndex, base, passive, active, flanks, appearance };
+  return buildBody(id, rng, element, role, appearance);
 }
 
 // Híbrido de subida de nivel: crecimiento automático (mantiene el arquetipo) +

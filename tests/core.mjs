@@ -1,10 +1,11 @@
 // Test Node (sin navegador) del núcleo determinista: forge, svg y motor de batalla.
 import assert from 'node:assert';
-import { makeCritter, statsAtLevel, power, pointsTotal, pointsFree, partsOf, rarityIndexFromParts } from '../src/critter/forge.js';
+import { makeCritter, statsAtLevel, power, pointsTotal, pointsFree, partsOf, rarityIndexFromParts, genomeId } from '../src/critter/forge.js';
 import { critterSvg } from '../src/critter/svg.js';
-import { typeMultiplier } from '../src/critter/types.js';
+import { typeMultiplier, mixElements } from '../src/critter/types.js';
 import { simulate, battleSeed } from '../src/battle/engine.js';
 import { normalizeTarget } from '../src/battle/policies.js';
+import { canFuse, fuse } from '../src/game/fusion.js';
 
 let failed = 0;
 const ok = (name, fn) => { try { fn(); console.log('  ✓', name); } catch (e) { failed++; console.error('  ✗', name, '\n   ', e.message); } };
@@ -99,6 +100,37 @@ ok('rareza por partes: salvajes 0/1 (≤4 partes); 9 = legendaria', () => {
   assert.equal(rarityIndexFromParts(4), 1);
   assert.equal(rarityIndexFromParts(5), 2);
   assert.equal(rarityIndexFromParts(9), 4);
+});
+
+ok('genoma-id: makeCritter reconstruye exacto y determinista', () => {
+  const id = genomeId({ element: 'fuego', role: 'dps', appearance: { head: 1, thorax: 0, abdomen: 2, legs: 3, legStyle: 1, antennae: true, hue: 5, pattern: 1 } });
+  const c1 = makeCritter(id), c2 = makeCritter(id);
+  assert.deepEqual(c1, c2);
+  assert.equal(c1.element, 'fuego'); assert.equal(c1.role, 'dps');
+  assert.equal(partsOf(c1.appearance), 6);   // 1+1+1+3
+  assert.equal(c1.rarityIndex, 2);           // raro
+});
+
+ok('fusión: difieren en una pieza → hija con +1 parte (sube rareza); subelemento', () => {
+  const base = { head: 0, thorax: -1, abdomen: -1, legStyle: 0, antennae: false, hue: 0, pattern: 0 };
+  const A = makeCritter(genomeId({ element: 'fuego', role: 'dps', appearance: { ...base, legs: 2 } }));   // 3 partes
+  const B = makeCritter(genomeId({ element: 'agua', role: 'dps', appearance: { ...base, legs: 3 } }));    // 4 partes (A + 1 pata)
+  assert.ok(canFuse(A, B));
+  const child = fuse(A, B);
+  assert.ok(child);
+  assert.equal(partsOf(child.appearance), partsOf(B.appearance) + 1);   // 5
+  assert.ok(child.rarityIndex > A.rarityIndex);                         // sube de rareza
+  assert.equal(child.element, 'agua+fuego');                            // subelemento canónico
+  assert.deepEqual(fuse(A, B), child);                                  // determinista
+  const C = makeCritter(genomeId({ element: 'fuego', role: 'dps', appearance: { ...base, legs: 2, hue: 9 } })); // misma estructura
+  assert.ok(!canFuse(A, C));                                            // 0 piezas de diferencia → no
+});
+
+ok('subelemento: ventajas de ambos, sin sumar debilidades', () => {
+  assert.equal(mixElements('fuego', 'agua'), 'agua+fuego');
+  assert.equal(mixElements('fuego', 'fuego'), 'fuego');
+  assert.equal(typeMultiplier('agua+fuego', 'planta'), 1.25);   // atacando: toma la ventaja (agua)
+  assert.equal(typeMultiplier('fuego', 'agua+fuego'), 1);       // defendiendo: el dual resiste (sin extra debilidad)
 });
 
 // Muestra: imprime un resumen de una batalla para inspección manual.

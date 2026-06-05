@@ -4,7 +4,7 @@ import { game, instanceByUid, critterById, persist } from '../game/state.js';
 import { placeInSlot, clearSlot, teamCount } from '../game/actions.js';
 import { openCritter } from '../ui.js';
 import { critterSvg } from '../critter/svg.js';
-import { ELEMENT_INFO } from '../critter/types.js';
+import { elementInfo } from '../critter/types.js';
 import { t } from '../i18n.js';
 
 const drag = reactive({ active: false, uid: null, from: 'bench', fromSlot: -1, x: 0, y: 0, pending: null });
@@ -13,7 +13,7 @@ const overSlot = ref(-1);
 const cellUid = (slot) => game.team[slot];
 function critterFor (uid) { const inst = instanceByUid(uid); return inst ? critterById(inst.id) : null; }
 function svgFor (uid, size) { const c = critterFor(uid); return c ? critterSvg(c, size) : ''; }
-function elColor (uid) { const c = critterFor(uid); return c ? ELEMENT_INFO[c.element].color : 'var(--line)'; }
+function elColor (uid) { const c = critterFor(uid); return c ? elementInfo(c.element).color : 'var(--line)'; }
 function levelOf (uid) { const i = instanceByUid(uid); return i ? i.level : null; }
 const bench = computed(() => { const on = new Set(game.team.filter(Boolean)); return game.collection.filter(i => !on.has(i.uid)); });
 

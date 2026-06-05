@@ -17,8 +17,17 @@ export const ELEMENT_INFO = {
 export const ADV = 1.25;   // multiplicador con ventaja de tipo
 export const DIS = 0.8;    // multiplicador con desventaja
 
-/** Multiplicador de daño del elemento atacante contra el defensor (rueda de N). */
-export function typeMultiplier (att, def) {
+// Un SUBELEMENTO (fruto de fusionar dos elementos distintos) se escribe "a+b".
+export const comps = (el) => String(el).split('+');
+export const isSub = (el) => String(el).includes('+');
+/** Mezcla de elementos (fusión): mismo → igual; distintos → subelemento canónico "a+b" (máx 2). */
+export function mixElements (a, b) {
+  if (a === b) return a;
+  const cs = [...new Set([...comps(a), ...comps(b)])].sort();
+  return cs.slice(0, 2).join('+');
+}
+
+function baseMult (att, def) {
   const n = ELEMENTS.length;
   const i = ELEMENTS.indexOf(att), j = ELEMENTS.indexOf(def);
   if (i < 0 || j < 0) return 1;
@@ -26,4 +35,23 @@ export function typeMultiplier (att, def) {
   if (diff === 1) return ADV;       // def es el siguiente al att → att tiene ventaja
   if (diff === n - 1) return DIS;   // def es el anterior → att en desventaja
   return 1;
+}
+/** Multiplicador de daño att→def. Soporta SUBELEMENTOS: el subelemento toma las
+ *  VENTAJAS de ambos sin sumar debilidades (atacando elige su mejor componente;
+ *  defendiendo, su mejor resistencia) → max_a min_d baseMult(a,d). */
+export function typeMultiplier (att, def) {
+  const A = comps(att), D = comps(def);
+  let best = -Infinity;
+  for (const a of A) { let worst = Infinity; for (const d of D) { const m = baseMult(a, d); if (m < worst) worst = m; } if (worst > best) best = worst; }
+  return best === -Infinity ? 1 : best;
+}
+
+const hx = (h) => { h = String(h).replace('#', ''); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16) || 0); };
+const mixHex = (a, b) => { const x = hx(a), y = hx(b); return '#' + [0, 1, 2].map(i => Math.round((x[i] + y[i]) / 2).toString(16).padStart(2, '0')).join(''); };
+/** Info visual/label de un elemento o subelemento (mezcla colores y etiquetas). */
+export function elementInfo (el) {
+  const cs = comps(el);
+  if (cs.length === 1) return ELEMENT_INFO[el] || ELEMENT_INFO.fuego;
+  const a = ELEMENT_INFO[cs[0]] || ELEMENT_INFO.fuego, b = ELEMENT_INFO[cs[1]] || ELEMENT_INFO.agua;
+  return { es: a.es + '/' + b.es, en: a.en + '/' + b.en, color: mixHex(a.color, b.color), color2: mixHex(a.color2, b.color2), sub: true };
 }

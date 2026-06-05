@@ -6,7 +6,7 @@
 //   columna central = segmentos: cabeza (fila 0, oblig) · tórax (fila 1, opc) ·
 //   abdomen (fila 2, opc).  columnas laterales = hasta 6 PATAS (3 por lado), una
 //   por celda → cada pata es un "slot" equipable.
-import { ELEMENT_INFO } from './types.js';
+import { elementInfo } from './types.js';
 import { RARITY_BY_KEY } from './forge.js';
 
 function darken (hex, f) {
@@ -26,7 +26,7 @@ const pts = (arr) => arr.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(
 
 export function critterSvg (critter, size = 96) {
   const a = critter.appearance || { head: 0, thorax: -1, abdomen: -1, legs: 4, legStyle: 1, antennae: true, hue: 0, pattern: 0 };
-  const ei = ELEMENT_INFO[critter.element] || ELEMENT_INFO.fuego;
+  const ei = elementInfo(critter.element);
   const ri = RARITY_BY_KEY[critter.rarity] || { color: '#94a3b8' };
   const glow = shift(ei.color, a.hue || 0);              // acento (ojos / pies)
   const cTop = darken(glow, 0.55);                       // caparazón (oscuro)
