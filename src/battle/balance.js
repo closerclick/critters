@@ -1,0 +1,16 @@
+// Constantes y fórmulas de balance del combate. Centralizadas para afinar sin
+// tocar el motor.
+export const BAL = {
+  energyPerAction: 34,   // energía al actuar (ataque básico)
+  energyPerHit: 12,      // energía al recibir un golpe
+  critChance: 0.12,
+  critMult: 1.6,
+  maxRounds: 60,         // tope de seguridad (evita peleas infinitas)
+};
+
+// Daño = ATK con mitigación por DEF (rendimientos decrecientes) × tipo × crítico.
+export function basicDamage (atk, def, typeMult, crit) {
+  const mitig = def / (def + 60);
+  const d = atk * (1 - mitig) * typeMult * (crit ? BAL.critMult : 1);
+  return Math.max(1, Math.round(d));
+}

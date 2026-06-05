@@ -1,0 +1,21 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Critters">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1e1b4b"/><stop offset="1" stop-color="#0b1220"/></linearGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a78bfa"/><stop offset="1" stop-color="#6d28d9"/></linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- cuernos -->
+  <path d="M150,150 L120,70 L182,140 Z" fill="#4c1d95"/>
+  <path d="M362,150 L392,70 L330,140 Z" fill="#4c1d95"/>
+  <!-- cuerpo -->
+  <path d="M256,118 C352,118 396,196 396,272 C396,372 332,418 256,418 C180,418 116,372 116,272 C116,196 160,118 256,118 Z" fill="url(#body)" stroke="#4c1d95" stroke-width="12"/>
+  <!-- panza -->
+  <ellipse cx="256" cy="320" rx="78" ry="62" fill="#ffffff" opacity=".16"/>
+  <!-- ojos -->
+  <circle cx="206" cy="252" r="34" fill="#fff"/><circle cx="210" cy="256" r="16" fill="#0b1220"/>
+  <circle cx="306" cy="252" r="34" fill="#fff"/><circle cx="302" cy="256" r="16" fill="#0b1220"/>
+  <!-- colmillos / boca -->
+  <path d="M214,338 Q256,372 298,338" fill="none" stroke="#0b1220" stroke-width="10" opacity=".55"/>
+  <path d="M232,344 L238,366 L246,346 Z" fill="#fff"/>
+  <path d="M280,344 L274,366 L266,346 Z" fill="#fff"/>
+</svg>
