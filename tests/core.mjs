@@ -129,6 +129,8 @@ ok('fusión: difieren en una pieza → hija con +1 parte (sube rareza); subeleme
 ok('subelemento: ventajas de ambos, sin sumar debilidades', () => {
   assert.equal(mixElements('fuego', 'agua'), 'agua+fuego');
   assert.equal(mixElements('fuego', 'fuego'), 'fuego');
+  assert.equal(mixElements('agua+fuego', 'planta'), 'agua+fuego+planta');        // dual + base → avanzado (Prisma)
+  assert.equal(mixElements('agua+fuego+planta', 'agua'), 'agua+fuego+planta');   // avanzado + base → igual (solo aporta ingredientes)
   assert.equal(typeMultiplier('agua+fuego', 'planta'), 1.25);   // atacando: toma la ventaja (agua)
   assert.equal(typeMultiplier('fuego', 'agua+fuego'), 1);       // defendiendo: el dual resiste (sin extra debilidad)
 });

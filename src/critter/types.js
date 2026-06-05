@@ -20,12 +20,15 @@ export const DIS = 0.8;    // multiplicador con desventaja
 // Un SUBELEMENTO (fruto de fusionar dos elementos distintos) se escribe "a+b".
 export const comps = (el) => String(el).split('+');
 export const isSub = (el) => String(el).includes('+');
-/** Mezcla de elementos (fusión): mismo → igual; distintos → subelemento canónico "a+b" (máx 2). */
+// El elemento de una araña = CONJUNTO de ingredientes base (subconjunto de los 3).
+// Fusionar = UNIÓN de ingredientes, con tope natural en los 3 base → solo hay 7
+// elementos posibles: 3 base · 3 subelementos (pares) · 1 avanzado (los 3 = "Prisma").
+// Mezclar avanzados no crea nada nuevo: solo aportan ingredientes (la unión ya está llena).
 export function mixElements (a, b) {
-  if (a === b) return a;
-  const cs = [...new Set([...comps(a), ...comps(b)])].sort();
-  return cs.slice(0, 2).join('+');
+  const cs = [...new Set([...comps(a), ...comps(b)])].filter(c => ELEMENTS.includes(c)).sort();
+  return (cs.length ? cs : ['fuego']).join('+');
 }
+export const ADVANCED_INFO = { es: 'Prisma', en: 'Prism', color: '#f0abfc', color2: '#6d28d9' };
 
 function baseMult (att, def) {
   const n = ELEMENTS.length;
@@ -48,10 +51,11 @@ export function typeMultiplier (att, def) {
 
 const hx = (h) => { h = String(h).replace('#', ''); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16) || 0); };
 const mixHex = (a, b) => { const x = hx(a), y = hx(b); return '#' + [0, 1, 2].map(i => Math.round((x[i] + y[i]) / 2).toString(16).padStart(2, '0')).join(''); };
-/** Info visual/label de un elemento o subelemento (mezcla colores y etiquetas). */
+/** Info visual/label de un elemento (base, subelemento o avanzado). */
 export function elementInfo (el) {
-  const cs = comps(el);
-  if (cs.length === 1) return ELEMENT_INFO[el] || ELEMENT_INFO.fuego;
-  const a = ELEMENT_INFO[cs[0]] || ELEMENT_INFO.fuego, b = ELEMENT_INFO[cs[1]] || ELEMENT_INFO.agua;
-  return { es: a.es + '/' + b.es, en: a.en + '/' + b.en, color: mixHex(a.color, b.color), color2: mixHex(a.color2, b.color2), sub: true };
+  const cs = comps(el).filter(c => ELEMENT_INFO[c]);
+  if (cs.length <= 1) return ELEMENT_INFO[cs[0]] || ELEMENT_INFO[el] || ELEMENT_INFO.fuego;
+  if (ELEMENTS.every(e => cs.includes(e))) return { es: ADVANCED_INFO.es, en: ADVANCED_INFO.en, color: ADVANCED_INFO.color, color2: ADVANCED_INFO.color2, sub: true, tier: 2 };
+  const a = ELEMENT_INFO[cs[0]], b = ELEMENT_INFO[cs[1]];
+  return { es: a.es + '/' + b.es, en: a.en + '/' + b.en, color: mixHex(a.color, b.color), color2: mixHex(a.color2, b.color2), sub: true, tier: 1 };
 }
