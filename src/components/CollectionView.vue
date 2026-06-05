@@ -28,7 +28,7 @@ function doFeed () { const r = feed(detail.value); if (r.error === 'frags') err.
   </div>
 
   <div v-if="detail" class="battle" style="background:rgba(2,6,15,.9)" @click.self="close">
-    <div style="margin:auto;background:var(--bg2);border:1px solid var(--line);border-radius:16px;max-width:360px;width:100%;padding:18px;text-align:center">
+    <div style="margin:auto;background:var(--panel2);border:1px solid var(--line2);border-radius:16px;max-width:360px;width:100%;padding:18px;text-align:center">
       <div v-html="svgBig()" style="display:flex;justify-content:center"></div>
       <h2 style="margin-top:6px">{{ critter()?.name }}</h2>
       <div class="chips" style="justify-content:center;margin:8px 0"><span class="chip">{{ t('nv') }}{{ inst()?.level }}</span></div>

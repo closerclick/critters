@@ -23,6 +23,6 @@ function choose (id) { chooseStarter(id); }
 
 <style scoped>
 .starter{height:100%;overflow-y:auto;display:flex;flex-direction:column;align-items:center;gap:12px;padding:18px 14px calc(env(safe-area-inset-bottom) + 24px);justify-content:center}
-.st-title{font-size:22px;font-weight:900;text-align:center;background:linear-gradient(90deg,#c4b5fd,#a78bfa);-webkit-background-clip:text;background-clip:text;color:transparent}
+.st-title{font-family:var(--fdisplay);font-size:24px;font-weight:800;text-align:center;background:linear-gradient(95deg,#e9d5ff,#b794ff 50%,#38e1d6);-webkit-background-clip:text;background-clip:text;color:transparent}
 .pick{display:flex;flex-direction:column}
 </style>
