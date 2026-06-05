@@ -44,14 +44,17 @@ export function makeCritter (id) {
   const passive = pick(rng, ROLE_PASSIVE_POOL[role]);
   const active = pick(rng, ROLE_ACTIVE_POOL[role]);
 
+  // Anatomía compuesta por partes: SOLO la cabeza es obligatoria; tórax y abdomen
+  // opcionales (-1 = ausente). Las patas (0..6) salen de la cabeza (estilo araña).
   const appearance = {
-    body: rint(rng, 0, 3),     // forma del cuerpo
-    eyes: rint(rng, 1, 3),     // cantidad de ojos
-    horns: rint(rng, 0, 3),    // cuernos
-    spikes: rng() < 0.5,       // púas en el lomo
-    tail: rng() < 0.6,         // cola
-    hue: rint(rng, -18, 18),   // variación de tono
-    pattern: rint(rng, 0, 2),  // patrón de panza
+    head: rint(rng, 0, 3),                        // 4 tipos de cabeza
+    thorax: rng() < 0.6 ? rint(rng, 0, 2) : -1,   // tórax opcional
+    abdomen: rng() < 0.7 ? rint(rng, 0, 3) : -1,  // abdomen opcional
+    legs: rint(rng, 0, 6),                         // 0..6 patas (en la cabeza)
+    legStyle: rint(rng, 0, 1),                     // recta | articulada
+    antennae: rng() < 0.6,                         // antenas
+    hue: rint(rng, -18, 18),                       // variación de tono
+    pattern: rint(rng, 0, 2),                      // patrón
   };
 
   const name = makeName(rng, rarityIndex);
