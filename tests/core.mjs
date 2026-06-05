@@ -1,6 +1,6 @@
 // Test Node (sin navegador) del núcleo determinista: forge, svg y motor de batalla.
 import assert from 'node:assert';
-import { makeCritter, statsAtLevel, power } from '../src/critter/forge.js';
+import { makeCritter, statsAtLevel, power, pointsTotal, pointsFree } from '../src/critter/forge.js';
 import { critterSvg } from '../src/critter/svg.js';
 import { typeMultiplier } from '../src/critter/types.js';
 import { simulate, battleSeed } from '../src/battle/engine.js';
@@ -61,6 +61,16 @@ ok('dos equipos DEFENSIVOS no empatan eternamente (rompe el standoff)', () => {
   assert.notEqual(r.winner, 'draw');                 // alguien avanza y gana
   assert.ok(r.cycles < 2000, 'no se estanca hasta el tope');
   assert.ok(r.log.some(e => e.t === 'move'), 'hubo movimiento');
+});
+
+ok('puntos asignables: alloc suma stats; pointsFree correcto', () => {
+  const c = makeCritter('alpha');
+  const s0 = statsAtLevel(c, 5);
+  const s1 = statsAtLevel(c, 5, { ATK: 3 });
+  assert.equal(s1.ATK - s0.ATK, 3 * 3);     // POINT_VALUE.ATK = 3
+  assert.equal(pointsTotal(5), 8);          // (5-1) * 2 por nivel
+  assert.equal(pointsFree(5, { ATK: 3 }), 5);
+  assert.equal(pointsTotal(1), 0);          // nivel 1 sin puntos
 });
 
 // Muestra: imprime un resumen de una batalla para inspección manual.

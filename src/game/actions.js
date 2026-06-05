@@ -3,7 +3,7 @@
 import { game, persist, newUid, instanceByUid } from './state.js';
 import { neighbors, nodeById, enemyTeam, reward, captureDrop, nodeBattleSeed } from './campaign.js';
 import { simulate } from '../battle/engine.js';
-import { xpForNext } from '../critter/forge.js';
+import { xpForNext, pointsFree } from '../critter/forge.js';
 
 export const SUMMON_COST = 100;   // monedas por invocación
 export const FEED_XP = 60;        // XP por alimentar
@@ -73,12 +73,24 @@ export function teamInstances () {
   game.team.forEach((uid, slot) => { if (uid) { const inst = instanceByUid(uid); if (inst) out.push({ slot, instance: inst }); } });
   return out;
 }
-export function teamSnapshot () { return teamInstances().map(x => ({ id: x.instance.id, level: x.instance.level, slot: x.slot, policy: x.instance.policy, target: x.instance.target })); }
+export function teamSnapshot () { return teamInstances().map(x => ({ id: x.instance.id, level: x.instance.level, slot: x.slot, policy: x.instance.policy, target: x.instance.target, alloc: x.instance.alloc })); }
 
 /** Cambia la política de movimiento de una instancia. */
 export function setPolicy (uid, policy) { const i = instanceByUid(uid); if (i) { i.policy = policy; persist(); } }
 /** Cambia la preferencia de objetivo de una instancia. */
 export function setTarget (uid, pref) { const i = instanceByUid(uid); if (i) { i.target = pref; persist(); } }
+
+// ---- puntos de stat (híbrido; respec libre en cualquier momento) ----
+export function adjustAlloc (uid, stat, delta) {
+  const i = instanceByUid(uid); if (!i) return;
+  if (!i.alloc) i.alloc = {};
+  const cur = i.alloc[stat] || 0;
+  const next = cur + delta;
+  if (next < 0) return;
+  if (delta > 0 && pointsFree(i.level, i.alloc) <= 0) return;   // sin puntos libres
+  i.alloc[stat] = next; persist();
+}
+export function resetAlloc (uid) { const i = instanceByUid(uid); if (i) { i.alloc = {}; persist(); } }
 
 // ---- telaraña de campaña ----
 export function isUnlocked (id) { return id === 'core' || neighbors(game.seed, id).some(nb => game.cleared.includes(nb)); }
@@ -90,7 +102,7 @@ export function fightCampaign (nodeId) {
   if (!isUnlocked(nodeId)) return { error: 'locked' };
   const ti = teamInstances();
   if (!ti.length) return { error: 'noteam' };
-  const mine = ti.map(x => ({ id: x.instance.id, level: x.instance.level, slot: x.slot, policy: x.instance.policy, target: x.instance.target }));
+  const mine = ti.map(x => ({ id: x.instance.id, level: x.instance.level, slot: x.slot, policy: x.instance.policy, target: x.instance.target, alloc: x.instance.alloc }));
   const enemies = enemyTeam(node, game.seed);
   const result = simulate(mine, enemies, nodeBattleSeed(mine, node, game.seed));
   const win = result.winner === 'A';

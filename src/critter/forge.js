@@ -65,8 +65,18 @@ export function makeCritter (id) {
   return { id, name, element, role, rarity: rarity.key, rarityIndex, base, passive, active, flanks, appearance };
 }
 
-/** Stats efectivas a un nivel dado (crecimiento + pasiva de stat). */
-export function statsAtLevel (critter, level = 1) {
+// Híbrido de subida de nivel: crecimiento automático (mantiene el arquetipo) +
+// PUNTOS asignables por el jugador (reasignables cuando quiera). Cada punto suma un
+// valor fijo por stat (HP rinde más porque va en cientos).
+export const STAT_KEYS = ['HP', 'ATK', 'DEF', 'SPD'];
+export const POINTS_PER_LEVEL = 2;
+export const POINT_VALUE = { HP: 12, ATK: 3, DEF: 3, SPD: 2 };
+export function pointsTotal (level) { return Math.max(0, (Math.max(1, level) - 1) * POINTS_PER_LEVEL); }
+export function pointsSpent (alloc) { return alloc ? ((alloc.HP || 0) + (alloc.ATK || 0) + (alloc.DEF || 0) + (alloc.SPD || 0)) : 0; }
+export function pointsFree (level, alloc) { return pointsTotal(level) - pointsSpent(alloc); }
+
+/** Stats efectivas a un nivel dado (crecimiento + pasiva de stat + puntos asignados). */
+export function statsAtLevel (critter, level = 1, alloc) {
   const g = 1 + (Math.max(1, level) - 1) * 0.08;
   const s = {
     HP: critter.base.HP * g,
@@ -76,6 +86,7 @@ export function statsAtLevel (critter, level = 1) {
   };
   const p = PASSIVES[critter.passive];
   if (p && p.statMult && p.stat) s[p.stat] *= p.statMult;
+  if (alloc) for (const k of STAT_KEYS) s[k] += (alloc[k] || 0) * POINT_VALUE[k];
   for (const k in s) s[k] = Math.round(s[k]);
   s.HP = Math.max(1, s.HP);
   return s;

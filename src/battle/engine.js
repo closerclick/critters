@@ -21,7 +21,7 @@ function buildUnits (team, side) {
   return team.map((m, i) => {
     const critter = makeCritter(m.id);
     const lvl = m.level || 1;
-    const s = statsAtLevel(critter, lvl);
+    const s = statsAtLevel(critter, lvl, m.alloc);
     const slot = m.slot != null ? m.slot : i;
     const srow = (slot / 3) | 0, scol = slot % 3;
     const b = m.bonus || {};   // equipo en patas: { range, atk, def }
