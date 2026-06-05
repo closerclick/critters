@@ -4,6 +4,7 @@ import { makeCritter, statsAtLevel, power, pointsTotal, pointsFree } from '../sr
 import { critterSvg } from '../src/critter/svg.js';
 import { typeMultiplier } from '../src/critter/types.js';
 import { simulate, battleSeed } from '../src/battle/engine.js';
+import { normalizeTarget } from '../src/battle/policies.js';
 
 let failed = 0;
 const ok = (name, fn) => { try { fn(); console.log('  ✓', name); } catch (e) { failed++; console.error('  ✗', name, '\n   ', e.message); } };
@@ -71,6 +72,25 @@ ok('puntos asignables: alloc suma stats; pointsFree correcto', () => {
   assert.equal(pointsTotal(5), 8);          // (5-1) * 2 por nivel
   assert.equal(pointsFree(5, { ATK: 3 }), 5);
   assert.equal(pointsTotal(1), 0);          // nivel 1 sin puntos
+});
+
+ok('normalizeTarget: permutación completa y válida (tolera legacy/parcial/vacío)', () => {
+  const full = normalizeTarget(['soporte'], 'dps');
+  assert.equal(full.length, 5);
+  assert.equal(new Set(full).size, 5);
+  assert.equal(full[0], 'soporte');                              // respeta lo pedido primero
+  assert.deepEqual([...full].sort(), ['cercano', 'debil', 'fuerte', 'rango', 'soporte']);
+  assert.equal(normalizeTarget('debil', 'tanque')[0], 'debil');  // legacy string → array
+  assert.equal(normalizeTarget(null, 'dps').length, 5);          // vacío → default por rol
+});
+
+ok('terreno: opts.terrain afecta la simulación y sigue determinista', () => {
+  const el = makeCritter('a1').element;
+  const r0 = simulate(teamA, teamB, seed);
+  const r1 = simulate(teamA, teamB, seed, { terrain: el });
+  const r1b = simulate(teamA, teamB, seed, { terrain: el });
+  assert.equal(JSON.stringify(r1.log), JSON.stringify(r1b.log));    // determinista con terreno
+  assert.notEqual(JSON.stringify(r0.log), JSON.stringify(r1.log));  // el terreno cambia el combate
 });
 
 // Muestra: imprime un resumen de una batalla para inspección manual.

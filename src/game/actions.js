@@ -104,7 +104,7 @@ export function fightCampaign (nodeId) {
   if (!ti.length) return { error: 'noteam' };
   const mine = ti.map(x => ({ id: x.instance.id, level: x.instance.level, slot: x.slot, policy: x.instance.policy, target: x.instance.target, alloc: x.instance.alloc }));
   const enemies = enemyTeam(node, game.seed);
-  const result = simulate(mine, enemies, nodeBattleSeed(mine, node, game.seed));
+  const result = simulate(mine, enemies, nodeBattleSeed(mine, node, game.seed), { terrain: node.terrain || null });
   const win = result.winner === 'A';
   const winXp = 18 + node.diff * 4;
   // XP: ganar da winXp; perder da un CUARTO (entrena igual → anti-softlock).
@@ -114,7 +114,7 @@ export function fightCampaign (nodeId) {
   for (const x of ti) {
     const before = x.instance.level;
     awardXp(x.instance, gain);
-    payload.xp['0:' + x.slot] = { gained: gain, level: x.instance.level, up: x.instance.level > before };
+    payload.xp['0:' + x.slot] = { gained: gain, level: x.instance.level, up: x.instance.level > before, xp: x.instance.xp, need: xpForNext(x.instance.level) };
   }
   if (win) {
     const firstClear = !game.cleared.includes(node.id);

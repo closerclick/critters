@@ -9,6 +9,7 @@ export const BAL = {
   // a CHARGE actúan (y restan CHARGE). Más SPD => actúa más seguido.
   charge: 1000,
   maxTicks: 2000,        // tope de seguridad (evita peleas infinitas)
+  terrainMult: 1.18,     // ventaja del terreno: ATK y DEF de los del elemento de la zona
 };
 
 // Daño = ATK con mitigación por DEF (rendimientos decrecientes) × tipo × crítico.

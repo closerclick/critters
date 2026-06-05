@@ -107,7 +107,7 @@ const summary = computed(() => {
           <span>🛡 {{ t('lblRecib') }}</span>
         </div>
         <div class="rt-row" v-for="(m, i) in summary.mine" :key="i" :class="{ dead: m.dead }">
-          <span class="rt-name">{{ m.name }}<small v-if="m.xp" class="rt-xp">+{{ m.xp.gained }} XP{{ m.xp.up ? ' · ⬆ ' + t('nv') + m.xp.level : '' }}</small></span>
+          <span class="rt-name">{{ m.name }}<small v-if="m.xp" class="rt-xp">+{{ m.xp.gained }} XP{{ m.xp.up ? ' · ⬆ ' + t('nv') + m.xp.level : '' }}</small><small v-if="m.xp" class="rt-xp dim">{{ Math.max(0, m.xp.need - m.xp.xp) }} → {{ t('nv') }}{{ m.xp.level + 1 }}</small></span>
           <span class="rt-hp">{{ m.hp }}/{{ m.maxHp }}</span>
           <span class="rt-d">{{ m.dealt }}</span>
           <span class="rt-t">{{ m.taken }}</span>
@@ -167,6 +167,7 @@ const summary = computed(() => {
 .rt-row{font-family:var(--fmono);font-size:12px;border-top:1px solid rgba(167,139,250,.06)}
 .rt-row .rt-name{font-family:var(--fbody);font-weight:700;text-align:left;display:flex;flex-direction:column;align-items:flex-start;line-height:1.15;min-width:0}
 .rt-row .rt-name > small{font-family:var(--fmono);font-size:9.5px;font-weight:400;color:var(--cyan);white-space:nowrap}
+.rt-row .rt-name > small.dim{color:var(--muted)}
 .rt-row .rt-hp{color:var(--good)} .rt-row .rt-d{color:var(--gold)} .rt-row .rt-t{color:#cbb6ff}
 .rt-row.dead{opacity:.55} .rt-row.dead .rt-hp{color:var(--bad)}
 .rt-total{font-family:var(--fmono);font-size:12px;text-align:center;padding:8px 10px;border-top:1px solid var(--line);background:rgba(167,139,250,.05)}

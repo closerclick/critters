@@ -12,12 +12,12 @@ import { typeMultiplier } from '../critter/types.js';
 import { RANGED_ROLES } from '../critter/roles.js';
 import { ACTIVES, PASSIVES } from '../critter/abilities.js';
 import { BAL, basicDamage } from './balance.js';
-import { defaultPolicy, defaultTarget } from './policies.js';
+import { defaultPolicy, normalizeTarget } from './policies.js';
 
 export const COLS = 8, ROWS = 3;
 const AOE = new Set(['all', 'self', 'allies', 'backmost']);   // activas que no requieren rango
 
-function buildUnits (team, side) {
+function buildUnits (team, side, terrain) {
   return team.map((m, i) => {
     const critter = makeCritter(m.id);
     const lvl = m.level || 1;
@@ -33,8 +33,9 @@ function buildUnits (team, side) {
       maxHp: s.HP, hp: s.HP, ATK: s.ATK + (b.atk || 0), DEF: s.DEF + (b.def || 0), SPD: s.SPD,
       range: (ranged ? 3 : 1) + (b.range || 0),
       policy: (m.policy === 'cazador' || m.policy === 'guardian') ? 'agresiva' : (m.policy || defaultPolicy(critter.role)),
-      target: m.target || defaultTarget(critter.role),
+      target: normalizeTarget(m.target, critter.role),   // prioridad ordenada de objetivos
       flanks: !!critter.flanks,
+      terrainFav: !!terrain && critter.element === terrain,   // el terreno de la zona favorece su elemento
       energy: 0, charge: 0, stunTurns: 0, buffs: [], alive: true, passive: critter.passive, active: critter.active,
     };
   });
@@ -45,6 +46,7 @@ function eff (u, stat) {
   let v = u[stat];
   for (const x of u.buffs) if (x.stat === stat) v *= x.mult;
   if (stat === 'ATK') { const p = PASSIVES[u.passive]; if (p && p.enrage && u.hp < u.maxHp * 0.5) v *= (1 + p.enrage); }
+  if (u.terrainFav && (stat === 'ATK' || stat === 'DEF')) v *= BAL.terrainMult;   // ventaja de terreno
   return v;
 }
 function faint (u, log) { if (u.alive) { u.alive = false; u.hp = 0; log.push({ t: 'faint', target: u.uid }); } }
@@ -70,24 +72,33 @@ function attackTarget (u, target, rng, log, mult, ability) {
   dealDamage(u, target, dmg, log, { crit, adv: tm > 1 ? 1 : (tm < 1 ? -1 : 0), ability: ability || null });
 }
 
-// Puntaje del objetivo según la preferencia (menor = mejor). Desempate determinista.
-function targetScore (u, e) {
-  switch (u.target) {
-    case 'debil': return e.hp * 100 + cheb(u, e);
-    case 'fuerte': return -(e.maxHp + e.ATK * 5) * 100 + cheb(u, e);
-    case 'rango': return (e.range > 1 ? 0 : 1) * 1e6 + cheb(u, e) * 100 + e.hp;
-    case 'soporte': return (e.role === 'soporte' ? 0 : 1) * 1e6 + cheb(u, e) * 100 + e.hp;
-    default: return cheb(u, e) * 1e4 + e.hp;   // 'cercano'
-  }
+// Candidatos para un criterio: los filtros por rol/tipo pueden quedar VACÍOS (→ se
+// cae al siguiente criterio de la prioridad); los selectores operan sobre todos.
+function candidatesFor (crit, enemies) {
+  const alive = enemies.filter(e => e.alive);
+  if (crit === 'soporte') return alive.filter(e => e.role === 'soporte');
+  if (crit === 'rango') return alive.filter(e => e.range > 1);
+  return alive;   // debil / fuerte / cercano
 }
-function chooseTarget (u, enemies) {
+function critScore (crit, u, e) {   // menor = mejor; desempate determinista por uid (arriba)
+  if (crit === 'debil') return e.hp * 1000 + cheb(u, e);
+  if (crit === 'fuerte') return -(e.maxHp + e.ATK * 5) * 1000 + cheb(u, e);
+  return cheb(u, e) * 1000 + e.hp;   // soporte / rango / cercano: el más cercano (luego el más débil)
+}
+function pickBy (u, enemies, crit) {
   let b = null, bs = Infinity;
-  for (const e of enemies) {
-    if (!e.alive) continue;
-    const s = targetScore(u, e);
+  for (const e of candidatesFor(crit, enemies)) {
+    const s = critScore(crit, u, e);
     if (s < bs || (s === bs && (b == null || e.uid < b.uid))) { bs = s; b = e; }
   }
   return b;
+}
+// Objetivo según la PRIORIDAD ordenada: el primer criterio con candidato válido gana.
+// Fallback final: el más cercano (siempre hay si quedan enemigos vivos).
+function chooseTarget (u, enemies) {
+  const list = Array.isArray(u.target) ? u.target : [u.target];
+  for (const crit of list) { const t = pickBy(u, enemies, crit); if (t) return t; }
+  return pickBy(u, enemies, 'cercano');
 }
 function farthest (u, enemies) { let b = null; for (const e of enemies) if (e.alive && (!b || cheb(u, e) > cheb(u, b))) b = e; return b; }
 
@@ -178,10 +189,11 @@ function takeTurn (u, enemies, allies, occ, rng, log, force) {
 
 const aliveN = (t) => t.reduce((n, u) => n + (u.alive ? 1 : 0), 0);
 const totHp = (t) => t.reduce((n, u) => n + Math.max(0, u.hp), 0);
-const snap = (u) => ({ uid: u.uid, side: u.side, slot: u.slot, row: u.row, col: u.col, id: u.id, level: u.level, name: u.name, element: u.element, role: u.role, rarity: u.rarity, maxHp: u.maxHp, range: u.range, policy: u.policy });
+const snap = (u) => ({ uid: u.uid, side: u.side, slot: u.slot, row: u.row, col: u.col, id: u.id, level: u.level, name: u.name, element: u.element, role: u.role, rarity: u.rarity, maxHp: u.maxHp, range: u.range, policy: u.policy, terrainFav: u.terrainFav });
 
-export function simulate (teamA, teamB, seed) {
-  const A = buildUnits(teamA, 0), B = buildUnits(teamB, 1), all = [...A, ...B];
+export function simulate (teamA, teamB, seed, opts) {
+  const terrain = (opts && opts.terrain) || null;
+  const A = buildUnits(teamA, 0, terrain), B = buildUnits(teamB, 1, terrain), all = [...A, ...B];
   const occ = {}; for (const u of all) occ[u.row + ',' + u.col] = u.uid;
   const rng = mulberry32(hash32(String(seed == null ? 'seed' : seed)));
   const log = [];
