@@ -44,7 +44,7 @@ ok('simulate es determinista (mismo seed → mismo resultado y log)', () => {
   assert.equal(r1.winner, r2.winner);
   assert.equal(JSON.stringify(r1.log), JSON.stringify(r2.log));
   assert.ok(['A', 'B', 'draw'].includes(r1.winner));
-  assert.ok(r1.rounds >= 1 && r1.log.length > 0);
+  assert.ok(r1.cycles >= 1 && r1.log.length > 0);
 });
 
 ok('batallas distintas con equipos distintos', () => {
@@ -59,13 +59,13 @@ ok('dos equipos DEFENSIVOS no empatan eternamente (rompe el standoff)', () => {
   const B = ['db1', 'db2', 'db3'].map((id, i) => ({ id, level: 4, slot: i, policy: 'defensiva' }));
   const r = simulate(A, B, battleSeed(A, B, 'standoff'));
   assert.notEqual(r.winner, 'draw');                 // alguien avanza y gana
-  assert.ok(r.rounds < 60, 'no se estanca hasta maxRounds');
+  assert.ok(r.cycles < 2000, 'no se estanca hasta el tope');
   assert.ok(r.log.some(e => e.t === 'move'), 'hubo movimiento');
 });
 
 // Muestra: imprime un resumen de una batalla para inspección manual.
 const demo = simulate(teamA, teamB, seed);
-console.log(`\n  demo: ganador=${demo.winner} rondas=${demo.rounds} eventos=${demo.log.length}`);
+console.log(`\n  demo: ganador=${demo.winner} ciclos=${demo.cycles} eventos=${demo.log.length}`);
 
 console.log(failed ? `\n${failed} fallo(s)` : '\nOK');
 process.exit(failed ? 1 : 0);

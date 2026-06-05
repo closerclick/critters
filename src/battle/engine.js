@@ -34,7 +34,7 @@ function buildUnits (team, side) {
       range: (ranged ? 3 : 1) + (b.range || 0),
       policy: m.policy === 'cazador' ? 'agresiva' : (m.policy || defaultPolicy(critter.role)),
       target: m.target || defaultTarget(critter.role),
-      energy: 0, stunTurns: 0, buffs: [], alive: true, passive: critter.passive, active: critter.active,
+      energy: 0, charge: 0, stunTurns: 0, buffs: [], alive: true, passive: critter.passive, active: critter.active,
     };
   });
 }
@@ -182,24 +182,32 @@ export function simulate (teamA, teamB, seed) {
   const log = [];
   const units = all.map(snap);
 
-  let rounds = 0, force = false;
-  while (rounds < BAL.maxRounds && aliveN(A) > 0 && aliveN(B) > 0) {
-    const before = log.length;
-    const order = all.filter(u => u.alive).sort((x, y) => eff(y, 'SPD') - eff(x, 'SPD') || x.side - y.side || x.col - y.col || x.row - y.row || (x.uid < y.uid ? -1 : 1));
-    for (const u of order) {
-      if (!u.alive) continue;
+  // Iniciativa por VELOCIDAD: cada tick todas cargan +SPD; las que llegan a CHARGE
+  // actúan (en orden de carga) y restan CHARGE. Sin rondas: una unidad rápida actúa
+  // más seguido que una lenta. Determinista.
+  const CH = BAL.charge;
+  let ticks = 0, sinceProgress = 0, force = false;
+  while (ticks < BAL.maxTicks && aliveN(A) > 0 && aliveN(B) > 0) {
+    ticks++;
+    for (const u of all) if (u.alive) u.charge += Math.max(1, eff(u, 'SPD'));
+    const ready = all.filter(u => u.alive && u.charge >= CH)
+      .sort((x, y) => y.charge - x.charge || x.side - y.side || x.col - y.col || x.row - y.row || (x.uid < y.uid ? -1 : 1));
+    for (const u of ready) {
+      if (!u.alive || u.charge < CH) continue;
+      u.charge -= CH;
+      const before = log.length;
       takeTurn(u, u.side === 0 ? B : A, u.side === 0 ? A : B, occ, rng, log, force);
+      const progressed = log.slice(before).some(e => e.t === 'attack' || e.t === 'move');
+      sinceProgress = progressed ? 0 : sinceProgress + 1;
+      force = sinceProgress >= 6;   // anti-estancamiento: si muchas acciones sin avance, fuerza avanzar
       if (aliveN(A) === 0 || aliveN(B) === 0) break;
     }
-    // si la ronda no produjo ataques ni movimientos, la próxima FUERZA avanzar
-    force = !log.slice(before).some(e => e.t === 'attack' || e.t === 'move');
-    rounds++;
   }
   let winner;
   if (aliveN(A) > 0 && aliveN(B) === 0) winner = 'A';
   else if (aliveN(B) > 0 && aliveN(A) === 0) winner = 'B';
   else { const ha = totHp(A), hb = totHp(B); winner = ha > hb ? 'A' : (hb > ha ? 'B' : 'draw'); }
-  return { winner, rounds, log, units };
+  return { winner, cycles: ticks, log, units };
 }
 
 export function battleSeed (teamA, teamB, matchId) {

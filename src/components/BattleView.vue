@@ -71,7 +71,7 @@ function next () { if (props.payload.nextNode) emit('next', props.payload.nextNo
         <button class="btn sec" @click="emit('close')">{{ t('cerrar') }}</button>
       </div>
     </div>
-    <div class="blog" v-else>{{ t('rondas') }}: {{ res().rounds }}</div>
+    <div class="blog" v-else>{{ t('ciclos') }}: {{ res().cycles }}</div>
   </div>
 </template>
 

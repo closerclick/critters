@@ -5,7 +5,10 @@ export const BAL = {
   energyPerHit: 12,      // energía al recibir un golpe
   critChance: 0.12,
   critMult: 1.6,
-  maxRounds: 60,         // tope de seguridad (evita peleas infinitas)
+  // Iniciativa por VELOCIDAD (ATB): cada tick las unidades cargan +SPD; al llegar
+  // a CHARGE actúan (y restan CHARGE). Más SPD => actúa más seguido.
+  charge: 1000,
+  maxTicks: 2000,        // tope de seguridad (evita peleas infinitas)
 };
 
 // Daño = ATK con mitigación por DEF (rendimientos decrecientes) × tipo × crítico.
