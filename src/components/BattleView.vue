@@ -14,6 +14,14 @@ const list = ref([]);             // uids para render
 const finished = ref(false);
 let timer = null, i = 0, alive = true;
 
+// Velocidad de reproducción (persistida). El replay apunta a ~8 s a 1×; los botones
+// 2×/5×/10× dividen el intervalo por evento.
+const SPEEDS = [1, 2, 5, 10];
+const speed = ref((() => { const v = Number(localStorage.getItem('critters_speed')); return SPEEDS.includes(v) ? v : 1; })());
+let baseMs = 120;
+const curMs = () => Math.max(8, Math.round(baseMs / speed.value));
+function setSpeed (s) { speed.value = s; try { localStorage.setItem('critters_speed', String(s)); } catch {} if (timer) { clearInterval(timer); timer = setInterval(step, curMs()); } }
+
 const res = () => props.payload.result;
 function initUnits () {
   for (const k in U) delete U[k];
@@ -40,7 +48,7 @@ function finish () {
   else sfx.defeat();
 }
 function skip () { if (finished.value) return; const log = res().log; while (i < log.length) applyEv(log[i++], true); finish(); }
-function start () { initUnits(); finished.value = false; i = 0; clearInterval(timer); const ms = Math.max(60, Math.min(260, Math.round(8000 / Math.max(1, res().log.length)))); timer = setInterval(step, ms); }
+function start () { initUnits(); finished.value = false; i = 0; clearInterval(timer); baseMs = Math.max(60, Math.min(260, Math.round(8000 / Math.max(1, res().log.length)))); timer = setInterval(step, curMs()); }
 
 onMounted(start);
 onUnmounted(() => { alive = false; clearInterval(timer); });
@@ -87,7 +95,11 @@ const summary = computed(() => {
       <div class="field-tags"><span>◀ {{ t('tuEquipo') }}</span><span>{{ t('rival') }} ▶</span></div>
     </div>
 
-    <div class="blog" v-if="!finished">{{ t('ciclos') }}: {{ res().cycles }}</div>
+    <div class="blog" v-if="!finished">
+      <span class="speedbar">
+        <button v-for="s in SPEEDS" :key="s" class="spd-btn" :class="{ on: speed === s }" @click="setSpeed(s)">{{ s }}×</button>
+      </span>
+    </div>
   </div>
 
   <div class="result-modal" v-if="finished">
@@ -173,4 +185,9 @@ const summary = computed(() => {
 .rt-total{font-family:var(--fmono);font-size:12px;text-align:center;padding:8px 10px;border-top:1px solid var(--line);background:rgba(167,139,250,.05)}
 .rt-total b{color:var(--bad)}
 .rc-btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+
+.speedbar{display:inline-flex;gap:6px}
+.spd-btn{font-family:var(--fmono);font-weight:800;font-size:12px;padding:5px 11px;border-radius:9px;border:1px solid var(--line2);
+  background:rgba(167,139,250,.08);color:var(--muted);min-width:40px}
+.spd-btn.on{background:var(--accent2);border-color:var(--accent);color:#fff;box-shadow:0 0 10px color-mix(in srgb,var(--accent) 55%,transparent)}
 </style>
