@@ -1,6 +1,6 @@
 // Test Node (sin navegador) del núcleo determinista: forge, svg y motor de batalla.
 import assert from 'node:assert';
-import { makeCritter, statsAtLevel, power, pointsTotal, pointsFree } from '../src/critter/forge.js';
+import { makeCritter, statsAtLevel, power, pointsTotal, pointsFree, partsOf, rarityIndexFromParts } from '../src/critter/forge.js';
 import { critterSvg } from '../src/critter/svg.js';
 import { typeMultiplier } from '../src/critter/types.js';
 import { simulate, battleSeed } from '../src/battle/engine.js';
@@ -91,6 +91,14 @@ ok('terreno: opts.terrain afecta la simulación y sigue determinista', () => {
   const r1b = simulate(teamA, teamB, seed, { terrain: el });
   assert.equal(JSON.stringify(r1.log), JSON.stringify(r1b.log));    // determinista con terreno
   assert.notEqual(JSON.stringify(r0.log), JSON.stringify(r1.log));  // el terreno cambia el combate
+});
+
+ok('rareza por partes: salvajes 0/1 (≤4 partes); 9 = legendaria', () => {
+  for (let k = 0; k < 80; k++) { const c = makeCritter('wild' + k); assert.ok(c.rarityIndex <= 1, 'salvaje rareza ≤1'); assert.ok(partsOf(c.appearance) <= 4); assert.ok(partsOf(c.appearance) >= 1); }
+  assert.equal(rarityIndexFromParts(1), 0);
+  assert.equal(rarityIndexFromParts(4), 1);
+  assert.equal(rarityIndexFromParts(5), 2);
+  assert.equal(rarityIndexFromParts(9), 4);
 });
 
 // Muestra: imprime un resumen de una batalla para inspección manual.

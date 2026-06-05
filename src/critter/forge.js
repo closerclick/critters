@@ -1,7 +1,7 @@
 // Motor de creación de criaturas (determinista). makeCritter(id) deriva TODA la
 // criatura de su id/semilla: rareza, elemento, rol, stats base, pasiva, activa,
 // nombre y parámetros de apariencia. Reproducible por cualquiera con solo el id.
-import { rngFrom, weighted, pick, rint } from '../lib/rng.js';
+import { rngFrom, pick, rint } from '../lib/rng.js';
 import { ELEMENTS } from './types.js';
 import { ROLES, ROLE_WEIGHTS } from './roles.js';
 import { PASSIVES, ROLE_ACTIVE_POOL, ROLE_PASSIVE_POOL } from './abilities.js';
@@ -18,14 +18,41 @@ export const RARITY_BY_KEY = Object.fromEntries(RARITIES.map((r, i) => [r.key, {
 
 const BASE_BUDGET = 240;   // presupuesto de puntos (nivel 1, rareza común)
 const HP_FACTOR = 6;       // los puntos de HP "rinden" más (vida en cientos)
+export const MAX_PARTS = 9;   // grilla 3×3 llena (cabeza + tórax + abdomen + 6 patas)
+
+// Nº de PARTES ocupadas en la grilla 3×3: cabeza (siempre) + tórax? + abdomen? + patas.
+export function partsOf (a) { return 1 + (a.thorax >= 0 ? 1 : 0) + (a.abdomen >= 0 ? 1 : 0) + (a.legs || 0); }
+// La RAREZA la da el nº de partes: 1-2 común, 3-4 infrecuente, 5-6 raro, 7-8 épico, 9 legendaria.
+export function rarityIndexFromParts (parts) { return parts >= 9 ? 4 : parts >= 7 ? 3 : parts >= 5 ? 2 : parts >= 3 ? 1 : 0; }
+export function rarityFromParts (parts) { return RARITIES[rarityIndexFromParts(parts)]; }
 
 /** Crea la criatura completa a partir de su id. Puro y determinista. */
 export function makeCritter (id) {
   const rng = rngFrom('critter:' + id);
-  const rarity = weighted(rng, RARITIES.map(r => [r, r.weight]));
-  const rarityIndex = RARITIES.indexOf(rarity);
   const element = pick(rng, ELEMENTS);
   const role = pick(rng, ROLES);
+
+  // Anatomía por PARTES (la rareza sale de cuántas hay). SALVAJES/invocadas: pocas
+  // partes → rareza 0/1; la rareza alta (hasta 9 = legendaria) se consigue FUSIONANDO.
+  // Cabeza obligatoria; tórax/abdomen opcionales (-1 = ausente); patas en la cabeza.
+  const appearance = {
+    head: rint(rng, 0, 3),                         // 4 tipos de cabeza
+    thorax: rng() < 0.35 ? rint(rng, 0, 2) : -1,   // tórax opcional
+    abdomen: rng() < 0.35 ? rint(rng, 0, 3) : -1,  // abdomen opcional
+    legs: rint(rng, 0, 3),                          // 0..3 patas (salvaje)
+    legStyle: rint(rng, 0, 1),                      // recta | articulada
+    antennae: rng() < 0.6,                          // antenas
+    hue: rint(rng, -18, 18),                        // variación de tono
+    pattern: rint(rng, 0, 2),                       // patrón
+  };
+  // Tope de 4 partes (rareza ≤ 1) para salvajes: quita abdomen, luego tórax, luego patas.
+  while (partsOf(appearance) > 4) {
+    if (appearance.abdomen >= 0) appearance.abdomen = -1;
+    else if (appearance.thorax >= 0) appearance.thorax = -1;
+    else appearance.legs--;
+  }
+  const rarityIndex = rarityIndexFromParts(partsOf(appearance));
+  const rarity = RARITIES[rarityIndex];
   const w = ROLE_WEIGHTS[role];
   const budget = BASE_BUDGET * rarity.budget;
 
@@ -47,19 +74,6 @@ export function makeCritter (id) {
   // o pelea de FRENTE (forma línea)? Determinista por semilla, sesgado por rol.
   const FLANK = { dps: 0.7, distancia: 0.7, control: 0.6, soporte: 0.5, peleador: 0.4, tanque: 0.2 };
   const flanks = rng() < (FLANK[role] ?? 0.5);
-
-  // Anatomía compuesta por partes: SOLO la cabeza es obligatoria; tórax y abdomen
-  // opcionales (-1 = ausente). Las patas (0..6) salen de la cabeza (estilo araña).
-  const appearance = {
-    head: rint(rng, 0, 3),                        // 4 tipos de cabeza
-    thorax: rng() < 0.6 ? rint(rng, 0, 2) : -1,   // tórax opcional
-    abdomen: rng() < 0.7 ? rint(rng, 0, 3) : -1,  // abdomen opcional
-    legs: rint(rng, 0, 6),                         // 0..6 patas (en la cabeza)
-    legStyle: rint(rng, 0, 1),                     // recta | articulada
-    antennae: rng() < 0.6,                         // antenas
-    hue: rint(rng, -18, 18),                       // variación de tono
-    pattern: rint(rng, 0, 2),                      // patrón
-  };
 
   const name = makeName(rng, rarityIndex);
   return { id, name, element, role, rarity: rarity.key, rarityIndex, base, passive, active, flanks, appearance };
