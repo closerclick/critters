@@ -1,8 +1,9 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { game, loadGame } from './game/state.js';
 import { fightCampaign } from './game/actions.js';
 import { i18n, t, toggleLang } from './i18n.js';
+import { nav } from './nav.js';
 import CampaignView from './components/CampaignView.vue';
 import CollectionView from './components/CollectionView.vue';
 import TeamView from './components/TeamView.vue';
@@ -29,8 +30,15 @@ function onNext (n) { fight(n); }
 function onClose () {
   const cap = battle.value && battle.value.captured;
   battle.value = null;
-  if (cap) showToast(t('capturaste') + ' ' + (cap.id ? '' : '') + '✨');
+  if (cap) showToast('✨ ' + t('capturaste'));
 }
+
+// La batalla es una "capa" de navegación: el back físico / chevron la cierra.
+let battleNav = null;
+watch(battle, (b) => {
+  if (b) { if (!battleNav) battleNav = nav.open(() => onClose()); }
+  else if (battleNav) { const h = battleNav; battleNav = null; try { h.close(); } catch (e) {} }
+});
 </script>
 
 <template>

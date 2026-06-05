@@ -4,8 +4,7 @@ import App from './App.vue';
 
 // Botón "Instalar App" (PWA) unificado y navegación "volver" del ecosistema.
 import '@closerclick/closer-click-install';
-import { createBackNav } from '@closerclick/closer-click-nav';
-createBackNav();
+import './nav.js';   // registra <closer-click-back> (instancia compartida)
 
 createApp(App).mount('#app');
 

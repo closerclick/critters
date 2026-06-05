@@ -49,6 +49,7 @@ function next () { emit('next', (props.payload.level || 1) + 1); }
 
 <template>
   <div class="battle">
+    <closer-click-back class="battle-back" style="--cc-back-size:32px;color:var(--text)" @click="emit('close')"></closer-click-back>
     <h2>{{ t('campana') }} · {{ t('nivel') }} {{ payload.level }}</h2>
     <div class="arena" @click="skip">
       <div class="side-label">▲ {{ t('rival') }}</div>
