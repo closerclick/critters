@@ -18,6 +18,7 @@ const bench = computed(() => { const on = new Set(game.team.filter(Boolean)); re
 
 function onDown (e, uid, from, fromSlot) {
   if (!uid) return;
+  e.preventDefault();   // evita iniciar selección de texto al arrastrar
   drag.pending = { uid, from, fromSlot, sx: e.clientX, sy: e.clientY };
   drag.x = e.clientX; drag.y = e.clientY;
   window.addEventListener('pointermove', onMove, { passive: false });
