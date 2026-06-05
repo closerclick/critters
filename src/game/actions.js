@@ -16,6 +16,17 @@ export function addCritter (id, level = 1) {
   return inst;
 }
 
+/** Elige la criatura inicial (1 de 3). La coloca en el centro y cierra la elección. */
+export function chooseStarter (id) {
+  if (game.collection.length) return null;
+  const inst = addCritter(id, 1);
+  game.team = Array(9).fill(null);
+  game.team[4] = inst.uid;   // centro (la posición más protegida)
+  game.starterOptions = null;
+  persist();
+  return inst;
+}
+
 export function awardXp (inst, amount) {
   inst.xp += amount;
   while (inst.xp >= xpForNext(inst.level)) { inst.xp -= xpForNext(inst.level); inst.level++; }

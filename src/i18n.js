@@ -31,6 +31,9 @@ const STR = {
     pasiva: 'Pasiva', activa: 'Activa', tipo: 'Tipo', rol: 'Rol', rareza: 'Rareza',
     colVacia: 'Aún no tienes criaturas. Invoca una o gana niveles para capturarlas.',
     nuevaCriatura: '¡Nueva criatura!',
+    eligeInicial: 'Elige tu primera criatura',
+    eligeInicialHint: 'Empiezas con una. Gana batallas para conseguir más (capturas, monedas e invocaciones).',
+    elegir: 'Elegir',
   },
   en: {
     campana: 'Campaign', coleccion: 'Collection', equipo: 'Team', invocar: 'Summon',
@@ -51,6 +54,9 @@ const STR = {
     pasiva: 'Passive', activa: 'Active', tipo: 'Type', rol: 'Role', rareza: 'Rarity',
     colVacia: 'No critters yet. Summon one or win levels to capture them.',
     nuevaCriatura: 'New critter!',
+    eligeInicial: 'Choose your first critter',
+    eligeInicialHint: 'You start with one. Win battles to get more (captures, coins and summons).',
+    elegir: 'Choose',
   },
 };
 

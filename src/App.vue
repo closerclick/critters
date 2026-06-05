@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { game, loadGame } from './game/state.js';
 import { fightCampaign } from './game/actions.js';
 import { i18n, t, toggleLang } from './i18n.js';
@@ -8,6 +8,9 @@ import CollectionView from './components/CollectionView.vue';
 import TeamView from './components/TeamView.vue';
 import SummonView from './components/SummonView.vue';
 import BattleView from './components/BattleView.vue';
+import StarterView from './components/StarterView.vue';
+
+const needsStarter = computed(() => game.ready && game.collection.length === 0);
 
 const tab = ref('campana');
 const battle = ref(null);
@@ -31,6 +34,8 @@ function onClose () {
 </script>
 
 <template>
+  <StarterView v-if="needsStarter" />
+  <template v-else>
   <div class="topbar">
     <closer-click-back style="color:var(--text);--cc-back-size:34px"></closer-click-back>
     <div class="brand"><img src="/icon.svg" alt="" /><span>Critters</span></div>
@@ -61,4 +66,5 @@ function onClose () {
   <BattleView v-if="battle" :payload="battle" @close="onClose" @next="onNext" />
 
   <div class="toast" v-if="toast">{{ toast }}</div>
+  </template>
 </template>

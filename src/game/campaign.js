@@ -6,8 +6,9 @@ import { battleSeed } from '../battle/engine.js';
 export const SLOTS5 = [4, 0, 2, 6, 8];   // colocación por defecto (centro + esquinas)
 
 export function enemyLevel (n) { return Math.max(1, Math.round(1 + (n - 1) * 0.7)); }
-// Cantidad de rivales: empieza en 2 y sube hasta 5 (dificultad creciente).
-export function enemyCount (n) { return Math.min(5, 2 + Math.floor((n - 1) / 2)); }
+// Cantidad de rivales: empieza en 1 (duelo) y sube hasta 5 (dificultad creciente),
+// para que se pueda arrancar con una sola criatura.
+export function enemyCount (n) { return Math.min(5, 1 + Math.floor(n / 2)); }
 
 /** Equipo rival del nivel n: criaturas deterministas (`lvlN-i`). */
 export function enemyTeam (n) {
@@ -23,8 +24,10 @@ export function campaignBattleSeed (mine, n) { return battleSeed(mine, enemyTeam
 
 export function reward (n) { return { coins: 30 + n * 10, frags: 1 + Math.floor(n / 3) }; }
 
-/** Captura del jefe (centro) en algunos niveles: id de criatura o null. Determinista. */
+/** Captura de un rival en el primer despeje: id de criatura o null. Determinista.
+ *  Niveles 1 y 2 garantizan captura (para que el equipo crezca al arrancar). */
 export function captureDrop (n) {
+  if (n <= 2) return `lvl${n}-0`;
   const rng = rngFrom('capture:' + n);
   return rng() < 0.6 ? `lvl${n}-2` : null;
 }

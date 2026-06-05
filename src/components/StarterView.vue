@@ -1,0 +1,28 @@
+<script setup>
+import { game } from '../game/state.js';
+import { chooseStarter } from '../game/actions.js';
+import { t } from '../i18n.js';
+import CritterCard from './CritterCard.vue';
+
+function choose (id) { chooseStarter(id); }
+</script>
+
+<template>
+  <div class="starter">
+    <div class="brand" style="margin-top:env(safe-area-inset-top)"><img src="/icon.svg" alt="" /><span>Critters</span></div>
+    <h2 class="st-title">{{ t('eligeInicial') }}</h2>
+    <p class="hint" style="text-align:center;max-width:340px">{{ t('eligeInicialHint') }}</p>
+    <div class="grid-cards" style="max-width:520px;width:100%">
+      <div v-for="id in game.starterOptions" :key="id" class="pick" @click="choose(id)">
+        <CritterCard :instance="{ id, level: 1 }" :size="92" />
+        <button class="btn block" style="margin-top:8px">{{ t('elegir') }}</button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.starter{height:100%;overflow-y:auto;display:flex;flex-direction:column;align-items:center;gap:12px;padding:18px 14px calc(env(safe-area-inset-bottom) + 24px);justify-content:center}
+.st-title{font-size:22px;font-weight:900;text-align:center;background:linear-gradient(90deg,#c4b5fd,#a78bfa);-webkit-background-clip:text;background-clip:text;color:transparent}
+.pick{display:flex;flex-direction:column}
+</style>

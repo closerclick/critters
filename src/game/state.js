@@ -10,9 +10,10 @@ const LS_KEY = 'critters.save';
 export const game = reactive({
   ready: false,
   collection: [],            // [{ uid, id, level, xp }]
-  wallet: { coins: 150, frags: 0 },
+  wallet: { coins: 0, frags: 0 },
   team: Array(9).fill(null), // slot 0..8 → uid de instancia (o null)
   campaignMax: 1,            // nivel más alto desbloqueado
+  starterOptions: null,      // 3 ids candidatos para elegir la primera criatura
 });
 
 // ---- cache de criaturas (id → descriptor) ----
@@ -24,7 +25,7 @@ export function critterOf (uid) { const i = instanceByUid(uid); return i ? critt
 export function newUid () { return 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
 // ---- persistencia ----
-function snapshot () { return { collection: game.collection, wallet: game.wallet, team: game.team, campaignMax: game.campaignMax }; }
+function snapshot () { return { collection: game.collection, wallet: game.wallet, team: game.team, campaignMax: game.campaignMax, starterOptions: game.starterOptions }; }
 let _t = null;
 export function persist () {
   try { localStorage.setItem(LS_KEY, JSON.stringify(snapshot())); } catch {}
@@ -35,12 +36,13 @@ function apply (d) {
   if (d.wallet) game.wallet = { coins: d.wallet.coins || 0, frags: d.wallet.frags || 0 };
   if (Array.isArray(d.team)) { const t = Array(9).fill(null); d.team.slice(0, 9).forEach((v, i) => t[i] = v || null); game.team = t; }
   if (d.campaignMax) game.campaignMax = d.campaignMax;
+  if (Array.isArray(d.starterOptions)) game.starterOptions = d.starterOptions;
 }
 
 export async function loadGame () {
   // 1) Local primero (sincrónico): la UI arranca sin esperar la red del store.
   try { const d = JSON.parse(localStorage.getItem(LS_KEY)); if (d) apply(d); } catch {}
-  if (!game.collection.length) grantStarter();
+  if (!game.collection.length) ensureStarterOptions();   // primer arranque → elegir 1 de 3
   game.ready = true;
   persist();
   // 2) Store en segundo plano: fusiona si trae más progreso.
@@ -49,14 +51,23 @@ export async function loadGame () {
   }).catch(() => {});
 }
 
-// Primer arranque: 3 criaturas iniciales colocadas en el frente.
-function grantStarter () {
-  const ids = ['inicio-fuego', 'inicio-agua', 'inicio-planta'];
-  game.collection = ids.map(id => ({ uid: newUid(), id, level: 1, xp: 0 }));
-  game.team = Array(9).fill(null);
-  game.team[4] = game.collection[0].uid;  // centro
-  game.team[0] = game.collection[1].uid;  // frente izq
-  game.team[2] = game.collection[2].uid;  // frente der
-  game.wallet = { coins: 150, frags: 0 };
-  game.campaignMax = 1;
+// Primer arranque: genera 3 candidatos de nivel 1 (variados en elemento/rol) para
+// que el jugador elija UNO. Se persisten hasta que elige (estables al recargar).
+function makeStarterOptions () {
+  const opts = [], seen = new Set();
+  let n = 0;
+  while (opts.length < 3 && n < 60) {
+    const id = 'start-' + Date.now().toString(36) + '-' + n + '-' + Math.random().toString(36).slice(2, 6);
+    const c = critterById(id);
+    const key = c.element + ':' + c.role;
+    if (!seen.has(key)) { seen.add(key); opts.push(id); }
+    n++;
+  }
+  while (opts.length < 3) opts.push('start-x' + opts.length + '-' + Math.random().toString(36).slice(2, 6));
+  return opts;
+}
+function ensureStarterOptions () {
+  if (!game.collection.length && (!Array.isArray(game.starterOptions) || game.starterOptions.length !== 3)) {
+    game.starterOptions = makeStarterOptions();
+  }
 }
