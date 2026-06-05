@@ -4,6 +4,7 @@ import { game, loadGame, resetGame } from './game/state.js';
 import { fightCampaign } from './game/actions.js';
 import { i18n, t, toggleLang } from './i18n.js';
 import { nav } from './nav.js';
+import { isMuted as sfxIsMuted, toggleMuted as sfxToggle } from './sfx.js';
 import CampaignView from './components/CampaignView.vue';
 import CollectionView from './components/CollectionView.vue';
 import TeamView from './components/TeamView.vue';
@@ -16,6 +17,8 @@ const needsStarter = computed(() => game.ready && game.collection.length === 0);
 const tab = ref('campana');
 const battle = ref(null);
 const showReset = ref(false);
+const sfxMuted = ref(sfxIsMuted());
+function toggleSfx () { sfxMuted.value = sfxToggle(); }
 const toast = ref('');
 let toastT = null;
 function showToast (m) { toast.value = m; clearTimeout(toastT); toastT = setTimeout(() => { toast.value = ''; }, 1900); }
@@ -52,6 +55,7 @@ watch(battle, (b) => { if (b && !battleNav) battleNav = nav.open(() => closeBatt
       <span class="coin">🪙 {{ game.wallet.coins }}</span>
       <span class="frag">🔹 {{ game.wallet.frags }}</span>
     </div>
+    <button class="tb-btn" @click="toggleSfx" title="sonido">{{ sfxMuted ? '🔇' : '🔊' }}</button>
     <button class="tb-btn" @click="toggleLang">{{ i18n.lang === 'es' ? 'EN' : 'ES' }}</button>
     <button class="tb-btn danger" :title="t('borrarTitulo')" @click="showReset = true">🗑</button>
     <closer-click-install class="cc-install"></closer-click-install>

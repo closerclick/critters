@@ -2,12 +2,13 @@
 import { ref } from 'vue';
 import { game } from '../game/state.js';
 import { summon, SUMMON_COST } from '../game/actions.js';
+import { summon as sfxSummon } from '../sfx.js';
 import { t } from '../i18n.js';
 import CritterCard from './CritterCard.vue';
 
 const last = ref(null);
 const err = ref('');
-function doSummon () { const r = summon(); if (r.error === 'coins') { err.value = t('sinMonedas'); return; } err.value = ''; last.value = r.instance; }
+function doSummon () { const r = summon(); if (r.error === 'coins') { err.value = t('sinMonedas'); return; } err.value = ''; last.value = r.instance; sfxSummon(); }
 </script>
 
 <template>

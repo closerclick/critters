@@ -3,6 +3,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import { critterById } from '../game/state.js';
 import { critterSvg } from '../critter/svg.js';
 import { COLS, ROWS } from '../battle/engine.js';
+import * as sfx from '../sfx.js';
 import { t } from '../i18n.js';
 
 const props = defineProps({ payload: Object });
@@ -27,12 +28,17 @@ function showDmg (u, val, cls) { u.dmg = val; u.dmgClass = cls; u.flash = true; 
 function applyEv (ev, silent) {
   const u = ev.target && U[ev.target], by = ev.by && U[ev.by];
   if (ev.t === 'move') { if (by) { by.row = ev.r; by.col = ev.c; } }
-  else if (ev.t === 'attack' || ev.t === 'thorns') { if (u) { u.hp = Math.max(0, u.hp - (ev.dmg || 0)); if (!silent) showDmg(u, ev.dmg, ev.crit ? 'crit' : ''); } }
-  else if (ev.t === 'heal' || ev.t === 'lifesteal' || ev.t === 'regen') { if (u) { u.hp = Math.min(u.maxHp, u.hp + (ev.heal || 0)); if (!silent) showDmg(u, '+' + (ev.heal || 0), 'heal'); } }
-  else if (ev.t === 'faint') { if (u) { u.hp = 0; u.dead = true; } }
+  else if (ev.t === 'attack' || ev.t === 'thorns') { if (u) { u.hp = Math.max(0, u.hp - (ev.dmg || 0)); if (!silent) { showDmg(u, ev.dmg, ev.crit ? 'crit' : ''); if (ev.t === 'attack') sfx.hit(ev.crit); } } }
+  else if (ev.t === 'heal' || ev.t === 'lifesteal' || ev.t === 'regen') { if (u) { u.hp = Math.min(u.maxHp, u.hp + (ev.heal || 0)); if (!silent) { showDmg(u, '+' + (ev.heal || 0), 'heal'); if (ev.t === 'heal') sfx.heal(); } } }
+  else if (ev.t === 'active') { if (!silent) sfx.active(); }
+  else if (ev.t === 'faint') { if (u) { u.hp = 0; u.dead = true; if (!silent) sfx.faint(); } }
 }
 function step () { const log = res().log; if (i >= log.length) { finish(); return; } applyEv(log[i++]); }
-function finish () { clearInterval(timer); timer = null; finished.value = true; }
+function finish () {
+  clearInterval(timer); timer = null; finished.value = true;
+  if (props.payload.win) { sfx.victory(); if (props.payload.captured) setTimeout(() => sfx.capture(), 500); }
+  else sfx.defeat();
+}
 function skip () { if (finished.value) return; const log = res().log; while (i < log.length) applyEv(log[i++], true); finish(); }
 function start () { initUnits(); finished.value = false; i = 0; clearInterval(timer); const ms = Math.max(60, Math.min(260, Math.round(8000 / Math.max(1, res().log.length)))); timer = setInterval(step, ms); }
 

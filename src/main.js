@@ -1,6 +1,8 @@
 import { createApp } from 'vue';
 import './style.css';
 import App from './App.vue';
+import { initAudio } from './sfx.js';
+initAudio();   // desbloquea el audio en el primer toque (foley procedural)
 
 // Botón "Instalar App" (PWA) unificado y navegación "volver" del ecosistema.
 import '@closerclick/closer-click-install';
