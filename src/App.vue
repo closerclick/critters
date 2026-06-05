@@ -4,12 +4,14 @@ import { game, loadGame, resetGame } from './game/state.js';
 import { fightCampaign } from './game/actions.js';
 import { i18n, t, toggleLang } from './i18n.js';
 import { nav } from './nav.js';
+import { ui, closeCritter } from './ui.js';
 import { isMuted as sfxIsMuted, toggleMuted as sfxToggle } from './sfx.js';
 import CampaignView from './components/CampaignView.vue';
 import CollectionView from './components/CollectionView.vue';
 import TeamView from './components/TeamView.vue';
 import SummonView from './components/SummonView.vue';
 import BattleView from './components/BattleView.vue';
+import CritterDetail from './components/CritterDetail.vue';
 import StarterView from './components/StarterView.vue';
 
 const needsStarter = computed(() => game.ready && game.collection.length === 0);
@@ -53,6 +55,13 @@ function fight (n) {
 function onNext (n) { fight(n); }
 function onCloseRequest () { if (battleNav) nav.back(); else closeBattleUI(); }
 watch(battle, (b) => { if (b && !battleNav) battleNav = nav.open(() => closeBattleUI()); });
+
+// Perfil/config de criatura: también es una capa de nav (el back lo cierra). Se abre
+// tocando un avatar en colección o equipo (nunca en pelea).
+let detailNav = null;
+function closeDetailUI () { closeCritter(); detailNav = null; }
+function onDetailClose () { if (detailNav) nav.back(); else closeDetailUI(); }
+watch(() => ui.detailUid, (v) => { if (v && !detailNav) detailNav = nav.open(() => closeDetailUI()); });
 </script>
 
 <template>
@@ -88,6 +97,8 @@ watch(battle, (b) => { if (b && !battleNav) battleNav = nav.open(() => closeBatt
   <main class="view center" v-else><p class="hint">…</p></main>
 
   <BattleView v-if="battle" :payload="battle" @close="onCloseRequest" @next="onNext" />
+
+  <CritterDetail v-if="ui.detailUid" :uid="ui.detailUid" @close="onDetailClose" />
 
   <div class="toast" v-if="toast">{{ toast }}</div>
 

@@ -2,6 +2,7 @@
 import { ref, reactive, computed, onUnmounted } from 'vue';
 import { game, instanceByUid, critterById, persist } from '../game/state.js';
 import { placeInSlot, clearSlot, teamCount } from '../game/actions.js';
+import { openCritter } from '../ui.js';
 import { critterSvg } from '../critter/svg.js';
 import { ELEMENT_INFO } from '../critter/types.js';
 import { t } from '../i18n.js';
@@ -44,6 +45,8 @@ function onUp (e) {
     const cell = el && el.closest && el.closest('.tg-cell');
     if (cell) drop(Number(cell.dataset.slot));
     else if (drag.from === 'slot') clearSlot(drag.fromSlot);   // soltar fuera = quitar del equipo
+  } else if (drag.pending) {
+    openCritter(drag.pending.uid);   // tap (sin arrastrar) = abrir perfil/config
   }
   reset();
 }
