@@ -15,6 +15,17 @@ import StarterView from './components/StarterView.vue';
 const needsStarter = computed(() => game.ready && game.collection.length === 0);
 
 const tab = ref('campana');
+// Navegación por pestañas como capas de nav: cambiar de tab deja un registro, así
+// el back/chevron vuelve al tab anterior; a closer.click solo se sale desde el home
+// (campaña) cuando ya no hay registros que deshacer.
+let tabLayers = [];
+function goTab (to) {
+  if (to === tab.value) return;
+  const from = tab.value;
+  const h = nav.open(() => { tab.value = from; tabLayers.pop(); });
+  tabLayers.push(h);
+  tab.value = to;
+}
 const battle = ref(null);
 const showReset = ref(false);
 const sfxMuted = ref(sfxIsMuted());
@@ -62,10 +73,10 @@ watch(battle, (b) => { if (b && !battleNav) battleNav = nav.open(() => closeBatt
   </div>
 
   <nav class="tabs">
-    <button :class="{ on: tab === 'campana' }" @click="tab = 'campana'">{{ t('campana') }}</button>
-    <button :class="{ on: tab === 'equipo' }" @click="tab = 'equipo'">{{ t('equipo') }}</button>
-    <button :class="{ on: tab === 'coleccion' }" @click="tab = 'coleccion'">{{ t('coleccion') }}</button>
-    <button :class="{ on: tab === 'invocar' }" @click="tab = 'invocar'">{{ t('invocar') }}</button>
+    <button :class="{ on: tab === 'campana' }" @click="goTab('campana')">{{ t('campana') }}</button>
+    <button :class="{ on: tab === 'equipo' }" @click="goTab('equipo')">{{ t('equipo') }}</button>
+    <button :class="{ on: tab === 'coleccion' }" @click="goTab('coleccion')">{{ t('coleccion') }}</button>
+    <button :class="{ on: tab === 'invocar' }" @click="goTab('invocar')">{{ t('invocar') }}</button>
   </nav>
 
   <main class="view" v-if="game.ready">

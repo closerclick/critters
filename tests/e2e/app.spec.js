@@ -16,7 +16,7 @@ test('elegir criatura inicial (1 de 3) y pelear nivel 1', async ({ page }) => {
   await page.locator('.web .node.core').click({ force: true })   // nodo central de la telaraña
   await expect(page.locator('.battle')).toBeVisible()
   await page.locator('.arena').click()
-  await expect(page.locator('.bresult .big')).toBeVisible()
+  await expect(page.locator('.result-modal .rc-title')).toBeVisible()
 })
 
 test('invocar gasta monedas y agrega a la colección', async ({ page }) => {

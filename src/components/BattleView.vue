@@ -60,9 +60,11 @@ const summary = computed(() => {
       if (e.target) taken[e.target] = (taken[e.target] || 0) + (e.dmg || 0);
     }
   }
+  const xp = props.payload.xp || {};
   const mine = res().units.filter(u => u.side === 0).map(u => ({
     name: u.name, hp: Math.max(0, U[u.uid] ? U[u.uid].hp : 0), maxHp: u.maxHp,
     dealt: dealt[u.uid] || 0, taken: taken[u.uid] || 0, dead: U[u.uid] && U[u.uid].dead,
+    xp: xp[u.uid] || null,
   }));
   return { mine, totalTaken: mine.reduce((s, m) => s + m.taken, 0) };
 });
@@ -85,27 +87,40 @@ const summary = computed(() => {
       <div class="field-tags"><span>◀ {{ t('tuEquipo') }}</span><span>{{ t('rival') }} ▶</span></div>
     </div>
 
-    <div class="bresult" v-if="finished">
-      <div class="big" :class="outcome === 'win' ? 'win' : (outcome === 'lose' ? 'lose' : '')">{{ outcome === 'win' ? t('victoria') : (outcome === 'lose' ? t('derrota') : t('empate')) }}</div>
-      <p class="hint" v-if="payload.win && payload.reward">+🪙{{ payload.reward.coins }} · +🔹{{ payload.reward.frags }}</p>
-      <p class="hint" v-if="payload.captured">✨ {{ t('capturaste') }} {{ critterById(payload.captured.id).name }}</p>
+    <div class="blog" v-if="!finished">{{ t('ciclos') }}: {{ res().cycles }}</div>
+  </div>
 
-      <div class="summary" v-if="summary">
-        <div class="sum-total">🛡 {{ t('dRecibido') }}: <b>{{ summary.totalTaken }}</b></div>
-        <div class="sum-row" v-for="(m, i) in summary.mine" :key="i" :class="{ dead: m.dead }">
-          <span class="sum-name">{{ m.name }}</span>
-          <span class="sum-hp">❤ {{ m.hp }}/{{ m.maxHp }}</span>
-          <span class="sum-d">⚔ {{ m.dealt }}</span>
-          <span class="sum-t">🛡 {{ m.taken }}</span>
-        </div>
+  <div class="result-modal" v-if="finished">
+    <div class="result-card" :class="outcome">
+      <div class="rc-title" :class="outcome">{{ outcome === 'win' ? t('victoria') : (outcome === 'lose' ? t('derrota') : t('empate')) }}</div>
+      <div class="rc-rewards" v-if="payload.win">
+        <span v-if="payload.reward" class="rc-chip coin">+🪙 {{ payload.reward.coins }}</span>
+        <span v-if="payload.reward" class="rc-chip frag">+🔹 {{ payload.reward.frags }}</span>
+        <span v-if="payload.captured" class="rc-chip cap">✨ {{ critterById(payload.captured.id).name }}</span>
       </div>
-      <div class="row-btns">
+
+      <div class="rtable" v-if="summary">
+        <div class="rt-head">
+          <span class="rt-name">{{ t('tuEquipo') }}</span>
+          <span>❤ {{ t('lblVida') }}</span>
+          <span>⚔ {{ t('lblDanio') }}</span>
+          <span>🛡 {{ t('lblRecib') }}</span>
+        </div>
+        <div class="rt-row" v-for="(m, i) in summary.mine" :key="i" :class="{ dead: m.dead }">
+          <span class="rt-name">{{ m.name }}<small v-if="m.xp" class="rt-xp">+{{ m.xp.gained }} XP{{ m.xp.up ? ' · ⬆ ' + t('nv') + m.xp.level : '' }}</small></span>
+          <span class="rt-hp">{{ m.hp }}/{{ m.maxHp }}</span>
+          <span class="rt-d">{{ m.dealt }}</span>
+          <span class="rt-t">{{ m.taken }}</span>
+        </div>
+        <div class="rt-total">🛡 {{ t('dRecibido') }}: <b>{{ summary.totalTaken }}</b></div>
+      </div>
+
+      <div class="rc-btns">
         <button class="btn sec" @click="start">↻ {{ t('repetir') }}</button>
         <button v-if="payload.win && payload.nextNode" class="btn" @click="next">{{ t('siguiente') }} →</button>
         <button class="btn sec" @click="emit('close')">{{ t('cerrar') }}</button>
       </div>
     </div>
-    <div class="blog" v-else>{{ t('ciclos') }}: {{ res().cycles }}</div>
   </div>
 </template>
 
@@ -130,11 +145,31 @@ const summary = computed(() => {
 .dmgnum.heal{color:#86efac}
 @keyframes rise{0%{opacity:0;transform:translateY(5px)}25%{opacity:1}100%{opacity:0;transform:translateY(-16px)}}
 .field-tags{display:flex;justify-content:space-between;font-family:var(--fdisplay);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.12em;padding:0 4px}
-.summary{margin:8px auto 2px;max-width:340px;width:100%;background:rgba(167,139,250,.06);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
-.sum-total{font-family:var(--fmono);font-size:12.5px;text-align:center;margin-bottom:6px}
-.sum-total b{color:var(--bad)}
-.sum-row{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;font-size:11.5px;font-family:var(--fmono);padding:2px 0;align-items:center}
-.sum-row .sum-name{font-family:var(--fbody);font-weight:700;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.sum-row .sum-hp{color:var(--good)} .sum-row .sum-d{color:var(--gold)} .sum-row .sum-t{color:var(--muted)}
-.sum-row.dead{opacity:.5} .sum-row.dead .sum-hp{color:var(--bad)}
+/* ---- modal de resultado ---- */
+.result-modal{position:fixed;inset:0;z-index:35;display:flex;align-items:center;justify-content:center;padding:18px;
+  background:rgba(2,4,12,.66);backdrop-filter:blur(5px);animation:fade .25s ease-out}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.result-card{width:100%;max-width:380px;background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line2);
+  border-radius:18px;padding:18px 16px;box-shadow:0 22px 60px rgba(0,0,0,.65);text-align:center;animation:pop .32s cubic-bezier(.2,1.3,.4,1)}
+@keyframes pop{from{opacity:0;transform:scale(.9) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.result-card.win{border-color:color-mix(in srgb,var(--good) 45%,var(--line2))}
+.result-card.lose{border-color:color-mix(in srgb,var(--bad) 45%,var(--line2))}
+.rc-title{font-family:var(--fdisplay);font-weight:800;font-size:30px;margin-bottom:8px}
+.rc-title.win{color:var(--good);text-shadow:0 0 26px rgba(74,222,128,.5)}
+.rc-title.lose{color:var(--bad)} .rc-title.draw{color:var(--muted)}
+.rc-rewards{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:12px}
+.rc-chip{font-family:var(--fmono);font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;border:1px solid var(--line2);background:rgba(167,139,250,.08)}
+.rc-chip.coin{color:var(--gold)} .rc-chip.frag{color:var(--cyan)} .rc-chip.cap{color:#e9d5ff}
+.rtable{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:14px;background:rgba(7,6,17,.35)}
+.rt-head,.rt-row{display:grid;grid-template-columns:1fr 64px 52px 56px;align-items:center;gap:4px;padding:7px 10px}
+.rt-head{font-family:var(--fdisplay);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);background:rgba(167,139,250,.08);border-bottom:1px solid var(--line)}
+.rt-head span:not(.rt-name),.rt-row span:not(.rt-name){text-align:right;font-variant-numeric:tabular-nums}
+.rt-row{font-family:var(--fmono);font-size:12px;border-top:1px solid rgba(167,139,250,.06)}
+.rt-row .rt-name{font-family:var(--fbody);font-weight:700;text-align:left;display:flex;flex-direction:column;align-items:flex-start;line-height:1.15;min-width:0}
+.rt-row .rt-name > small{font-family:var(--fmono);font-size:9.5px;font-weight:400;color:var(--cyan);white-space:nowrap}
+.rt-row .rt-hp{color:var(--good)} .rt-row .rt-d{color:var(--gold)} .rt-row .rt-t{color:#cbb6ff}
+.rt-row.dead{opacity:.55} .rt-row.dead .rt-hp{color:var(--bad)}
+.rt-total{font-family:var(--fmono);font-size:12px;text-align:center;padding:8px 10px;border-top:1px solid var(--line);background:rgba(167,139,250,.05)}
+.rt-total b{color:var(--bad)}
+.rc-btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 </style>
