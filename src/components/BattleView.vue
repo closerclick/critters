@@ -11,7 +11,7 @@ const emit = defineEmits(['close', 'next']);
 const U = reactive({});           // uid → estado vivo
 const list = ref([]);             // uids para render
 const finished = ref(false);
-let timer = null, i = 0;
+let timer = null, i = 0, alive = true;
 
 const res = () => props.payload.result;
 function initUnits () {
@@ -23,7 +23,7 @@ const svgFor = (u) => critterSvg(critterById(u.id), 40);
 const leftOf = (u) => (u.col / COLS * 100) + '%';
 const topOf = (u) => (u.row / ROWS * 100) + '%';
 
-function showDmg (u, val, cls) { u.dmg = val; u.dmgClass = cls; u.flash = true; setTimeout(() => { u.flash = false; }, 220); }
+function showDmg (u, val, cls) { u.dmg = val; u.dmgClass = cls; u.flash = true; setTimeout(() => { if (alive) u.flash = false; }, 220); }
 function applyEv (ev, silent) {
   const u = ev.target && U[ev.target], by = ev.by && U[ev.by];
   if (ev.t === 'move') { if (by) { by.row = ev.r; by.col = ev.c; } }
@@ -37,7 +37,7 @@ function skip () { if (finished.value) return; const log = res().log; while (i <
 function start () { initUnits(); finished.value = false; i = 0; clearInterval(timer); const ms = Math.max(60, Math.min(260, Math.round(8000 / Math.max(1, res().log.length)))); timer = setInterval(step, ms); }
 
 onMounted(start);
-onUnmounted(() => clearInterval(timer));
+onUnmounted(() => { alive = false; clearInterval(timer); });
 watch(() => props.payload, start);
 
 const outcome = computed(() => props.payload.win ? 'win' : (res().winner === 'draw' ? 'draw' : 'lose'));
@@ -46,7 +46,7 @@ function next () { if (props.payload.nextNode) emit('next', props.payload.nextNo
 
 <template>
   <div class="battle">
-    <closer-click-back class="battle-back" style="--cc-back-size:32px;color:var(--text)" @click="emit('close')"></closer-click-back>
+    <closer-click-back class="battle-back" style="--cc-back-size:32px;color:var(--text)"></closer-click-back>
     <h2>{{ t('campana') }} · {{ payload.boss ? 'BOSS ★' : (t('nivel') + ' ' + payload.level) }}</h2>
     <div class="arena" @click="skip">
       <div class="field">

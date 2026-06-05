@@ -54,6 +54,15 @@ ok('batallas distintas con equipos distintos', () => {
   assert.notEqual(JSON.stringify(r1.log), JSON.stringify(r2.log));
 });
 
+ok('dos equipos DEFENSIVOS no empatan eternamente (rompe el standoff)', () => {
+  const A = ['da1', 'da2', 'da3'].map((id, i) => ({ id, level: 7, slot: i, policy: 'defensiva' }));
+  const B = ['db1', 'db2', 'db3'].map((id, i) => ({ id, level: 4, slot: i, policy: 'defensiva' }));
+  const r = simulate(A, B, battleSeed(A, B, 'standoff'));
+  assert.notEqual(r.winner, 'draw');                 // alguien avanza y gana
+  assert.ok(r.rounds < 60, 'no se estanca hasta maxRounds');
+  assert.ok(r.log.some(e => e.t === 'move'), 'hubo movimiento');
+});
+
 // Muestra: imprime un resumen de una batalla para inspección manual.
 const demo = simulate(teamA, teamB, seed);
 console.log(`\n  demo: ganador=${demo.winner} rondas=${demo.rounds} eventos=${demo.log.length}`);

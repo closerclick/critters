@@ -1,10 +1,10 @@
 <script setup>
 import { ref } from 'vue';
 import { game, instanceByUid, critterById } from '../game/state.js';
-import { feed, FEED_COST, setPolicy } from '../game/actions.js';
+import { feed, FEED_COST, setPolicy, setTarget } from '../game/actions.js';
 import { critterSvg } from '../critter/svg.js';
 import { ACTIVES, PASSIVES } from '../critter/abilities.js';
-import { POLICIES, POLICY_INFO, defaultPolicy } from '../battle/policies.js';
+import { POLICIES, POLICY_INFO, defaultPolicy, TARGET_PREFS, TARGET_INFO, defaultTarget } from '../battle/policies.js';
 import { t, loc } from '../i18n.js';
 import CritterCard from './CritterCard.vue';
 
@@ -19,7 +19,9 @@ const activeInfo = () => { const c = critter(); return c ? ACTIVES[c.active] : n
 const passiveInfo = () => { const c = critter(); return c ? PASSIVES[c.passive] : null; };
 function doFeed () { const r = feed(detail.value); if (r.error === 'frags') err.value = t('sinFrags'); else err.value = ''; }
 const curPolicy = () => { const i = inst(), c = critter(); return (i && i.policy) || (c ? defaultPolicy(c.role) : 'agresiva'); };
+const curTarget = () => { const i = inst(), c = critter(); return (i && i.target) || (c ? defaultTarget(c.role) : 'cercano'); };
 function setPol (p) { setPolicy(detail.value, p); }
+function setTgt (p) { setTarget(detail.value, p); }
 </script>
 
 <template>
@@ -45,6 +47,13 @@ function setPol (p) { setPolicy(detail.value, p); }
           <button v-for="p in POLICIES" :key="p" class="chip" :style="curPolicy() === p ? { background: 'var(--accent2)', color: '#fff', borderColor: 'var(--accent)' } : {}" @click="setPol(p)">{{ loc(POLICY_INFO[p]) }}</button>
         </div>
         <div class="hint" style="margin-top:5px;text-align:center">{{ loc(POLICY_INFO[curPolicy()]?.d) }}</div>
+      </div>
+      <div style="margin:8px 0">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">{{ t('objetivo') }}</div>
+        <div class="chips" style="justify-content:center">
+          <button v-for="p in TARGET_PREFS" :key="p" class="chip" :style="curTarget() === p ? { background: 'var(--accent2)', color: '#fff', borderColor: 'var(--accent)' } : {}" @click="setTgt(p)">{{ loc(TARGET_INFO[p]) }}</button>
+        </div>
+        <div class="hint" style="margin-top:5px;text-align:center">{{ loc(TARGET_INFO[curTarget()]?.d) }}</div>
       </div>
       <div class="row-btns">
         <button class="btn" :disabled="game.wallet.frags < FEED_COST" @click="doFeed">{{ t('alimentar') }} · 🔹{{ FEED_COST }}</button>

@@ -73,10 +73,12 @@ export function teamInstances () {
   game.team.forEach((uid, slot) => { if (uid) { const inst = instanceByUid(uid); if (inst) out.push({ slot, instance: inst }); } });
   return out;
 }
-export function teamSnapshot () { return teamInstances().map(x => ({ id: x.instance.id, level: x.instance.level, slot: x.slot, policy: x.instance.policy })); }
+export function teamSnapshot () { return teamInstances().map(x => ({ id: x.instance.id, level: x.instance.level, slot: x.slot, policy: x.instance.policy, target: x.instance.target })); }
 
-/** Cambia la política de decisión de una instancia. */
+/** Cambia la política de movimiento de una instancia. */
 export function setPolicy (uid, policy) { const i = instanceByUid(uid); if (i) { i.policy = policy; persist(); } }
+/** Cambia la preferencia de objetivo de una instancia. */
+export function setTarget (uid, pref) { const i = instanceByUid(uid); if (i) { i.target = pref; persist(); } }
 
 // ---- telaraña de campaña ----
 export function isUnlocked (id) { return id === 'core' || neighbors(game.seed, id).some(nb => game.cleared.includes(nb)); }
@@ -88,7 +90,7 @@ export function fightCampaign (nodeId) {
   if (!isUnlocked(nodeId)) return { error: 'locked' };
   const ti = teamInstances();
   if (!ti.length) return { error: 'noteam' };
-  const mine = ti.map(x => ({ id: x.instance.id, level: x.instance.level, slot: x.slot, policy: x.instance.policy }));
+  const mine = ti.map(x => ({ id: x.instance.id, level: x.instance.level, slot: x.slot, policy: x.instance.policy, target: x.instance.target }));
   const enemies = enemyTeam(node, game.seed);
   const result = simulate(mine, enemies, nodeBattleSeed(mine, node, game.seed));
   const win = result.winner === 'A';

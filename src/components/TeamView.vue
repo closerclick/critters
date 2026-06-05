@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed } from 'vue';
+import { ref, reactive, computed, onUnmounted } from 'vue';
 import { game, instanceByUid, critterById, persist } from '../game/state.js';
 import { placeInSlot, clearSlot, teamCount } from '../game/actions.js';
 import { critterSvg } from '../critter/svg.js';
@@ -48,6 +48,7 @@ function onUp (e) {
   reset();
 }
 function reset () { drag.active = false; drag.uid = null; drag.from = 'bench'; drag.fromSlot = -1; drag.pending = null; overSlot.value = -1; }
+onUnmounted(() => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); });
 function drop (targetSlot) {
   const uid = drag.uid, occupant = game.team[targetSlot];
   if (uid === occupant) return;

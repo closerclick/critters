@@ -12,7 +12,7 @@ import { typeMultiplier } from '../critter/types.js';
 import { RANGED_ROLES } from '../critter/roles.js';
 import { ACTIVES, PASSIVES } from '../critter/abilities.js';
 import { BAL, basicDamage } from './balance.js';
-import { defaultPolicy } from './policies.js';
+import { defaultPolicy, defaultTarget } from './policies.js';
 
 export const COLS = 8, ROWS = 3;
 const AOE = new Set(['all', 'self', 'allies', 'backmost']);   // activas que no requieren rango
@@ -32,7 +32,8 @@ function buildUnits (team, side) {
       id: m.id, level: lvl, critter, name: critter.name, element: critter.element, role: critter.role, rarity: critter.rarity,
       maxHp: s.HP, hp: s.HP, ATK: s.ATK + (b.atk || 0), DEF: s.DEF + (b.def || 0), SPD: s.SPD,
       range: (ranged ? 3 : 1) + (b.range || 0),
-      policy: m.policy || defaultPolicy(critter.role),
+      policy: m.policy === 'cazador' ? 'agresiva' : (m.policy || defaultPolicy(critter.role)),
+      target: m.target || defaultTarget(critter.role),
       energy: 0, stunTurns: 0, buffs: [], alive: true, passive: critter.passive, active: critter.active,
     };
   });
@@ -68,26 +69,57 @@ function attackTarget (u, target, rng, log, mult, ability) {
   dealDamage(u, target, dmg, log, { crit, adv: tm > 1 ? 1 : (tm < 1 ? -1 : 0), ability: ability || null });
 }
 
+// Puntaje del objetivo según la preferencia (menor = mejor). Desempate determinista.
+function targetScore (u, e) {
+  switch (u.target) {
+    case 'debil': return e.hp * 100 + cheb(u, e);
+    case 'fuerte': return -(e.maxHp + e.ATK * 5) * 100 + cheb(u, e);
+    case 'rango': return (e.range > 1 ? 0 : 1) * 1e6 + cheb(u, e) * 100 + e.hp;
+    case 'soporte': return (e.role === 'soporte' ? 0 : 1) * 1e6 + cheb(u, e) * 100 + e.hp;
+    default: return cheb(u, e) * 1e4 + e.hp;   // 'cercano'
+  }
+}
 function chooseTarget (u, enemies) {
-  const alive = enemies.filter(e => e.alive);
-  if (!alive.length) return null;
-  if (u.policy === 'cazador') { let b = alive[0]; for (const e of alive) if (e.hp < b.hp || (e.hp === b.hp && cheb(u, e) < cheb(u, b))) b = e; return b; }
-  let b = alive[0]; for (const e of alive) { const d = cheb(u, e), db = cheb(u, b); if (d < db || (d === db && e.hp < b.hp)) b = e; }
+  let b = null, bs = Infinity;
+  for (const e of enemies) {
+    if (!e.alive) continue;
+    const s = targetScore(u, e);
+    if (s < bs || (s === bs && (b == null || e.uid < b.uid))) { bs = s; b = e; }
+  }
   return b;
 }
 function farthest (u, enemies) { let b = null; for (const e of enemies) if (e.alive && (!b || cheb(u, e) > cheb(u, b))) b = e; return b; }
 
-function moveToward (u, target, occ, log) {
-  const dr = Math.sign(target.row - u.row), dc = Math.sign(target.col - u.col);
-  for (const [mr, mc] of [[dr, dc], [0, dc], [dr, 0]]) {
+// Mejor celda de ataque libre alrededor del objetivo (dentro de rango), la más
+// cercana a la unidad → permite FLANQUEAR (rodear hacia un hueco libre, incluso
+// detrás del enemigo) en vez de amontonarse de frente.
+function approachCell (u, target, range, occ) {
+  let best = null, bd = Infinity;
+  for (let dr = -range; dr <= range; dr++) for (let dc = -range; dc <= range; dc++) {
+    if (Math.max(Math.abs(dr), Math.abs(dc)) > range || (!dr && !dc)) continue;
+    const r = target.row + dr, c = target.col + dc;
+    if (r < 0 || r >= ROWS || c < 0 || c >= COLS) continue;
+    const k = r + ',' + c;
+    if (occ[k] && k !== u.row + ',' + u.col) continue;   // ocupada por otro
+    const d = Math.max(Math.abs(u.row - r), Math.abs(u.col - c)) * 100 + Math.abs(u.col - c);
+    if (d < bd) { bd = d; best = { row: r, col: c }; }
+  }
+  return best || { row: target.row, col: target.col };
+}
+// Da UN paso (8 direcciones, diagonal incluida) hacia `goal`, eligiendo la celda
+// libre que más acerca. Determinista.
+function stepToward (u, goal, occ, log) {
+  let best = null, bk = Infinity;
+  for (let mr = -1; mr <= 1; mr++) for (let mc = -1; mc <= 1; mc++) {
     if (!mr && !mc) continue;
     const nr = u.row + mr, nc = u.col + mc;
     if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
-    const k = nr + ',' + nc; if (occ[k]) continue;
-    delete occ[u.row + ',' + u.col]; u.row = nr; u.col = nc; occ[k] = u.uid;
-    log.push({ t: 'move', by: u.uid, r: nr, c: nc });
-    return true;
+    if (occ[nr + ',' + nc]) continue;
+    const d = Math.max(Math.abs(nr - goal.row), Math.abs(nc - goal.col));
+    const k = d * 1000 + Math.abs(nc - goal.col) * 10 + Math.abs(nr - goal.row);   // prioriza avanzar en columna
+    if (k < bk) { bk = k; best = { nr, nc }; }
   }
+  if (best) { delete occ[u.row + ',' + u.col]; u.row = best.nr; u.col = best.nc; occ[best.nr + ',' + best.nc] = u.uid; log.push({ t: 'move', by: u.uid, r: best.nr, c: best.nc }); return true; }
   return false;
 }
 
@@ -113,7 +145,7 @@ function castActive (u, ab, enemies, allies, rng, log) {
   }
 }
 
-function takeTurn (u, enemies, allies, occ, rng, log) {
+function takeTurn (u, enemies, allies, occ, rng, log, force) {
   u.buffs = u.buffs.filter(b => (--b.turns) > 0);
   const p = PASSIVES[u.passive];
   if (p && p.regen && u.hp < u.maxHp) { const h = Math.max(1, Math.round(u.maxHp * p.regen)); u.hp = Math.min(u.maxHp, u.hp + h); log.push({ t: 'regen', target: u.uid, heal: h }); }
@@ -125,10 +157,15 @@ function takeTurn (u, enemies, allies, occ, rng, log) {
   const inRange = cheb(u, target) <= u.range;
   if (u.energy >= ab.cost && (AOE.has(ab.scope) || inRange)) { castActive(u, ab, enemies, allies, rng, log); u.energy = 0; return; }
   if (inRange) { attackTarget(u, target, rng, log); u.energy = Math.min(ab.cost, u.energy + BAL.energyPerAction); return; }
-  if (u.policy === 'defensiva') { u.energy = Math.min(ab.cost, u.energy + 8); return; }   // aguanta
-  // avanzar (guardián avanza poco: solo si está lejos)
-  if (u.policy === 'guardian' && cheb(u, target) <= 2) { u.energy = Math.min(ab.cost, u.energy + 8); return; }
-  if (moveToward(u, target, occ, log)) {
+  // Aguantar (defensiva / guardián), SALVO que `force` rompa el estancamiento: si
+  // la ronda anterior no hubo ataques ni movimientos, todos avanzan (evita empates
+  // por bloqueo mutuo cuando ambos bandos son defensivos).
+  if (!force) {
+    if (u.policy === 'defensiva') { u.energy = Math.min(ab.cost, u.energy + 8); return; }
+    if (u.policy === 'guardian' && cheb(u, target) <= 2) { u.energy = Math.min(ab.cost, u.energy + 8); return; }
+  }
+  const goal = approachCell(u, target, u.range, occ);
+  if (stepToward(u, goal, occ, log)) {
     if (cheb(u, target) <= u.range) attackTarget(u, target, rng, log);
     else u.energy = Math.min(ab.cost, u.energy + 6);
   }
@@ -141,18 +178,21 @@ const snap = (u) => ({ uid: u.uid, side: u.side, slot: u.slot, row: u.row, col: 
 export function simulate (teamA, teamB, seed) {
   const A = buildUnits(teamA, 0), B = buildUnits(teamB, 1), all = [...A, ...B];
   const occ = {}; for (const u of all) occ[u.row + ',' + u.col] = u.uid;
-  const rng = mulberry32(hash32(String(seed || 'seed')));
+  const rng = mulberry32(hash32(String(seed == null ? 'seed' : seed)));
   const log = [];
   const units = all.map(snap);
 
-  let rounds = 0;
+  let rounds = 0, force = false;
   while (rounds < BAL.maxRounds && aliveN(A) > 0 && aliveN(B) > 0) {
+    const before = log.length;
     const order = all.filter(u => u.alive).sort((x, y) => eff(y, 'SPD') - eff(x, 'SPD') || x.side - y.side || x.col - y.col || x.row - y.row || (x.uid < y.uid ? -1 : 1));
     for (const u of order) {
       if (!u.alive) continue;
-      takeTurn(u, u.side === 0 ? B : A, u.side === 0 ? A : B, occ, rng, log);
+      takeTurn(u, u.side === 0 ? B : A, u.side === 0 ? A : B, occ, rng, log, force);
       if (aliveN(A) === 0 || aliveN(B) === 0) break;
     }
+    // si la ronda no produjo ataques ni movimientos, la próxima FUERZA avanzar
+    force = !log.slice(before).some(e => e.t === 'attack' || e.t === 'move');
     rounds++;
   }
   let winner;
@@ -163,6 +203,6 @@ export function simulate (teamA, teamB, seed) {
 }
 
 export function battleSeed (teamA, teamB, matchId) {
-  const key = (t) => t.map(m => `${m.id}@${m.level || 1}#${m.slot}`).join(',');
-  return `${key(teamA)}|${key(teamB)}|${matchId || ''}`;
+  const key = (t) => t.map(m => `${m.id}@${m.level ?? 1}#${m.slot}`).join(',');
+  return `${key(teamA)}|${key(teamB)}|${matchId == null ? '' : matchId}`;
 }

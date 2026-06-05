@@ -22,24 +22,23 @@ function showToast (m) { toast.value = m; clearTimeout(toastT); toastT = setTime
 
 onMounted(() => { loadGame(); });
 
+// La batalla es una "capa" de navegación: el back físico / chevron la cierran y
+// vuelven a la pantalla del juego (NO a closer.click). Una sola vía: cerrar la
+// batalla = pop de la capa (nav.back) → su callback baja la UI.
+let battleNav = null;
+function closeBattleUI () {
+  const cap = battle.value && battle.value.captured;
+  battle.value = null; battleNav = null;
+  if (cap) showToast('✨ ' + t('capturaste'));
+}
 function fight (n) {
   const r = fightCampaign(n);
   if (r.error === 'noteam') { showToast(t('equipoVacio')); return; }
-  battle.value = r;
+  battle.value = r;   // si ya había batalla (Siguiente), reusa la misma capa
 }
 function onNext (n) { fight(n); }
-function onClose () {
-  const cap = battle.value && battle.value.captured;
-  battle.value = null;
-  if (cap) showToast('✨ ' + t('capturaste'));
-}
-
-// La batalla es una "capa" de navegación: el back físico / chevron la cierra.
-let battleNav = null;
-watch(battle, (b) => {
-  if (b) { if (!battleNav) battleNav = nav.open(() => onClose()); }
-  else if (battleNav) { const h = battleNav; battleNav = null; try { h.close(); } catch (e) {} }
-});
+function onCloseRequest () { if (battleNav) nav.back(); else closeBattleUI(); }
+watch(battle, (b) => { if (b && !battleNav) battleNav = nav.open(() => closeBattleUI()); });
 </script>
 
 <template>
@@ -73,7 +72,7 @@ watch(battle, (b) => {
   </main>
   <main class="view center" v-else><p class="hint">…</p></main>
 
-  <BattleView v-if="battle" :payload="battle" @close="onClose" @next="onNext" />
+  <BattleView v-if="battle" :payload="battle" @close="onCloseRequest" @next="onNext" />
 
   <div class="toast" v-if="toast">{{ toast }}</div>
 
