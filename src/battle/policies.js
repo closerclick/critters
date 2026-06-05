@@ -2,18 +2,14 @@
 //  - POLÍTICA de movimiento: cómo se desplaza (avanzar / aguantar / proteger).
 //  - PREFERENCIA de objetivo: a quién apunta (cercano / débil / fuerte / ranged / soporte).
 
-export const POLICIES = ['agresiva', 'defensiva', 'guardian'];
+export const POLICIES = ['agresiva', 'defensiva'];
 export const POLICY_INFO = {
-  agresiva:  { es: 'Agresiva',  en: 'Aggressive', d: { es: 'Avanza hacia el enemigo y ataca.', en: 'Advances and attacks.' } },
-  defensiva: { es: 'Defensiva', en: 'Defensive',  d: { es: 'Aguanta su posición; ataca lo que entra en rango.', en: 'Holds; attacks what comes in range.' } },
-  guardian:  { es: 'Guardián',  en: 'Guardian',   d: { es: 'Se queda al frente; avanza poco.', en: 'Stays at the front; advances little.' } },
-  // (legacy) 'cazador' se trata como 'agresiva' en el motor.
+  agresiva:  { es: 'Agresiva',  en: 'Aggressive', d: { es: 'Avanza, flanquea y ataca al enemigo.', en: 'Advances, flanks and attacks.' } },
+  defensiva: { es: 'Defensiva', en: 'Defensive',  d: { es: 'Aguanta su posición; solo ataca lo que entra en rango.', en: 'Holds position; only attacks what comes in range.' } },
+  // (legacy) 'guardian'/'cazador' se tratan como 'agresiva' en el motor.
 };
-export function defaultPolicy (role) {
-  if (role === 'dps' || role === 'peleador') return 'agresiva';
-  if (role === 'tanque' || role === 'soporte' || role === 'distancia') return 'defensiva';
-  return 'guardian';
-}
+// Por defecto TODAS avanzan/flanquean; la defensiva es opt-in del jugador.
+export function defaultPolicy (role) { return 'agresiva'; }
 
 export const TARGET_PREFS = ['cercano', 'debil', 'fuerte', 'rango', 'soporte'];
 export const TARGET_INFO = {

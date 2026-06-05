@@ -28,6 +28,7 @@ const w = (k) => Math.max(6, Math.min(100, Math.round(100 * st.value[k] / CAP[k]
     <div class="chips">
       <span class="chip el">{{ loc(el) }}</span>
       <span class="chip">{{ loc(role) }}</span>
+      <span class="chip">{{ critter.flanks ? t('flanquea') : t('frontal') }}</span>
     </div>
     <div class="stats" v-if="stats">
       <div class="s hp"><span class="k">{{ t('statHP') }}</span><span class="bar"><i :style="{ width: w('HP') }"></i></span><span class="v">{{ st.HP }}</span></div>

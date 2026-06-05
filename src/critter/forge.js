@@ -43,6 +43,10 @@ export function makeCritter (id) {
 
   const passive = pick(rng, ROLE_PASSIVE_POOL[role]);
   const active = pick(rng, ROLE_ACTIVE_POOL[role]);
+  // Estilo de combate (rasgo de la especie): ¿flanquea (rodea, incl. por detrás)
+  // o pelea de FRENTE (forma línea)? Determinista por semilla, sesgado por rol.
+  const FLANK = { dps: 0.7, distancia: 0.7, control: 0.6, soporte: 0.5, peleador: 0.4, tanque: 0.2 };
+  const flanks = rng() < (FLANK[role] ?? 0.5);
 
   // Anatomía compuesta por partes: SOLO la cabeza es obligatoria; tórax y abdomen
   // opcionales (-1 = ausente). Las patas (0..6) salen de la cabeza (estilo araña).
@@ -58,7 +62,7 @@ export function makeCritter (id) {
   };
 
   const name = makeName(rng, rarityIndex);
-  return { id, name, element, role, rarity: rarity.key, rarityIndex, base, passive, active, appearance };
+  return { id, name, element, role, rarity: rarity.key, rarityIndex, base, passive, active, flanks, appearance };
 }
 
 /** Stats efectivas a un nivel dado (crecimiento + pasiva de stat). */

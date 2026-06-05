@@ -110,6 +110,11 @@ export function fightCampaign (nodeId) {
     const nb = neighbors(game.seed, node.id).find(id => isUnlocked(id) && !game.cleared.includes(id));
     if (nb) payload.nextNode = nb;
     persist();
+  } else {
+    // Red de seguridad anti-softlock: al perder, el equipo igual entrena un poco
+    // (gana algo de XP) → eventualmente sube de nivel y puede ganar el nodo.
+    for (const x of ti) awardXp(x.instance, 8 + node.diff);
+    persist();
   }
   return payload;
 }

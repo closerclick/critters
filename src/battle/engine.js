@@ -32,8 +32,9 @@ function buildUnits (team, side) {
       id: m.id, level: lvl, critter, name: critter.name, element: critter.element, role: critter.role, rarity: critter.rarity,
       maxHp: s.HP, hp: s.HP, ATK: s.ATK + (b.atk || 0), DEF: s.DEF + (b.def || 0), SPD: s.SPD,
       range: (ranged ? 3 : 1) + (b.range || 0),
-      policy: m.policy === 'cazador' ? 'agresiva' : (m.policy || defaultPolicy(critter.role)),
+      policy: (m.policy === 'cazador' || m.policy === 'guardian') ? 'agresiva' : (m.policy || defaultPolicy(critter.role)),
       target: m.target || defaultTarget(critter.role),
+      flanks: !!critter.flanks,
       energy: 0, charge: 0, stunTurns: 0, buffs: [], alive: true, passive: critter.passive, active: critter.active,
     };
   });
@@ -90,19 +91,26 @@ function chooseTarget (u, enemies) {
 }
 function farthest (u, enemies) { let b = null; for (const e of enemies) if (e.alive && (!b || cheb(u, e) > cheb(u, b))) b = e; return b; }
 
-// Mejor celda de ataque libre alrededor del objetivo (dentro de rango), la más
-// cercana a la unidad → permite FLANQUEAR (rodear hacia un hueco libre, incluso
-// detrás del enemigo) en vez de amontonarse de frente.
+// Celda de ataque libre alrededor del objetivo (dentro de rango) a la que dirigirse.
+// Depende del ESTILO de la criatura:
+//  - flanqueadora (u.flanks): considera TODAS las celdas (incl. detrás) y prefiere
+//    la de SU MISMA FILA → distintas unidades toman distintas celdas (se reparten,
+//    rodean). Esto evita que todas vayan a la misma casilla y se encolen.
+//  - frontal: solo celdas del lado que mira a su bando (no rodea) → forma una línea
+//    de frente; si el frente está lleno, espera detrás de sus aliadas.
 function approachCell (u, target, range, occ) {
+  const frontC = u.side === 0 ? -1 : 1;   // hacia dónde está el frente del enemigo respecto a u
   let best = null, bd = Infinity;
   for (let dr = -range; dr <= range; dr++) for (let dc = -range; dc <= range; dc++) {
     if (Math.max(Math.abs(dr), Math.abs(dc)) > range || (!dr && !dc)) continue;
     const r = target.row + dr, c = target.col + dc;
     if (r < 0 || r >= ROWS || c < 0 || c >= COLS) continue;
+    if (!u.flanks && Math.sign(c - target.col) === -frontC) continue;   // frontal: no va por detrás
     const k = r + ',' + c;
-    if (occ[k] && k !== u.row + ',' + u.col) continue;   // ocupada por otro
-    const d = Math.max(Math.abs(u.row - r), Math.abs(u.col - c)) * 100 + Math.abs(u.col - c);
-    if (d < bd) { bd = d; best = { row: r, col: c }; }
+    if (occ[k] && k !== u.row + ',' + u.col) continue;                  // ocupada por otra
+    const dist = Math.max(Math.abs(u.row - r), Math.abs(u.col - c));
+    const score = dist * 1000 + Math.abs(r - u.row) * 40 + Math.abs(c - target.col) * 4 + Math.abs(c - u.col);
+    if (score < bd) { bd = score; best = { row: r, col: c }; }
   }
   return best || { row: target.row, col: target.col };
 }
@@ -160,10 +168,7 @@ function takeTurn (u, enemies, allies, occ, rng, log, force) {
   // Aguantar (defensiva / guardián), SALVO que `force` rompa el estancamiento: si
   // la ronda anterior no hubo ataques ni movimientos, todos avanzan (evita empates
   // por bloqueo mutuo cuando ambos bandos son defensivos).
-  if (!force) {
-    if (u.policy === 'defensiva') { u.energy = Math.min(ab.cost, u.energy + 8); return; }
-    if (u.policy === 'guardian' && cheb(u, target) <= 2) { u.energy = Math.min(ab.cost, u.energy + 8); return; }
-  }
+  if (!force && u.policy === 'defensiva') { u.energy = Math.min(ab.cost, u.energy + 8); return; }
   const goal = approachCell(u, target, u.range, occ);
   if (stepToward(u, goal, occ, log)) {
     if (cheb(u, target) <= u.range) attackTarget(u, target, rng, log);

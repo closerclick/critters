@@ -42,6 +42,24 @@ watch(() => props.payload, start);
 
 const outcome = computed(() => props.payload.win ? 'win' : (res().winner === 'draw' ? 'draw' : 'lose'));
 function next () { if (props.payload.nextNode) emit('next', props.payload.nextNode); }
+
+// Resumen al terminar: por cada critter de tu equipo (lado 0), daño hecho/recibido
+// y vida restante, más el daño total recibido por el equipo. Se computa del log.
+const summary = computed(() => {
+  if (!finished.value) return null;
+  const dealt = {}, taken = {};
+  for (const e of res().log) {
+    if (e.t === 'attack' || e.t === 'thorns') {
+      if (e.by) dealt[e.by] = (dealt[e.by] || 0) + (e.dmg || 0);
+      if (e.target) taken[e.target] = (taken[e.target] || 0) + (e.dmg || 0);
+    }
+  }
+  const mine = res().units.filter(u => u.side === 0).map(u => ({
+    name: u.name, hp: Math.max(0, U[u.uid] ? U[u.uid].hp : 0), maxHp: u.maxHp,
+    dealt: dealt[u.uid] || 0, taken: taken[u.uid] || 0, dead: U[u.uid] && U[u.uid].dead,
+  }));
+  return { mine, totalTaken: mine.reduce((s, m) => s + m.taken, 0) };
+});
 </script>
 
 <template>
@@ -65,6 +83,16 @@ function next () { if (props.payload.nextNode) emit('next', props.payload.nextNo
       <div class="big" :class="outcome === 'win' ? 'win' : (outcome === 'lose' ? 'lose' : '')">{{ outcome === 'win' ? t('victoria') : (outcome === 'lose' ? t('derrota') : t('empate')) }}</div>
       <p class="hint" v-if="payload.win && payload.reward">+🪙{{ payload.reward.coins }} · +🔹{{ payload.reward.frags }}</p>
       <p class="hint" v-if="payload.captured">✨ {{ t('capturaste') }} {{ critterById(payload.captured.id).name }}</p>
+
+      <div class="summary" v-if="summary">
+        <div class="sum-total">🛡 {{ t('dRecibido') }}: <b>{{ summary.totalTaken }}</b></div>
+        <div class="sum-row" v-for="(m, i) in summary.mine" :key="i" :class="{ dead: m.dead }">
+          <span class="sum-name">{{ m.name }}</span>
+          <span class="sum-hp">❤ {{ m.hp }}/{{ m.maxHp }}</span>
+          <span class="sum-d">⚔ {{ m.dealt }}</span>
+          <span class="sum-t">🛡 {{ m.taken }}</span>
+        </div>
+      </div>
       <div class="row-btns">
         <button class="btn sec" @click="start">↻ {{ t('repetir') }}</button>
         <button v-if="payload.win && payload.nextNode" class="btn" @click="next">{{ t('siguiente') }} →</button>
@@ -96,4 +124,11 @@ function next () { if (props.payload.nextNode) emit('next', props.payload.nextNo
 .dmgnum.heal{color:#86efac}
 @keyframes rise{0%{opacity:0;transform:translateY(5px)}25%{opacity:1}100%{opacity:0;transform:translateY(-16px)}}
 .field-tags{display:flex;justify-content:space-between;font-family:var(--fdisplay);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.12em;padding:0 4px}
+.summary{margin:8px auto 2px;max-width:340px;width:100%;background:rgba(167,139,250,.06);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.sum-total{font-family:var(--fmono);font-size:12.5px;text-align:center;margin-bottom:6px}
+.sum-total b{color:var(--bad)}
+.sum-row{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;font-size:11.5px;font-family:var(--fmono);padding:2px 0;align-items:center}
+.sum-row .sum-name{font-family:var(--fbody);font-weight:700;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sum-row .sum-hp{color:var(--good)} .sum-row .sum-d{color:var(--gold)} .sum-row .sum-t{color:var(--muted)}
+.sum-row.dead{opacity:.5} .sum-row.dead .sum-hp{color:var(--bad)}
 </style>
