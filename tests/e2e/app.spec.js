@@ -13,7 +13,7 @@ test('elegir criatura inicial (1 de 3) y pelear nivel 1', async ({ page }) => {
   await expect(page.locator('.tabs')).toBeVisible()
   const n = await page.evaluate(async () => (await import('/src/game/state.js')).game.collection.length)
   expect(n).toBe(1)
-  await page.locator('.lvls .lvl').first().click()
+  await page.locator('.web .node.core').click({ force: true })   // nodo central de la telaraña
   await expect(page.locator('.battle')).toBeVisible()
   await page.locator('.arena').click()
   await expect(page.locator('.bresult .big')).toBeVisible()

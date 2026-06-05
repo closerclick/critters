@@ -1,7 +1,7 @@
 // Acciones del juego: invocación (gacha), XP/nivel, gestión del equipo 3×3 y
 // batalla de campaña. Operan sobre el estado reactivo y persisten.
 import { game, persist, newUid, instanceByUid } from './state.js';
-import { enemyTeam, reward, captureDrop, campaignBattleSeed } from './campaign.js';
+import { neighbors, nodeById, enemyTeam, reward, captureDrop, nodeBattleSeed } from './campaign.js';
 import { simulate } from '../battle/engine.js';
 import { xpForNext } from '../critter/forge.js';
 
@@ -73,30 +73,40 @@ export function teamInstances () {
   game.team.forEach((uid, slot) => { if (uid) { const inst = instanceByUid(uid); if (inst) out.push({ slot, instance: inst }); } });
   return out;
 }
-export function teamSnapshot () { return teamInstances().map(x => ({ id: x.instance.id, level: x.instance.level, slot: x.slot })); }
+export function teamSnapshot () { return teamInstances().map(x => ({ id: x.instance.id, level: x.instance.level, slot: x.slot, policy: x.instance.policy })); }
 
-/** Pelea el nivel n de la campaña con el equipo actual. */
-export function fightCampaign (n) {
+/** Cambia la política de decisión de una instancia. */
+export function setPolicy (uid, policy) { const i = instanceByUid(uid); if (i) { i.policy = policy; persist(); } }
+
+// ---- telaraña de campaña ----
+export function isUnlocked (id) { return id === 'core' || neighbors(game.seed, id).some(nb => game.cleared.includes(nb)); }
+
+/** Pelea el NODO de la telaraña con el equipo actual. */
+export function fightCampaign (nodeId) {
+  const node = nodeById(game.seed, nodeId);
+  if (!node) return { error: 'node' };
+  if (!isUnlocked(nodeId)) return { error: 'locked' };
   const ti = teamInstances();
   if (!ti.length) return { error: 'noteam' };
-  const mine = ti.map(x => ({ id: x.instance.id, level: x.instance.level, slot: x.slot }));
-  const enemies = enemyTeam(n);
-  const seed = campaignBattleSeed(mine, n);
-  const result = simulate(mine, enemies, seed);
+  const mine = ti.map(x => ({ id: x.instance.id, level: x.instance.level, slot: x.slot, policy: x.instance.policy }));
+  const enemies = enemyTeam(node, game.seed);
+  const result = simulate(mine, enemies, nodeBattleSeed(mine, node, game.seed));
   const win = result.winner === 'A';
-  const payload = { result, win, level: n };
+  const payload = { result, win, node: node.id, level: node.diff, boss: node.boss };
   if (win) {
-    const firstClear = n >= game.campaignMax;
-    const rw = reward(n);
+    const firstClear = !game.cleared.includes(node.id);
+    const rw = reward(node);
     game.wallet.coins += rw.coins; game.wallet.frags += rw.frags;
     payload.reward = rw;
-    for (const x of ti) awardXp(x.instance, 20 + n * 4);
+    for (const x of ti) awardXp(x.instance, 18 + node.diff * 4);
     if (firstClear) {
-      game.campaignMax = Math.max(game.campaignMax, n + 1);
+      game.cleared.push(node.id);
       payload.firstClear = true;
-      const drop = captureDrop(n);
+      const drop = captureDrop(node, game.seed);
       if (drop) payload.captured = addCritter(drop, 1);
     }
+    const nb = neighbors(game.seed, node.id).find(id => isUnlocked(id) && !game.cleared.includes(id));
+    if (nb) payload.nextNode = nb;
     persist();
   }
   return payload;

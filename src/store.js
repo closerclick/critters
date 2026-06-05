@@ -44,3 +44,6 @@ export async function saveDoc (thread, doc) {
   try { await b.removeThread(thread); } catch {}
   await b.appendMessage(thread, { id: 'doc', ts: Date.now(), doc });
 }
+
+/** Borra la partida guardada en el store (para "borrar datos"). */
+export async function clearSave () { const b = await getBackend(); try { await b.removeThread(SAVE_THREAD); } catch {} }

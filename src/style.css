@@ -154,5 +154,12 @@ button{font-family:inherit;cursor:pointer;color:inherit}
 .bresult .big.win{color:var(--good);text-shadow:0 0 24px rgba(74,222,128,.5)} .bresult .big.lose{color:var(--bad)}
 .row-btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:8px}
 
+/* ---- modal de borrado / overlay genérico ---- */
+.tb-btn.danger{border-color:rgba(255,93,108,.4);color:#ff8a96}
+.overlay{position:fixed;inset:0;z-index:50;background:rgba(2,4,12,.7);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:18px}
+.warn-card{background:var(--panel2);border:1px solid var(--bad);border-radius:16px;max-width:360px;width:100%;padding:20px;text-align:center;box-shadow:0 16px 50px rgba(0,0,0,.6)}
+.warn-card h2{font-family:var(--fdisplay);font-size:19px;margin-bottom:8px}
+.btn.danger{background:linear-gradient(180deg,#ff7884,#e11d48);color:#fff;box-shadow:0 6px 18px rgba(225,29,72,.4)}
+
 /* ---- toast ---- */
 .toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line2);padding:11px 18px;border-radius:12px;font-size:13px;font-weight:600;z-index:40;box-shadow:0 10px 30px rgba(0,0,0,.6);max-width:90vw;text-align:center}

@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
-import { game, loadGame } from './game/state.js';
+import { game, loadGame, resetGame } from './game/state.js';
 import { fightCampaign } from './game/actions.js';
 import { i18n, t, toggleLang } from './i18n.js';
 import { nav } from './nav.js';
@@ -15,6 +15,7 @@ const needsStarter = computed(() => game.ready && game.collection.length === 0);
 
 const tab = ref('campana');
 const battle = ref(null);
+const showReset = ref(false);
 const toast = ref('');
 let toastT = null;
 function showToast (m) { toast.value = m; clearTimeout(toastT); toastT = setTimeout(() => { toast.value = ''; }, 1900); }
@@ -53,6 +54,7 @@ watch(battle, (b) => {
       <span class="frag">🔹 {{ game.wallet.frags }}</span>
     </div>
     <button class="tb-btn" @click="toggleLang">{{ i18n.lang === 'es' ? 'EN' : 'ES' }}</button>
+    <button class="tb-btn danger" :title="t('borrarTitulo')" @click="showReset = true">🗑</button>
     <closer-click-install class="cc-install"></closer-click-install>
   </div>
 
@@ -74,5 +76,16 @@ watch(battle, (b) => {
   <BattleView v-if="battle" :payload="battle" @close="onClose" @next="onNext" />
 
   <div class="toast" v-if="toast">{{ toast }}</div>
+
+  <div v-if="showReset" class="overlay" @click.self="showReset = false">
+    <div class="warn-card">
+      <h2>⚠️ {{ t('borrarTitulo') }}</h2>
+      <p class="hint">{{ t('borrarWarn') }}</p>
+      <div class="row-btns">
+        <button class="btn sec" @click="showReset = false">{{ t('cancelar') }}</button>
+        <button class="btn danger" @click="resetGame()">{{ t('borrar') }}</button>
+      </div>
+    </div>
+  </div>
   </template>
 </template>

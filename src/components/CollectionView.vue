@@ -1,9 +1,10 @@
 <script setup>
 import { ref } from 'vue';
 import { game, instanceByUid, critterById } from '../game/state.js';
-import { feed, FEED_COST } from '../game/actions.js';
+import { feed, FEED_COST, setPolicy } from '../game/actions.js';
 import { critterSvg } from '../critter/svg.js';
 import { ACTIVES, PASSIVES } from '../critter/abilities.js';
+import { POLICIES, POLICY_INFO, defaultPolicy } from '../battle/policies.js';
 import { t, loc } from '../i18n.js';
 import CritterCard from './CritterCard.vue';
 
@@ -17,6 +18,8 @@ const svgBig = () => { const c = critter(); return c ? critterSvg(c, 130) : ''; 
 const activeInfo = () => { const c = critter(); return c ? ACTIVES[c.active] : null; };
 const passiveInfo = () => { const c = critter(); return c ? PASSIVES[c.passive] : null; };
 function doFeed () { const r = feed(detail.value); if (r.error === 'frags') err.value = t('sinFrags'); else err.value = ''; }
+const curPolicy = () => { const i = inst(), c = critter(); return (i && i.policy) || (c ? defaultPolicy(c.role) : 'agresiva'); };
+function setPol (p) { setPolicy(detail.value, p); }
 </script>
 
 <template>
@@ -35,6 +38,13 @@ function doFeed () { const r = feed(detail.value); if (r.error === 'frags') err.
       <div style="text-align:left;font-size:13px;margin:8px 0">
         <p style="margin:6px 0"><b style="color:var(--accent)">{{ t('activa') }}:</b> {{ loc(activeInfo()) }} — <span style="color:var(--muted)">{{ loc(activeInfo()?.d) }}</span></p>
         <p style="margin:6px 0"><b style="color:var(--accent)">{{ t('pasiva') }}:</b> {{ loc(passiveInfo()) }} — <span style="color:var(--muted)">{{ loc(passiveInfo()?.d) }}</span></p>
+      </div>
+      <div style="margin:8px 0">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">{{ t('politica') }}</div>
+        <div class="chips" style="justify-content:center">
+          <button v-for="p in POLICIES" :key="p" class="chip" :style="curPolicy() === p ? { background: 'var(--accent2)', color: '#fff', borderColor: 'var(--accent)' } : {}" @click="setPol(p)">{{ loc(POLICY_INFO[p]) }}</button>
+        </div>
+        <div class="hint" style="margin-top:5px;text-align:center">{{ loc(POLICY_INFO[curPolicy()]?.d) }}</div>
       </div>
       <div class="row-btns">
         <button class="btn" :disabled="game.wallet.frags < FEED_COST" @click="doFeed">{{ t('alimentar') }} · 🔹{{ FEED_COST }}</button>

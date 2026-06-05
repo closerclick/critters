@@ -36,7 +36,10 @@ export function critterSvg (critter, size = 96) {
   const hasTh = (a.thorax ?? -1) >= 0, hasAb = (a.abdomen ?? -1) >= 0;
 
   const xC = 50, y0 = 24, y1 = 50, y2 = 76, rowY = [y0, y1, y2];
-  const lowestY = hasAb ? y2 : (hasTh ? y1 : y0);
+  const L0 = Math.max(0, Math.min(6, a.legs | 0));
+  const legRowMax = L0 >= 5 ? 2 : L0 >= 3 ? 1 : L0 >= 1 ? 0 : -1;   // fila más baja con patas
+  const segLow = hasAb ? y2 : (hasTh ? y1 : y0);
+  const lowestY = Math.max(segLow, legRowMax >= 0 ? rowY[legRowMax] : 0);   // la espina llega hasta las patas
 
   // ---- patas en las celdas laterales (angulares, oscuras, detrás) ----
   const LEG_CELLS = [[0, -1], [0, 1], [1, -1], [1, 1], [2, -1], [2, 1]];
@@ -97,9 +100,20 @@ export function critterSvg (critter, size = 96) {
       + `<polyline points="${xC + 3},${y0 - 11} ${xC + 8},${y0 - 18} ${xC + 6},${y0 - 24}" fill="none" stroke="${edge}" stroke-width="2" stroke-linejoin="miter"/>`;
   }
 
+  // ---- encuadre: centrar y escalar el bicho dentro del círculo según su tamaño ----
+  const headTop = a.antennae ? (y0 - 24) : (a.head === 1 ? (y0 - 15) : (a.head === 2 ? (y0 - 19) : (y0 - 13)));
+  const segBottom = hasAb ? (y2 + 18) : (hasTh ? (y1 + 12) : (y0 + 13));
+  const legBottom = legRowMax >= 0 ? (rowY[legRowMax] + 8) : 0;
+  const minY = headTop, maxY = Math.max(segBottom, legBottom);
+  const halfW = L0 > 0 ? 34 : 16;
+  const cy = (minY + maxY) / 2;
+  let s = 80 / Math.max(maxY - minY, 2 * halfW);
+  s = Math.max(0.7, Math.min(1.7, s));
+  const tf = `translate(50 50) scale(${s.toFixed(3)}) translate(${-xC} ${(-cy).toFixed(2)})`;
+
   return `<svg viewBox="0 0 100 100" width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${critter.name || 'critter'}">
   <defs><linearGradient id="${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${cTop}"/><stop offset="1" stop-color="${cBot}"/></linearGradient></defs>
   <circle cx="50" cy="50" r="48" fill="none" stroke="${ri.color}" stroke-width="3" opacity=".8"/>
-  <g>${legs}${spine}${abdomen}${thorax}${head}${ant}${eyes}</g>
+  <g transform="${tf}">${legs}${spine}${abdomen}${thorax}${head}${ant}${eyes}</g>
 </svg>`;
 }
