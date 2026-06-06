@@ -5,18 +5,18 @@ import { feed, FEED_COST, setPolicy, setTarget, adjustAlloc, resetAlloc } from '
 import { critterSvg } from '../critter/svg.js';
 import { statsAtLevel, STAT_KEYS, pointsFree, xpForNext, RARITY_BY_KEY } from '../critter/forge.js';
 import { ACTIVES, PASSIVES } from '../critter/abilities.js';
-import { elementInfo } from '../critter/types.js';
+import { elementInfo, ELEMENT_INFO, comps } from '../critter/types.js';
 import { POLICIES, POLICY_INFO, defaultPolicy, TARGET_INFO, normalizeTarget } from '../battle/policies.js';
 import { t, loc } from '../i18n.js';
 
 // Perfil + configuración de UNA criatura. Se abre tocando su avatar en cualquier
-// vista (colección, equipo) — nunca en pelea.
+// vista (colección, equipo) — nunca en pelea. Separado en pestañas.
 const props = defineProps({ uid: String });
 const emit = defineEmits(['close']);
 
 const inst = computed(() => instanceByUid(props.uid));
 const critter = computed(() => { const i = inst.value; return i ? critterById(i.id) : null; });
-const svgBig = computed(() => critter.value ? critterSvg(critter.value, 130) : '');
+const svgBig = computed(() => critter.value ? critterSvg(critter.value, 110) : '');
 const stats = computed(() => critter.value ? statsAtLevel(critter.value, inst.value.level, inst.value.alloc) : null);
 const free = computed(() => inst.value ? pointsFree(inst.value.level, inst.value.alloc) : 0);
 const activeInfo = computed(() => critter.value ? ACTIVES[critter.value.active] : null);
@@ -25,10 +25,27 @@ const rar = computed(() => critter.value ? RARITY_BY_KEY[critter.value.rarity] :
 const elInfo = computed(() => critter.value ? elementInfo(critter.value.element) : null);
 const curPolicy = computed(() => { const i = inst.value, c = critter.value; return (i && i.policy) || (c ? defaultPolicy(c.role) : 'agresiva'); });
 
+// Composición de INGREDIENTES (multiset de bases con multiplicidad) → barra + leyenda.
+const ingredients = computed(() => {
+  const c = critter.value; if (!c) return [];
+  const counts = {}; for (const k of comps(c.element)) if (ELEMENT_INFO[k]) counts[k] = (counts[k] || 0) + 1;
+  const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
+  return ['fuego', 'agua', 'planta'].filter(b => counts[b]).map(b => ({ key: b, n: counts[b], pct: Math.round(100 * counts[b] / total), info: ELEMENT_INFO[b] }));
+});
+const ingTotal = computed(() => ingredients.value.reduce((a, x) => a + x.n, 0));
+
 // XP hacia el siguiente nivel.
 const xpCur = computed(() => inst.value ? inst.value.xp : 0);
 const xpNeed = computed(() => xpForNext(inst.value ? inst.value.level : 1));
 const xpPct = computed(() => Math.min(100, Math.round(100 * xpCur.value / xpNeed.value)));
+
+const TABS = [
+  { k: 'stats', i: '📊', l: 'tabStats' },
+  { k: 'elem', i: '🧪', l: 'tabElemento' },
+  { k: 'hab', i: '✦', l: 'tabHabilidades' },
+  { k: 'comb', i: '⚔', l: 'tabCombate' },
+];
+const tab = ref('stats');
 
 const err = ref('');
 const allocOf = (s) => { const i = inst.value; return (i && i.alloc && i.alloc[s]) || 0; };
@@ -40,7 +57,7 @@ function doFeed () { const r = feed(props.uid); err.value = (r && r.error === 'f
 
 // Prioridad de objetivos: lista reordenable por drag & drop (puntero, mobile-friendly).
 const order = ref([]);
-watch(() => props.uid, () => { order.value = normalizeTarget(inst.value && inst.value.target, critter.value && critter.value.role); }, { immediate: true });
+watch(() => props.uid, () => { order.value = normalizeTarget(inst.value && inst.value.target, critter.value && critter.value.role); tab.value = 'stats'; }, { immediate: true });
 const dragIdx = ref(-1);
 function tDown (e, i) { e.preventDefault(); dragIdx.value = i; window.addEventListener('pointermove', tMove, { passive: false }); window.addEventListener('pointerup', tUp); }
 function tMove (e) {
@@ -60,23 +77,21 @@ onUnmounted(() => { window.removeEventListener('pointermove', tMove); window.rem
   <div class="detail-modal" @click.self="emit('close')">
     <div class="detail-card" v-if="critter">
       <div v-html="svgBig" style="display:flex;justify-content:center"></div>
-      <h2 style="margin-top:6px">{{ critter.name }}</h2>
-      <div class="chips" style="justify-content:center;margin:8px 0">
+      <h2 style="margin-top:4px">{{ critter.name }}</h2>
+      <div class="chips" style="justify-content:center;margin:6px 0 4px">
         <span class="chip">{{ t('nv') }}{{ inst.level }}</span>
         <span v-if="rar" class="chip" :style="{ color: rar.color, borderColor: rar.color }">{{ loc(rar) }}</span>
-        <span v-if="elInfo" class="chip" :style="{ color: elInfo.color }">{{ loc(elInfo) }}</span>
       </div>
 
-      <div class="xpbar"><i :style="{ width: xpPct + '%' }"></i></div>
-      <div class="xp-cap">XP {{ xpCur }}/{{ xpNeed }} · {{ Math.max(0, xpNeed - xpCur) }} → {{ t('nv') }}{{ inst.level + 1 }}</div>
-
-      <div style="text-align:left;font-size:13px;margin:8px 0">
-        <p style="margin:6px 0"><b style="color:var(--accent)">{{ t('activa') }}:</b> {{ loc(activeInfo) }} — <span style="color:var(--muted)">{{ loc(activeInfo?.d) }}</span></p>
-        <p style="margin:6px 0"><b style="color:var(--accent)">{{ t('pasiva') }}:</b> {{ loc(passiveInfo) }} — <span style="color:var(--muted)">{{ loc(passiveInfo?.d) }}</span></p>
+      <div class="dtabs">
+        <button v-for="x in TABS" :key="x.k" class="dtab" :class="{ on: tab === x.k }" @click="tab = x.k">{{ x.i }} {{ t(x.l) }}</button>
       </div>
 
-      <div style="margin:10px 0">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <!-- STATS -->
+      <div v-show="tab === 'stats'" class="dpane">
+        <div class="xpbar"><i :style="{ width: xpPct + '%' }"></i></div>
+        <div class="xp-cap">XP {{ xpCur }}/{{ xpNeed }} · {{ Math.max(0, xpNeed - xpCur) }} → {{ t('nv') }}{{ inst.level + 1 }}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0 4px">
           <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">{{ t('puntos') }} · {{ t('lblLibres') }}: <b style="color:var(--cyan)">{{ free }}</b></span>
           <button class="chip" @click="resetPts">{{ t('resetear') }}</button>
         </div>
@@ -89,16 +104,38 @@ onUnmounted(() => { window.removeEventListener('pointermove', tMove); window.rem
         </div>
       </div>
 
-      <div style="margin:8px 0">
+      <!-- ELEMENTO + composición de ingredientes -->
+      <div v-show="tab === 'elem'" class="dpane">
+        <div class="chips" style="justify-content:center;margin-bottom:8px">
+          <span v-if="elInfo" class="chip" :style="{ color: elInfo.color, borderColor: elInfo.color }">{{ loc(elInfo) }}</span>
+        </div>
+        <div class="comp-title">{{ t('composicion') }}</div>
+        <div class="comp-bar">
+          <span v-for="g in ingredients" :key="g.key" class="comp-seg" :style="{ width: g.pct + '%', background: g.info.color }"></span>
+        </div>
+        <div class="comp-legend">
+          <span v-for="g in ingredients" :key="g.key" class="comp-leg">
+            <span class="comp-dot" :style="{ background: g.info.color }"></span>{{ loc(g.info) }} <b>×{{ g.n }}</b>
+          </span>
+        </div>
+        <div class="hint" style="margin-top:6px">{{ ingTotal }} {{ t('ingredientes') }} · {{ ingredients.length }} {{ t('distintos') }}</div>
+      </div>
+
+      <!-- HABILIDADES -->
+      <div v-show="tab === 'hab'" class="dpane" style="text-align:left;font-size:13px">
+        <p style="margin:8px 0"><b style="color:var(--accent)">{{ t('activa') }}:</b> {{ loc(activeInfo) }}<br><span style="color:var(--muted)">{{ loc(activeInfo?.d) }}</span></p>
+        <p style="margin:8px 0"><b style="color:var(--accent)">{{ t('pasiva') }}:</b> {{ loc(passiveInfo) }}<br><span style="color:var(--muted)">{{ loc(passiveInfo?.d) }}</span></p>
+      </div>
+
+      <!-- COMBATE: política + objetivo -->
+      <div v-show="tab === 'comb'" class="dpane">
         <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">{{ t('politica') }}</div>
         <div class="chips" style="justify-content:center">
           <button v-for="p in POLICIES" :key="p" class="chip" :style="curPolicy === p ? { background: 'var(--accent2)', color: '#fff', borderColor: 'var(--accent)' } : {}" @click="setPol(p)">{{ loc(POLICY_INFO[p]) }}</button>
         </div>
         <div class="hint" style="margin-top:5px;text-align:center">{{ loc(POLICY_INFO[curPolicy]?.d) }}</div>
-      </div>
 
-      <div style="margin:8px 0">
-        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">{{ t('objetivo') }}</div>
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:12px 0 6px">{{ t('objetivo') }}</div>
         <div class="tgt-list">
           <div v-for="(k, i) in order" :key="k" class="tgt-row" :data-tidx="i" :class="{ drag: dragIdx === i }" @pointerdown="tDown($event, i)">
             <span class="tgt-handle">⠿</span>
@@ -109,11 +146,11 @@ onUnmounted(() => { window.removeEventListener('pointermove', tMove); window.rem
         <div class="hint" style="margin-top:6px;text-align:center">{{ t('objetivoHint') }}</div>
       </div>
 
-      <div class="row-btns">
+      <div class="row-btns" style="margin-top:12px">
         <button class="btn" :disabled="game.wallet.frags < FEED_COST" @click="doFeed">{{ t('alimentar') }} · 🔹{{ FEED_COST }}</button>
         <button class="btn sec" @click="emit('close')">{{ t('cerrar') }}</button>
       </div>
-      <p class="hint">{{ t('alimentarHint') }}</p>
+      <p class="hint" v-if="tab === 'stats'">{{ t('alimentarHint') }}</p>
       <p v-if="err" class="hint" style="color:var(--bad)">{{ err }}</p>
     </div>
   </div>
@@ -127,9 +164,22 @@ onUnmounted(() => { window.removeEventListener('pointermove', tMove); window.rem
   border-radius:16px;padding:18px;text-align:center;box-shadow:0 22px 60px rgba(0,0,0,.6);animation:dpop .3s cubic-bezier(.2,1.25,.4,1)}
 @keyframes dpop{from{opacity:0;transform:scale(.93)}to{opacity:1;transform:scale(1)}}
 
+.dtabs{display:flex;gap:4px;margin:8px 0 4px;border-bottom:1px solid var(--line);padding-bottom:0}
+.dtab{flex:1 1 0;min-width:0;font-family:var(--fdisplay);font-weight:700;font-size:11px;padding:7px 4px;border:none;background:none;color:var(--muted);
+  border-bottom:2px solid transparent;border-radius:0;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dtab.on{color:var(--text);border-bottom-color:var(--accent)}
+.dpane{min-height:160px;padding-top:8px;animation:dfade .18s ease-out}
+
 .xpbar{height:7px;border-radius:5px;background:rgba(7,6,17,.7);overflow:hidden;margin:0 0 3px;border:1px solid var(--line)}
 .xpbar i{display:block;height:100%;background:linear-gradient(90deg,var(--cyan),var(--accent));transition:width .3s}
-.xp-cap{font-family:var(--fmono);font-size:10.5px;color:var(--muted);margin-bottom:8px}
+.xp-cap{font-family:var(--fmono);font-size:10.5px;color:var(--muted);margin-bottom:4px}
+
+.comp-title{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.comp-bar{display:flex;height:16px;border-radius:8px;overflow:hidden;border:1px solid var(--line);background:rgba(7,6,17,.6)}
+.comp-seg{height:100%;transition:width .3s}
+.comp-legend{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:8px;font-size:12.5px}
+.comp-leg{display:inline-flex;align-items:center;gap:5px}
+.comp-dot{width:11px;height:11px;border-radius:50%;display:inline-block}
 
 .tgt-list{display:flex;flex-direction:column;gap:6px}
 .tgt-row{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:10px;border:1px solid var(--line2);
