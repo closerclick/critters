@@ -26,11 +26,10 @@ test('invocar gasta monedas y agrega a la colección', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('.starter')).toBeVisible()
   await page.locator('.starter .pick').first().click()
-  await page.locator('.tabs button').nth(4).click()    // Invocar (tras Fusión)
+  await page.locator('.tabs button').nth(2).click()    // Colección (Invocar vive acá)
   await page.evaluate(async () => { (await import('/src/game/state.js')).game.wallet.coins = 200 })
   const before = await page.evaluate(async () => (await import('/src/game/state.js')).game.collection.length)
-  await page.locator('.center .btn').click()
-  await expect(page.locator('.center .card')).toBeVisible()
+  await page.locator('.col-summon').click()            // botón Invocar dentro de Colección
   const after = await page.evaluate(async () => (await import('/src/game/state.js')).game.collection.length)
   expect(after).toBe(before + 1)
 })

@@ -24,7 +24,7 @@ function shift (hex, deg) {
 }
 const pts = (arr) => arr.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
 
-export function critterSvg (critter, size = 96) {
+export function critterSvg (critter, size = 96, opts = {}) {
   const a = critter.appearance || { head: 0, thorax: -1, abdomen: -1, legs: 4, legStyle: 1, antennae: true, hue: 0, pattern: 0 };
   const ei = elementInfo(critter.element);
   const ri = RARITY_BY_KEY[critter.rarity] || { color: '#94a3b8' };
@@ -113,7 +113,7 @@ export function critterSvg (critter, size = 96) {
 
   return `<svg viewBox="0 0 100 100" width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${critter.name || 'critter'}">
   <defs><linearGradient id="${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${cTop}"/><stop offset="1" stop-color="${cBot}"/></linearGradient></defs>
-  <circle cx="50" cy="50" r="48" fill="none" stroke="${ri.color}" stroke-width="3" opacity=".8"/>
+  ${opts.frame === false ? '' : `<circle cx="50" cy="50" r="48" fill="none" stroke="${ri.color}" stroke-width="3" opacity=".8"/>`}
   <g transform="${tf}">${legs}${spine}${abdomen}${thorax}${head}${ant}${eyes}</g>
 </svg>`;
 }

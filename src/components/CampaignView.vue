@@ -27,9 +27,11 @@ const terrainShow = (n) => (n.terrain && access(n.id)) ? elementInfo(n.terrain).
 const BASE = 3.4 * RING_GAP;         // mundo visible en la dimensión MENOR
 const svgEl = ref(null);
 const vw = ref(BASE), vh = ref(BASE);
+const zoom = ref(1);                  // >1 acerca, <1 aleja (rueda / pinch)
 const panX = ref(0), panY = ref(0);
 const viewBox = computed(() => `${(panX.value - vw.value / 2).toFixed(1)} ${(panY.value - vh.value / 2).toFixed(1)} ${vw.value.toFixed(1)} ${vh.value.toFixed(1)}`);
-function measure () { const el = svgEl.value; if (!el) return; const r = el.getBoundingClientRect(); const m = Math.min(r.width, r.height) || 1; vw.value = BASE * ((r.width || m) / m); vh.value = BASE * ((r.height || m) / m); }
+function measure () { const el = svgEl.value; if (!el) return; const r = el.getBoundingClientRect(); const m = Math.min(r.width, r.height) || 1; const b = BASE / zoom.value; vw.value = b * ((r.width || m) / m); vh.value = b * ((r.height || m) / m); }
+function setZoom (z) { zoom.value = Math.max(0.4, Math.min(3, z)); measure(); }
 
 function recenter () {
   const open = nodes.value.filter(n => unlocked(n.id) && !cleared(n.id));
@@ -41,17 +43,28 @@ function onResize () { measure(); }
 onMounted(() => { measure(); recenter(); window.addEventListener('resize', onResize); });
 onUnmounted(() => window.removeEventListener('resize', onResize));
 
-// Pan por puntero; tap (sin arrastrar) sobre un nodo = pelear.
-let drag = null, movedFlag = false;
-function onDown (e) { drag = { sx: e.clientX, sy: e.clientY, px: panX.value, py: panY.value }; movedFlag = false; }
-function onMove (e) {
-  if (!drag) return;
-  const w = svgEl.value.clientWidth || 1, k = vw.value / w;
-  const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
-  if (Math.hypot(dx, dy) > 4) movedFlag = true;
-  panX.value = drag.px - dx * k; panY.value = drag.py - dy * k;
+// Pan (1 dedo/arrastre) + PINCH (2 dedos) + rueda. tap (sin mover) sobre un nodo = pelear.
+const pointers = new Map();
+let panStart = null, pinchStart = null, movedFlag = false;
+const pinchDist = () => { const [a, b] = [...pointers.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+function onDown (e) {
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY }); movedFlag = false;
+  if (pointers.size === 1) { panStart = { sx: e.clientX, sy: e.clientY, px: panX.value, py: panY.value }; pinchStart = null; }
+  else if (pointers.size === 2) { pinchStart = { dist: pinchDist() || 1, zoom: zoom.value }; panStart = null; }
 }
-function onUp () { drag = null; }
+function onMove (e) {
+  if (!pointers.has(e.pointerId)) return;
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointers.size >= 2 && pinchStart) { setZoom(pinchStart.zoom * (pinchDist() / pinchStart.dist)); movedFlag = true; }
+  else if (panStart) {
+    const w = svgEl.value.clientWidth || 1, k = vw.value / w;
+    const dx = e.clientX - panStart.sx, dy = e.clientY - panStart.sy;
+    if (Math.hypot(dx, dy) > 4) movedFlag = true;
+    panX.value = panStart.px - dx * k; panY.value = panStart.py - dy * k;
+  }
+}
+function onUp (e) { pointers.delete(e.pointerId); if (pointers.size < 2) pinchStart = null; if (pointers.size === 0) panStart = null; }
+function onWheel (e) { setZoom(zoom.value * (e.deltaY < 0 ? 1.12 : 1 / 1.12)); }
 function play (n) { if (movedFlag) { movedFlag = false; return; } if (unlocked(n.id)) emit('fight', n.id); }
 </script>
 
@@ -60,7 +73,7 @@ function play (n) { if (movedFlag) { movedFlag = false; return; } if (unlocked(n
   <p class="hint" v-if="teamCount() === 0">{{ t('equipoVacio') }}</p>
   <div class="webwrap">
     <svg ref="svgEl" :viewBox="viewBox" class="web" preserveAspectRatio="xMidYMid meet"
-         @pointerdown="onDown" @pointermove="onMove" @pointerup="onUp" @pointercancel="onUp">
+         @wheel.prevent="onWheel" @pointerdown="onDown" @pointermove="onMove" @pointerup="onUp" @pointercancel="onUp">
       <line v-for="(e, i) in E" :key="i" :x1="nmap[e[0]].x" :y1="nmap[e[0]].y" :x2="nmap[e[1]].x" :y2="nmap[e[1]].y"
             class="thread" :class="{ on: access(e[0]) && access(e[1]) }" />
       <g v-for="n in nodes" :key="n.id" class="node" :class="nodeCls(n)" @click="play(n)">
@@ -71,7 +84,11 @@ function play (n) { if (movedFlag) { movedFlag = false; return; } if (unlocked(n
         <text v-else :x="n.x" :y="n.y + 7" class="lab">◆</text>
       </g>
     </svg>
-    <button class="recenter" @click="recenter" title="centrar">⊙</button>
+    <div class="map-ctrl">
+      <button @click="setZoom(zoom * 1.25)" title="acercar">＋</button>
+      <button @click="setZoom(zoom / 1.25)" title="alejar">－</button>
+      <button @click="recenter" title="centrar">⊙</button>
+    </div>
   </div>
   <p class="hint web-hint">{{ t('webHint') }}</p>
 </template>
@@ -95,7 +112,8 @@ function play (n) { if (movedFlag) { movedFlag = false; return; } if (unlocked(n
 .node.core .dot{fill:#241d44;stroke:var(--cyan)}
 .node.boss .dot{stroke:var(--gold)!important;stroke-width:7}
 .node.boss .lab{fill:var(--gold)}
-.recenter{position:absolute;right:10px;bottom:10px;width:38px;height:38px;border-radius:11px;border:1px solid var(--line2);
-  background:rgba(20,16,40,.85);color:var(--cyan);font-size:18px;backdrop-filter:blur(4px)}
+.map-ctrl{position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;gap:6px}
+.map-ctrl button{width:38px;height:38px;border-radius:11px;border:1px solid var(--line2);
+  background:rgba(20,16,40,.85);color:var(--cyan);font-size:18px;font-weight:800;backdrop-filter:blur(4px)}
 .web-hint{text-align:center;margin-top:6px}
 </style>

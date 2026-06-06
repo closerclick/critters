@@ -27,15 +27,26 @@ function initUnits () {
   for (const u of res().units) U[u.uid] = { ...u, hp: u.maxHp, dead: false, flash: false, dmg: null, dmgClass: '' };
   list.value = res().units.map(u => u.uid);
 }
-const svgFor = (u) => critterSvg(critterById(u.id), 40);
+const svgFor = (u) => critterSvg(critterById(u.id), 40, { frame: false });
 const leftOf = (u) => (u.col / COLS * 100) + '%';
 const topOf = (u) => (u.row / ROWS * 100) + '%';
+
+// Estela de golpe: línea atacante→objetivo en cada ataque (hace visible el diagonal).
+const trails = ref([]);
+let trailN = 0;
+const cxU = (u) => ((u.col + 0.5) / COLS * 100);
+const cyU = (u) => ((u.row + 0.5) / ROWS * 100);
+function addTrail (by, tgt, crit) {
+  const k = ++trailN;
+  trails.value.push({ k, x1: cxU(by), y1: cyU(by), x2: cxU(tgt), y2: cyU(tgt), crit });
+  setTimeout(() => { if (alive) trails.value = trails.value.filter(t => t.k !== k); }, 300);
+}
 
 function showDmg (u, val, cls) { u.dmg = val; u.dmgClass = cls; u.flash = true; setTimeout(() => { if (alive) u.flash = false; }, 220); }
 function applyEv (ev, silent) {
   const u = ev.target && U[ev.target], by = ev.by && U[ev.by];
   if (ev.t === 'move') { if (by) { by.row = ev.r; by.col = ev.c; } }
-  else if (ev.t === 'attack' || ev.t === 'thorns') { if (u) { u.hp = Math.max(0, u.hp - (ev.dmg || 0)); if (!silent) { showDmg(u, ev.dmg, ev.crit ? 'crit' : ''); if (ev.t === 'attack') sfx.hit(ev.crit); } } }
+  else if (ev.t === 'attack' || ev.t === 'thorns') { if (u) { u.hp = Math.max(0, u.hp - (ev.dmg || 0)); if (!silent) { showDmg(u, ev.dmg, ev.crit ? 'crit' : ''); if (ev.t === 'attack') { sfx.hit(ev.crit); if (by) addTrail(by, u, ev.crit); } } } }
   else if (ev.t === 'heal' || ev.t === 'lifesteal' || ev.t === 'regen') { if (u) { u.hp = Math.min(u.maxHp, u.hp + (ev.heal || 0)); if (!silent) { showDmg(u, '+' + (ev.heal || 0), 'heal'); if (ev.t === 'heal') sfx.heal(); } } }
   else if (ev.t === 'active') { if (!silent) sfx.active(); }
   else if (ev.t === 'faint') { if (u) { u.hp = 0; u.dead = true; if (!silent) sfx.faint(); } }
@@ -87,6 +98,9 @@ const summary = computed(() => {
     <div class="arena" @click="skip">
       <div class="field" :style="terrainInfo ? { '--terr': terrainInfo.color } : {}">
         <div class="zone you"></div><div class="zone foe"></div>
+        <svg class="trails" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <line v-for="tr in trails" :key="tr.k" :x1="tr.x1" :y1="tr.y1" :x2="tr.x2" :y2="tr.y2" class="trail" :class="{ crit: tr.crit }" />
+        </svg>
         <div v-for="uid in list" :key="uid" class="fu" :class="{ dead: U[uid].dead, hit: U[uid].flash, foe: U[uid].side === 1, fav: U[uid].terrainFav }"
              :style="{ left: leftOf(U[uid]), top: topOf(U[uid]) }">
           <span v-if="U[uid].flash && U[uid].dmg != null" class="dmgnum" :class="U[uid].dmgClass">{{ U[uid].dmg }}</span>
@@ -152,6 +166,10 @@ const summary = computed(() => {
 .fu.hit .fu-svg{transform:scale(1.14)}
 .fu.fav .fu-svg{filter:drop-shadow(0 0 6px var(--terr,transparent)) drop-shadow(0 2px 5px rgba(0,0,0,.6))}
 .bterrain{font-family:var(--fmono);font-size:11.5px;text-align:center;margin:-2px 0 4px}
+.trails{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3;overflow:visible}
+.trail{stroke:rgba(255,255,255,.85);stroke-width:.7;stroke-linecap:round;animation:trailFade .3s ease-out forwards}
+.trail.crit{stroke:var(--gold);stroke-width:1.1}
+@keyframes trailFade{0%{opacity:0;stroke-width:1.4}25%{opacity:.95}100%{opacity:0}}
 .hpbar{width:80%;height:4px;background:rgba(7,6,17,.85);border-radius:3px;overflow:hidden;margin-top:1px}
 .hpbar i{display:block;height:100%;background:linear-gradient(90deg,#4ade80,#a3e635);transition:width .22s}
 .hpbar.low i{background:linear-gradient(90deg,#ff5d6c,#fb923c)}

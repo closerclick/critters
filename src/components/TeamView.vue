@@ -4,6 +4,7 @@ import { game, instanceByUid, critterById, persist } from '../game/state.js';
 import { placeInSlot, clearSlot, teamCount, setActiveLineup, createLineup, renameLineup, deleteLineup } from '../game/actions.js';
 import { openCritter } from '../ui.js';
 import { critterSvg } from '../critter/svg.js';
+import { pointsFree } from '../critter/forge.js';
 import { elementInfo } from '../critter/types.js';
 import { t } from '../i18n.js';
 
@@ -15,6 +16,7 @@ function critterFor (uid) { const inst = instanceByUid(uid); return inst ? critt
 function svgFor (uid, size) { const c = critterFor(uid); return c ? critterSvg(c, size) : ''; }
 function elColor (uid) { const c = critterFor(uid); return c ? elementInfo(c.element).color : 'var(--line)'; }
 function levelOf (uid) { const i = instanceByUid(uid); return i ? i.level : null; }
+function freePts (uid) { const i = instanceByUid(uid); return i ? pointsFree(i.level, i.alloc) : 0; }
 const bench = computed(() => { const on = new Set(game.team.filter(Boolean)); return game.collection.filter(i => !on.has(i.uid)); });
 
 // Alineaciones: cambiar / crear / renombrar / borrar (una araña puede estar en varias).
@@ -89,6 +91,7 @@ function drop (targetSlot) {
         <template v-if="cellUid(slot - 1) && !(drag.active && drag.from === 'slot' && drag.fromSlot === slot - 1)">
           <div class="tg-svg" v-html="svgFor(cellUid(slot - 1), 56)"></div>
           <span class="tg-lv">{{ t('nv') }}{{ levelOf(cellUid(slot - 1)) }}</span>
+          <span v-if="freePts(cellUid(slot - 1)) > 0" class="tg-pts">✦{{ freePts(cellUid(slot - 1)) }}</span>
         </template>
         <span v-else-if="!cellUid(slot - 1)" class="tg-plus">+</span>
       </div>
@@ -101,6 +104,7 @@ function drop (targetSlot) {
          @pointerdown="onDown($event, i.uid, 'bench', -1)">
       <div class="bench-svg" v-html="svgFor(i.uid, 56)"></div>
       <span class="bench-lv">{{ t('nv') }}{{ levelOf(i.uid) }}</span>
+      <span v-if="freePts(i.uid) > 0" class="bench-pts">✦{{ freePts(i.uid) }}</span>
       <span class="bench-nm">{{ critterFor(i.uid).name }}</span>
     </div>
   </div>
@@ -126,6 +130,8 @@ function drop (targetSlot) {
 .tg-svg{filter:drop-shadow(0 3px 6px rgba(0,0,0,.5))}
 .tg-plus{font-family:var(--fdisplay);font-size:24px;color:var(--muted);opacity:.5}
 .tg-lv{position:absolute;bottom:3px;right:5px;font-family:var(--fmono);font-size:9px;font-weight:700;color:var(--gold)}
+.tg-pts{position:absolute;top:3px;left:50%;transform:translateX(-50%);font-family:var(--fmono);font-size:8.5px;font-weight:800;color:var(--ink);background:var(--cyan);border-radius:6px;padding:0 4px;box-shadow:0 0 6px var(--cyan)}
+.bench-pts{position:absolute;top:3px;right:5px;font-family:var(--fmono);font-size:8.5px;font-weight:800;color:var(--ink);background:var(--cyan);border-radius:6px;padding:0 4px}
 .tg-count{font-family:var(--fmono);font-weight:700;font-size:15px}
 .tg-count span{color:var(--muted)}
 
