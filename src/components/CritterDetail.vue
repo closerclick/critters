@@ -1,12 +1,12 @@
 <script setup>
 import { computed, ref, watch, onUnmounted } from 'vue';
 import { instanceByUid, critterById, game } from '../game/state.js';
-import { feed, FEED_COST, setPolicy, setTarget, adjustAlloc, resetAlloc } from '../game/actions.js';
+import { feed, FEED_COST, setRol, setTarget, adjustAlloc, resetAlloc } from '../game/actions.js';
 import { critterSvg } from '../critter/svg.js';
 import { statsAtLevel, STAT_KEYS, pointsFree, xpForNext, RARITY_BY_KEY } from '../critter/forge.js';
 import { ACTIVES, PASSIVES } from '../critter/abilities.js';
 import { elementInfo, ELEMENT_INFO, comps } from '../critter/types.js';
-import { POLICIES, POLICY_INFO, defaultPolicy, TARGET_INFO, normalizeTarget } from '../battle/policies.js';
+import { ROL_INFO, ROL_KEYS, normalizeRol, normalizeTargets, TARGET_INFO } from '../battle/policies.js';
 import { t, loc } from '../i18n.js';
 
 // Perfil + configuración de UNA criatura. Se abre tocando su avatar en cualquier
@@ -23,7 +23,6 @@ const activeInfo = computed(() => critter.value ? ACTIVES[critter.value.active] 
 const passiveInfo = computed(() => critter.value ? PASSIVES[critter.value.passive] : null);
 const rar = computed(() => critter.value ? RARITY_BY_KEY[critter.value.rarity] : null);
 const elInfo = computed(() => critter.value ? elementInfo(critter.value.element) : null);
-const curPolicy = computed(() => { const i = inst.value, c = critter.value; return (i && i.policy) || (c ? defaultPolicy(c.role) : 'agresiva'); });
 
 // Composición de INGREDIENTES (multiset de bases con multiplicidad) → barra + leyenda.
 const ingredients = computed(() => {
@@ -52,12 +51,21 @@ const allocOf = (s) => { const i = inst.value; return (i && i.alloc && i.alloc[s
 function incPt (s) { adjustAlloc(props.uid, s, 1); }
 function decPt (s) { adjustAlloc(props.uid, s, -1); }
 function resetPts () { resetAlloc(props.uid); }
-function setPol (p) { setPolicy(props.uid, p); }
 function doFeed () { const r = feed(props.uid); err.value = (r && r.error === 'frags') ? t('sinFrags') : ''; }
 
-// Prioridad de objetivos: lista reordenable por drag & drop (puntero, mobile-friendly).
-const order = ref([]);
-watch(() => props.uid, () => { order.value = normalizeTarget(inst.value && inst.value.target, critter.value && critter.value.role); tab.value = 'stats'; }, { immediate: true });
+// Prioridad de ROL + 3 listas de OBJETIVO (una por rol), reordenables por drag & drop.
+const rolOrder = ref([]);     // prioridad de rol
+const targetsObj = ref({});   // { atacante:[...], defensa:[...], soporte:[...] }
+const tgtRol = ref('atacante');   // sub-tab de objetivo seleccionado
+const order = ref([]);        // objetivo del rol seleccionado (vista editable)
+watch(() => props.uid, () => {
+  rolOrder.value = normalizeRol(inst.value && (inst.value.rol || inst.value.policy), critter.value && critter.value.role);
+  targetsObj.value = normalizeTargets(inst.value && inst.value.target);
+  tgtRol.value = 'atacante';
+  order.value = targetsObj.value[tgtRol.value].slice();
+  tab.value = 'stats';
+}, { immediate: true });
+function pickTgtRol (r) { if (r === tgtRol.value) return; tgtRol.value = r; order.value = targetsObj.value[r].slice(); }
 const dragIdx = ref(-1);
 function tDown (e, i) { e.preventDefault(); dragIdx.value = i; window.addEventListener('pointermove', tMove, { passive: false }); window.addEventListener('pointerup', tUp); }
 function tMove (e) {
@@ -69,7 +77,19 @@ function tMove (e) {
   const j = Number(row.dataset.tidx);
   if (j !== dragIdx.value) { const arr = order.value.slice(); const [m] = arr.splice(dragIdx.value, 1); arr.splice(j, 0, m); order.value = arr; dragIdx.value = j; }
 }
-function tUp () { window.removeEventListener('pointermove', tMove); window.removeEventListener('pointerup', tUp); if (dragIdx.value >= 0) { setTarget(props.uid, order.value.slice()); dragIdx.value = -1; } }
+function tUp () { window.removeEventListener('pointermove', tMove); window.removeEventListener('pointerup', tUp); if (dragIdx.value >= 0) { targetsObj.value[tgtRol.value] = order.value.slice(); setTarget(props.uid, tgtRol.value, order.value.slice()); dragIdx.value = -1; } }
+const rolIdx = ref(-1);
+function rDown (e, i) { e.preventDefault(); rolIdx.value = i; window.addEventListener('pointermove', rMove, { passive: false }); window.addEventListener('pointerup', rUp); }
+function rMove (e) {
+  if (rolIdx.value < 0) return;
+  e.preventDefault();
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  const row = el && el.closest && el.closest('[data-ridx]');
+  if (!row) return;
+  const j = Number(row.dataset.ridx);
+  if (j !== rolIdx.value) { const arr = rolOrder.value.slice(); const [m] = arr.splice(rolIdx.value, 1); arr.splice(j, 0, m); rolOrder.value = arr; rolIdx.value = j; }
+}
+function rUp () { window.removeEventListener('pointermove', rMove); window.removeEventListener('pointerup', rUp); if (rolIdx.value >= 0) { setRol(props.uid, rolOrder.value.slice()); rolIdx.value = -1; } }
 onUnmounted(() => { window.removeEventListener('pointermove', tMove); window.removeEventListener('pointerup', tUp); });
 </script>
 
@@ -129,13 +149,19 @@ onUnmounted(() => { window.removeEventListener('pointermove', tMove); window.rem
 
       <!-- COMBATE: política + objetivo -->
       <div v-show="tab === 'comb'" class="dpane">
-        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">{{ t('politica') }}</div>
-        <div class="chips" style="justify-content:center">
-          <button v-for="p in POLICIES" :key="p" class="chip" :style="curPolicy === p ? { background: 'var(--accent2)', color: '#fff', borderColor: 'var(--accent)' } : {}" @click="setPol(p)">{{ loc(POLICY_INFO[p]) }}</button>
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">{{ t('rol') }}</div>
+        <div class="tgt-list">
+          <div v-for="(k, i) in rolOrder" :key="k" class="tgt-row" :data-ridx="i" :class="{ drag: rolIdx === i }" @pointerdown="rDown($event, i)">
+            <span class="tgt-handle">⠿</span>
+            <span class="tgt-num">{{ i + 1 }}</span>
+            <span class="tgt-txt"><b>{{ loc(ROL_INFO[k]) }}</b><small>{{ loc(ROL_INFO[k].d) }}</small></span>
+          </div>
         </div>
-        <div class="hint" style="margin-top:5px;text-align:center">{{ loc(POLICY_INFO[curPolicy]?.d) }}</div>
 
-        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:12px 0 6px">{{ t('objetivo') }}</div>
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:12px 0 6px">{{ t('objetivo') }} · {{ t('porRol') }}</div>
+        <div class="dtabs" style="margin:0 0 6px">
+          <button v-for="r in ROL_KEYS" :key="r" class="dtab" :class="{ on: tgtRol === r }" @click="pickTgtRol(r)">{{ loc(ROL_INFO[r]) }}</button>
+        </div>
         <div class="tgt-list">
           <div v-for="(k, i) in order" :key="k" class="tgt-row" :data-tidx="i" :class="{ drag: dragIdx === i }" @pointerdown="tDown($event, i)">
             <span class="tgt-handle">⠿</span>

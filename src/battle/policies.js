@@ -4,6 +4,31 @@
 //    primero de la lista que tenga un objetivo válido (p. ej. "soporte → a distancia
 //    → débil": si no hay soporte enemigo, prueba a distancia, y si no, remata al débil).
 
+// ROL: lista de PRIORIDAD ordenable (atacante/defensa/soporte). Cada turno el critter usa
+// el PRIMER rol aplicable: soporte solo si puede curar y NO lo están atacando; defensa si lo
+// atacan o está herido; atacante siempre (fallback). Reemplaza a la vieja "política".
+export const ROL_KEYS = ['atacante', 'defensa', 'soporte'];
+export const ROL_INFO = {
+  atacante: { es: 'Atacante', en: 'Attacker', d: { es: 'Avanza y ataca al enemigo.', en: 'Advances and attacks.' } },
+  defensa:  { es: 'Defensa',  en: 'Defense',  d: { es: 'Aguanta; se defiende cuando lo atacan o está herido.', en: 'Holds; defends when attacked or hurt.' } },
+  soporte:  { es: 'Soporte',  en: 'Support',  d: { es: 'Cura/buffa si hay a quién y no lo atacan; si no, pasa al siguiente rol.', en: 'Heals/buffs when possible and safe; else next role.' } },
+};
+export function defaultRol (role) {
+  if (role === 'soporte') return ['soporte', 'defensa', 'atacante'];
+  if (role === 'tanque') return ['defensa', 'atacante', 'soporte'];
+  return ['atacante', 'defensa', 'soporte'];
+}
+// Permutación completa y válida de ROL_KEYS (tolera legacy/parcial/vacío).
+export function normalizeRol (rol, role) {
+  const base = defaultRol(role);
+  if (typeof rol === 'string') rol = [rol];
+  if (!Array.isArray(rol) || !rol.length) return base.slice();
+  const seen = new Set(), out = [];
+  for (const k of rol) if (ROL_KEYS.includes(k) && !seen.has(k)) { seen.add(k); out.push(k); }
+  for (const k of base) if (!seen.has(k)) out.push(k);
+  return out;
+}
+
 export const POLICIES = ['agresiva', 'defensiva'];
 export const POLICY_INFO = {
   agresiva:  { es: 'Agresiva',  en: 'Aggressive', d: { es: 'Avanza, flanquea y ataca al enemigo.', en: 'Advances, flanks and attacks.' } },
@@ -38,11 +63,30 @@ export function defaultTarget (role) {
 // Devuelve SIEMPRE una permutación completa y válida de TARGET_KEYS:
 // tolera legacy (string), arrays parciales o con claves desconocidas, y vacío.
 export function normalizeTarget (target, role) {
-  const base = defaultTarget(role);
+  return normPerm(target, defaultTarget(role));
+}
+function normPerm (target, base) {
   if (typeof target === 'string') target = [target];
   if (!Array.isArray(target) || !target.length) return base.slice();
   const seen = new Set(), out = [];
   for (const k of target) if (TARGET_KEYS.includes(k) && !seen.has(k)) { seen.add(k); out.push(k); }
   for (const k of base) if (!seen.has(k)) out.push(k);   // completa lo que falte
+  return out;
+}
+
+// PRIORIDAD de objetivo POR ROL: cada rol (atacante/defensa/soporte) tiene su propia
+// lista. Default distinto por rol; el atacante remata débiles, la defensa pega al
+// cercano/fuerte, el soporte (cuando ataca) va al soporte/distancia enemigo.
+export function defaultTargetForRol (rolKey) {
+  if (rolKey === 'defensa') return ['cercano', 'fuerte', 'debil', 'rango', 'soporte'];
+  if (rolKey === 'soporte') return ['soporte', 'rango', 'debil', 'cercano', 'fuerte'];
+  return ['debil', 'cercano', 'fuerte', 'rango', 'soporte'];   // atacante
+}
+// Devuelve { atacante:[...], defensa:[...], soporte:[...] }. Acepta legacy (un array para
+// todos) u objeto por rol.
+export function normalizeTargets (target) {
+  const legacy = Array.isArray(target) ? target : null;
+  const out = {};
+  for (const r of ROL_KEYS) out[r] = normPerm(legacy || (target && target[r]), defaultTargetForRol(r));
   return out;
 }

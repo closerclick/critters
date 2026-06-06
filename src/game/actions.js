@@ -74,7 +74,7 @@ export function teamInstances () {
   game.team.forEach((uid, slot) => { if (uid) { const inst = instanceByUid(uid); if (inst) out.push({ slot, instance: inst }); } });
   return out;
 }
-export function teamSnapshot () { return teamInstances().map(x => ({ id: x.instance.id, level: x.instance.level, slot: x.slot, policy: x.instance.policy, target: x.instance.target, alloc: x.instance.alloc })); }
+export function teamSnapshot () { return teamInstances().map(x => ({ id: x.instance.id, level: x.instance.level, slot: x.slot, rol: x.instance.rol, target: x.instance.target, alloc: x.instance.alloc })); }
 
 // ---- alineaciones (varias formaciones; una araña puede estar en varias) ----
 export function setActiveLineup (id) { const l = game.lineups.find(x => x.id === id); if (!l) return; game.activeLineup = id; game.team = l.team; persist(); }
@@ -86,8 +86,9 @@ function purgeUid (uid) { for (const l of game.lineups) for (let i = 0; i < l.te
 
 /** Cambia la política de movimiento de una instancia. */
 export function setPolicy (uid, policy) { const i = instanceByUid(uid); if (i) { i.policy = policy; persist(); } }
+export function setRol (uid, rol) { const i = instanceByUid(uid); if (i) { i.rol = rol; persist(); } }
 /** Cambia la preferencia de objetivo de una instancia. */
-export function setTarget (uid, pref) { const i = instanceByUid(uid); if (i) { i.target = pref; persist(); } }
+export function setTarget (uid, rol, list) { const i = instanceByUid(uid); if (!i) return; const cur = (i.target && !Array.isArray(i.target)) ? { ...i.target } : {}; cur[rol] = list; i.target = cur; persist(); }
 
 // ---- puntos de stat (híbrido; respec libre en cualquier momento) ----
 export function adjustAlloc (uid, stat, delta) {
@@ -150,7 +151,7 @@ export function fightCampaign (nodeId) {
   const ti = teamInstances();
   if (!ti.length) return { error: 'noteam' };
   game.lastNode = node.id;   // recordar el último enfrentamiento (botón "ir al último")
-  const mine = ti.map(x => ({ id: x.instance.id, level: x.instance.level, slot: x.slot, policy: x.instance.policy, target: x.instance.target, alloc: x.instance.alloc }));
+  const mine = ti.map(x => ({ id: x.instance.id, level: x.instance.level, slot: x.slot, rol: x.instance.rol, target: x.instance.target, alloc: x.instance.alloc }));
   const enemies = enemyTeam(node, game.seed);
   const result = simulate(mine, enemies, nodeBattleSeed(mine, node, game.seed), { terrain: node.terrain || null });
   const win = result.winner === 'A';

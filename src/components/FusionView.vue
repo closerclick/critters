@@ -26,6 +26,7 @@ const instA = computed(() => selA.value ? instanceByUid(selA.value) : null);
 const instB = computed(() => selB.value ? instanceByUid(selB.value) : null);
 const others = computed(() => game.collection.filter(i => i.uid !== selA.value));
 const compatOf = (uid) => isCompatibleFuse(selA.value, uid);
+const kindOf = (uid) => fuseKindOf(selA.value, uid);   // 'evolve'|'merge'|'degrade'|null
 const kind = computed(() => (selA.value && selB.value) ? fuseKindOf(selA.value, selB.value) : null);
 const preview = computed(() => (selA.value && selB.value) ? fusePreview(selA.value, selB.value) : null);
 const svgPrev = computed(() => preview.value ? critterSvg(preview.value, 58) : '');
@@ -101,7 +102,7 @@ function doFuse () {
     <div class="fsub" v-if="subLabel">{{ subLabel }}</div>
     <div class="grid-cards" v-if="gridList.length">
       <div v-for="i in gridList" :key="i.uid" @click="choose(i.uid)" class="fcell" :class="{ dim: selA && !selB && !compatOf(i.uid) }">
-        <span v-if="selA && !selB && compatOf(i.uid)" class="ftag ok">✓</span>
+        <span v-if="selA && !selB && compatOf(i.uid)" class="ftag" :class="kindOf(i.uid)">{{ kindOf(i.uid) === 'degrade' ? '↓' : kindOf(i.uid) === 'merge' ? '−' : '↑' }}</span>
         <CritterCard :instance="i" :size="78" />
       </div>
     </div>
@@ -129,8 +130,9 @@ function doFuse () {
 .fsub{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;text-align:center;margin:10px 0 6px}
 .fcell{position:relative;cursor:pointer}
 .fcell.dim{opacity:.28;pointer-events:none;filter:grayscale(.6)}
-.ftag{position:absolute;top:4px;left:50%;transform:translateX(-50%);z-index:3;font-family:var(--fmono);font-size:9px;font-weight:800;
-  padding:1px 6px;border-radius:7px}
-.ftag.ok{background:var(--good);color:#062b12}
-.ftag.weak{background:rgba(120,113,108,.85);color:#e7e5e4}
+.ftag{position:absolute;top:4px;left:50%;transform:translateX(-50%);z-index:3;font-family:var(--fmono);font-size:12px;font-weight:800;
+  padding:0 7px;border-radius:7px;line-height:1.5}
+.ftag.evolve{background:var(--good);color:#062b12}
+.ftag.merge{background:rgba(120,113,108,.9);color:#f5f5f4}
+.ftag.degrade{background:var(--bad,#ef4444);color:#fff}
 </style>

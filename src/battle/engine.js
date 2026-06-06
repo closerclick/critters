@@ -12,7 +12,7 @@ import { typeMultiplier } from '../critter/types.js';
 import { RANGED_ROLES } from '../critter/roles.js';
 import { ACTIVES, PASSIVES } from '../critter/abilities.js';
 import { BAL, basicDamage } from './balance.js';
-import { defaultPolicy, normalizeTarget } from './policies.js';
+import { normalizeRol, normalizeTargets } from './policies.js';
 
 export const COLS = 8, ROWS = 5;
 const ROW_OFFSET = (ROWS - 3) >> 1;   // centra la formación 3×3 verticalmente (filas 1-3 en 5)
@@ -33,8 +33,8 @@ function buildUnits (team, side, terrain) {
       id: m.id, level: lvl, critter, name: critter.name, element: critter.element, role: critter.role, rarity: critter.rarity,
       maxHp: s.HP, hp: s.HP, ATK: s.ATK + (b.atk || 0), DEF: s.DEF + (b.def || 0), SPD: s.SPD,
       range: (ranged ? 3 : 1) + (b.range || 0),
-      policy: (m.policy === 'cazador' || m.policy === 'guardian') ? 'agresiva' : (m.policy || defaultPolicy(critter.role)),
-      target: normalizeTarget(m.target, critter.role),   // prioridad ordenada de objetivos
+      rol: normalizeRol(m.rol || m.policy, critter.role),   // PRIORIDAD de rol (atacante/defensa/soporte)
+      targets: normalizeTargets(m.target),   // 3 listas de prioridad de objetivo (una por rol)
       flanks: !!critter.flanks,
       terrainFav: !!terrain && String(critter.element).split('+').includes(terrain),   // el terreno favorece su(s) elemento(s)
       energy: 0, charge: 0, stunTurns: 0, buffs: [], alive: true, passive: critter.passive, active: critter.active, lastTarget: null,
@@ -193,28 +193,57 @@ function castActive (u, ab, enemies, allies, rng, log) {
   }
 }
 
+// Rol ACTIVO este turno: el primer rol de la prioridad cuya condición se cumple.
+//  - soporte: tiene cura, hay aliado herido y NO lo están atacando (adyacente).
+//  - defensa: lo atacan (enemigo adyacente) o está herido (<40% vida).
+//  - atacante: siempre (fallback).
+function activeRole (u, enemies, allies) {
+  const rol = (u.rol && u.rol.length) ? u.rol : ['atacante'];
+  const ab = ACTIVES[u.active];
+  const canHeal = !!(ab && ab.type === 'heal');
+  const woundedAlly = canHeal && allies.some(a => a.alive && a.hp < a.maxHp);
+  const enemyAdjacent = enemies.some(e => e.alive && cheb(u, e) <= 1);
+  const lowHp = u.hp / u.maxHp < 0.4;
+  for (const r of rol) {
+    if (r === 'soporte') { if (canHeal && woundedAlly && !enemyAdjacent) return 'soporte'; }
+    else if (r === 'defensa') { if (enemyAdjacent || lowHp) return 'defensa'; }
+    else return 'atacante';
+  }
+  return 'atacante';
+}
+
 function takeTurn (u, enemies, allies, occ, rng, log, force) {
   u.buffs = u.buffs.filter(b => (--b.turns) > 0);
   const p = PASSIVES[u.passive];
   if (p && p.regen && u.hp < u.maxHp) { const h = Math.max(1, Math.round(u.maxHp * p.regen)); u.hp = Math.min(u.maxHp, u.hp + h); log.push({ t: 'regen', target: u.uid, heal: h }); }
   if (u.stunTurns > 0) { u.stunTurns--; log.push({ t: 'stun-skip', target: u.uid }); return; }
 
+  const ab = ACTIVES[u.active];
+  const role = activeRole(u, enemies, allies);
+  u.target = u.targets[role] || u.targets.atacante;   // usa la prioridad de objetivo del rol activo
+
+  // SOPORTE: cura al equipo sin rushear; bajo `force` cae al modo normal (anti-estancamiento).
+  if (role === 'soporte' && !force) {
+    if (u.energy >= ab.cost) { castActive(u, ab, enemies, allies, rng, log); u.energy = 0; return; }
+    u.energy = Math.min(ab.cost, u.energy + 10);   // carga apoyo y aguanta
+    return;
+  }
+
   const target = chooseTarget(u, enemies);
   if (!target) return;
-  const ab = ACTIVES[u.active];
   const inRange = cheb(u, target) <= u.range;
   if (u.energy >= ab.cost && (AOE.has(ab.scope) || inRange)) { castActive(u, ab, enemies, allies, rng, log); u.energy = 0; return; }
   if (inRange) { basicAttack(u, target, occ, rng, log); u.energy = Math.min(ab.cost, u.energy + BAL.energyPerAction); return; }
-  // Aguantar (defensiva), SALVO que `force` rompa el estancamiento (ambos defensivos).
-  if (!force && u.policy === 'defensiva') { u.energy = Math.min(ab.cost, u.energy + 8); return; }
-  // Moverse UN casillero consume TODO el ciclo (no ataca tras moverse).
+  // DEFENSA: aguanta su posición, SALVO que `force` rompa el estancamiento.
+  if (role === 'defensa' && !force) { u.energy = Math.min(ab.cost, u.energy + 8); return; }
+  // ATACANTE (o force): avanzar UN casillero (consume el ciclo).
   const goal = approachCell(u, target, u.range, occ);
   if (stepToward(u, goal, occ, log)) u.energy = Math.min(ab.cost, u.energy + 6);
 }
 
 const aliveN = (t) => t.reduce((n, u) => n + (u.alive ? 1 : 0), 0);
 const totHp = (t) => t.reduce((n, u) => n + Math.max(0, u.hp), 0);
-const snap = (u) => ({ uid: u.uid, side: u.side, slot: u.slot, row: u.row, col: u.col, id: u.id, level: u.level, name: u.name, element: u.element, role: u.role, rarity: u.rarity, maxHp: u.maxHp, range: u.range, policy: u.policy, terrainFav: u.terrainFav });
+const snap = (u) => ({ uid: u.uid, side: u.side, slot: u.slot, row: u.row, col: u.col, id: u.id, level: u.level, name: u.name, element: u.element, role: u.role, rarity: u.rarity, maxHp: u.maxHp, range: u.range, terrainFav: u.terrainFav });
 
 export function simulate (teamA, teamB, seed, opts) {
   const terrain = (opts && opts.terrain) || null;

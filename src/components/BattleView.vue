@@ -174,8 +174,8 @@ const summary = computed(() => {
 </template>
 
 <style scoped>
-.arena{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;gap:8px;min-height:0;padding:0 12px}
-.field{position:relative;width:100%;max-width:560px;margin:0 auto;aspect-ratio:8/5;border-radius:14px;border:1px solid var(--line);overflow:hidden;
+.arena{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;gap:8px;min-height:0;padding:0 6px}
+.field{position:relative;width:100%;max-width:760px;margin:0 auto;aspect-ratio:8/5;border-radius:14px;border:1px solid var(--line);overflow:hidden;
   background:linear-gradient(90deg, rgba(124,58,237,.10) 0 37.5%, transparent 37.5% 62.5%, rgba(56,225,214,.10) 62.5% 100%),
   repeating-linear-gradient(90deg, transparent 0 calc(12.5% - 1px), rgba(167,139,250,.10) calc(12.5% - 1px) 12.5%),
   repeating-linear-gradient(0deg, transparent 0 calc(20% - 1px), rgba(167,139,250,.10) calc(20% - 1px) 20%)}
