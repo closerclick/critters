@@ -3,7 +3,7 @@ import { ref, computed } from 'vue';
 import { game, instanceByUid, critterById } from '../game/state.js';
 import { fusePreview, fuseCritters, isCompatibleFuse, fuseKindOf } from '../game/actions.js';
 import { openCritter } from '../ui.js';
-import { elementInfo } from '../critter/types.js';
+import { elementInfo, ELEMENT_INFO, comps } from '../critter/types.js';
 import { RARITY_BY_KEY, statsAtLevel } from '../critter/forge.js';
 import { critterSvg } from '../critter/svg.js';
 import { t, loc } from '../i18n.js';
@@ -11,6 +11,13 @@ import CritterCard from './CritterCard.vue';
 
 const svgFor = (inst) => inst ? critterSvg(critterById(inst.id), 58) : '';
 const nameOf = (inst) => inst ? critterById(inst.id).name : '';
+// Ingredientes (bases con multiplicidad) de un descriptor → [{key,n,info}].
+const ingOf = (critter) => {
+  if (!critter) return [];
+  const counts = {}; for (const k of comps(critter.element)) if (ELEMENT_INFO[k]) counts[k] = (counts[k] || 0) + 1;
+  return ['fuego', 'agua', 'planta'].filter(b => counts[b]).map(b => ({ key: b, n: counts[b], info: ELEMENT_INFO[b] }));
+};
+const critOf = (inst) => inst ? critterById(inst.id) : null;
 
 const selA = ref(null);
 const selB = ref(null);
@@ -25,6 +32,9 @@ const svgPrev = computed(() => preview.value ? critterSvg(preview.value, 58) : '
 const prevEl = computed(() => preview.value ? elementInfo(preview.value.element) : null);
 const prevRar = computed(() => preview.value ? RARITY_BY_KEY[preview.value.rarity] : null);
 const prevStats = computed(() => preview.value ? statsAtLevel(preview.value, instA.value ? instA.value.level : 1) : null);
+const ingA = computed(() => ingOf(critOf(instA.value)));
+const ingB = computed(() => ingOf(critOf(instB.value)));
+const ingRes = computed(() => ingOf(preview.value));
 
 const gridList = computed(() => {
   if (!selA.value) return game.collection;
@@ -57,17 +67,20 @@ function doFuse () {
   <template v-if="game.collection.length >= 2">
     <div class="fuse-bar">
       <div class="fslot" :class="{ on: selA }" @click="clearA">
-        <template v-if="instA"><div class="fp" v-html="svgFor(instA)"></div><span class="fn">{{ nameOf(instA) }}</span></template>
+        <template v-if="instA"><div class="fp" v-html="svgFor(instA)"></div><span class="fn">{{ nameOf(instA) }}</span>
+          <div class="fing"><span v-for="g in ingA" :key="g.key" class="fdot" :style="{ '--c': g.info.color }">{{ g.n }}</span></div></template>
         <span v-else class="q">A</span>
       </div>
       <span class="op">+</span>
       <div class="fslot" :class="{ on: selB }" @click="selB = null">
-        <template v-if="instB"><div class="fp" v-html="svgFor(instB)"></div><span class="fn">{{ nameOf(instB) }}</span></template>
+        <template v-if="instB"><div class="fp" v-html="svgFor(instB)"></div><span class="fn">{{ nameOf(instB) }}</span>
+          <div class="fing"><span v-for="g in ingB" :key="g.key" class="fdot" :style="{ '--c': g.info.color }">{{ g.n }}</span></div></template>
         <span v-else class="q">B</span>
       </div>
       <span class="op">=</span>
       <div class="fslot res">
-        <template v-if="preview"><div class="fp" v-html="svgPrev"></div><span class="fn">{{ preview.name }}</span></template>
+        <template v-if="preview"><div class="fp" v-html="svgPrev"></div><span class="fn">{{ preview.name }}</span>
+          <div class="fing"><span v-for="g in ingRes" :key="g.key" class="fdot" :style="{ '--c': g.info.color }">{{ g.n }}</span></div></template>
         <span v-else class="q">?</span>
       </div>
     </div>
@@ -77,12 +90,12 @@ function doFuse () {
         <span class="dot">·</span> {{ loc(prevEl) }}
         <span class="dot">·</span> <span :style="{ color: prevRar.color }">{{ loc(prevRar) }}</span></div>
       <div class="prev-stats" v-if="prevStats">❤{{ prevStats.HP }} · ⚔{{ prevStats.ATK }} · 🛡{{ prevStats.DEF }} · ⚡{{ prevStats.SPD }}</div>
-      <div class="fnote" :class="kind === 'degrade' ? 'weak' : 'ok'">{{ kind === 'degrade' ? '⬇ ' + t('devolucionaNota') : '✦ ' + t('evolucionaNota') }}</div>
+      <div class="fnote" :class="kind === 'degrade' ? 'weak' : 'ok'">{{ kind === 'degrade' ? '⬇ ' + t('devolucionaNota') : kind === 'merge' ? '✦ ' + t('reforzarNota') : '✦ ' + t('evolucionaNota') }}</div>
     </div>
 
     <div class="row-btns" v-if="selA || selB">
       <button class="btn sec" @click="reset">{{ t('cancelar') }}</button>
-      <button class="btn" :class="{ sec: kind === 'degrade' }" :disabled="!preview" @click="doFuse">{{ kind === 'degrade' ? '⬇ ' + t('devolucionar') : '✦ ' + t('evolucionar') }}</button>
+      <button class="btn" :class="{ sec: kind === 'degrade' }" :disabled="!preview" @click="doFuse">{{ kind === 'degrade' ? '⬇ ' + t('devolucionar') : kind === 'merge' ? '✦ ' + t('reforzar') : '✦ ' + t('evolucionar') }}</button>
     </div>
 
     <div class="fsub" v-if="subLabel">{{ subLabel }}</div>
@@ -105,6 +118,8 @@ function doFuse () {
 .fslot .fp{width:100%;display:flex;align-items:center;justify-content:center}
 .fslot .fp :deep(svg){width:72%;height:auto;filter:drop-shadow(0 2px 5px rgba(0,0,0,.5))}
 .fslot .fn{font-size:10.5px;font-weight:700;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fslot .fing{display:flex;gap:3px;justify-content:center;flex-wrap:wrap;margin-top:3px}
+.fslot .fdot{font-family:var(--fmono);font-size:9px;font-weight:800;color:#fff;background:var(--c,#888);min-width:14px;height:14px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;line-height:1;box-shadow:0 0 4px var(--c,transparent)}
 .op{font-family:var(--fdisplay);font-size:22px;color:var(--muted);flex:0 0 auto}
 .prev-info{text-align:center;font-size:13px;margin:6px 0 8px}
 .prev-info .dot{color:var(--muted);margin:0 4px}

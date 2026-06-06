@@ -107,28 +107,27 @@ export function resetAlloc (uid) { const i = instanceByUid(uid); if (i) { i.allo
 export function fusablePartners (uid) {
   return game.collection.filter(b => b.uid !== uid).map(b => b.uid);
 }
-/** ¿A+B son fusionables? EVOLUCIÓN y DEVOLUCIÓN exigen MISMO NIVEL + estructura válida. */
+/** ¿A+B son fusionables? La fusión es por RAREZA (estructura), no por nivel. */
 export function isCompatibleFuse (uidA, uidB) {
   const a = instanceByUid(uidA), b = instanceByUid(uidB);
-  return !!(a && b) && a.level === b.level && canFuse(critterById(a.id), critterById(b.id));
+  return !!(a && b) && canFuse(critterById(a.id), critterById(b.id));
 }
-/** 'evolve' | 'degrade' | null para el par (solo si son del mismo nivel). Para la UI. */
+/** 'evolve' | 'merge' | 'degrade' | null para el par. Para la UI. */
 export function fuseKindOf (uidA, uidB) {
   const a = instanceByUid(uidA), b = instanceByUid(uidB);
-  if (!a || !b || a.level !== b.level) return null;
+  if (!a || !b) return null;
   return fuseKind(critterById(a.id), critterById(b.id));
 }
-/** Vista previa del descriptor resultante (no consume nada). Solo pares fusionables. */
+/** Vista previa del descriptor resultante (no consume nada). */
 export function fusePreview (uidA, uidB) {
   const a = instanceByUid(uidA), b = instanceByUid(uidB);
-  if (!a || !b || a.level !== b.level) return null;
+  if (!a || !b) return null;
   return fuse(critterById(a.id), critterById(b.id));
 }
-/** Fusiona dos instancias del MISMO NIVEL (evoluciona o degrada) y CONSUME ambas. */
+/** Fusiona dos instancias (evolucionar / reforzar / devolucionar) y CONSUME ambas. */
 export function fuseCritters (uidA, uidB) {
   const a = instanceByUid(uidA), b = instanceByUid(uidB);
   if (!a || !b || uidA === uidB) return { error: 'pick' };
-  if (a.level !== b.level) return { error: 'level' };
   const child = fuse(critterById(a.id), critterById(b.id));
   if (!child) return { error: 'incompat' };
   // La hija HEREDA la XP combinada de las dos (no se pierde lo invertido).
@@ -150,6 +149,7 @@ export function fightCampaign (nodeId) {
   if (!isUnlocked(nodeId)) return { error: 'locked' };
   const ti = teamInstances();
   if (!ti.length) return { error: 'noteam' };
+  game.lastNode = node.id;   // recordar el último enfrentamiento (botón "ir al último")
   const mine = ti.map(x => ({ id: x.instance.id, level: x.instance.level, slot: x.slot, policy: x.instance.policy, target: x.instance.target, alloc: x.instance.alloc }));
   const enemies = enemyTeam(node, game.seed);
   const result = simulate(mine, enemies, nodeBattleSeed(mine, node, game.seed), { terrain: node.terrain || null });

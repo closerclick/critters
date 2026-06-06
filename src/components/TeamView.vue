@@ -84,6 +84,7 @@ function applyDrop (targetLid, targetSlot) {
 
   <div class="team-layout">
   <div class="lineups">
+    <button class="lu-new" @click="createLineup()">＋ {{ t('nueva') }}</button>
     <div v-for="lu in game.lineups" :key="lu.id" class="lineup" :class="{ act: lu.id === game.activeLineup }">
       <div class="lu-row">
         <button class="lu-use" :class="{ on: lu.id === game.activeLineup }" @click="setActiveLineup(lu.id)">{{ lu.id === game.activeLineup ? '★ ' + t('enUso') : '☆ ' + t('usar') }}</button>
@@ -105,7 +106,6 @@ function applyDrop (targetLid, targetSlot) {
         <span class="front-tag">{{ t('rival') }} ▶</span>
       </div>
     </div>
-    <button class="lu-new" @click="createLineup()">＋ {{ t('nueva') }}</button>
   </div>
 
   <div class="bench-zone" data-bench>
@@ -127,7 +127,7 @@ function applyDrop (targetLid, targetSlot) {
 
 <style scoped>
 .team-layout{display:flex;flex-direction:column;gap:14px;margin-bottom:16px}
-.lineups{flex:1 1 auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(212px,1fr));gap:12px;align-content:start}
+.lineups{flex:1 1 auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;align-content:start}
 .lineups .lu-new{grid-column:1 / -1;justify-self:center}
 /* Web: banquillo a la IZQUIERDA + alineaciones en grilla (hasta 3 por fila). */
 @media (min-width:760px){
@@ -144,7 +144,7 @@ function applyDrop (targetLid, targetSlot) {
 .lu-count{flex:0 0 auto;font-family:var(--fmono);font-size:12px;font-weight:700;color:var(--muted)}
 .lu-del{flex:0 0 auto;width:30px;height:30px;border-radius:8px;border:1px solid var(--line2);background:rgba(167,139,250,.08);color:var(--text)}
 .lu-del:disabled{opacity:.3}
-.mini-tg{position:relative;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:5px;max-width:240px;margin:0 auto}
+.mini-tg{position:relative;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:6px;max-width:320px;margin:0 auto}
 .mini-cell{aspect-ratio:1;border-radius:10px;border:1px dashed var(--line2);background:rgba(167,139,250,.04);position:relative;
   display:flex;flex-direction:column;align-items:center;justify-content:center;touch-action:none;transition:.12s}
 .mini-cell.has{border-style:solid;border-color:color-mix(in srgb,var(--el,var(--accent)) 60%,transparent);background:radial-gradient(circle at 50% 35%, color-mix(in srgb,var(--el,var(--accent)) 20%,transparent), rgba(18,15,36,.5))}

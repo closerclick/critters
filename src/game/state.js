@@ -18,6 +18,7 @@ export const game = reactive({
   seed: null,                // semilla de la telaraña de campaña (per-usuario)
   cleared: [],               // ids de nodos despejados
   stars: {},                 // nodeId → mejores estrellas (1 ganar · 2 rápido · 3 sin bajas)
+  lastNode: null,            // último nodo enfrentado (botón "ir al último")
 });
 
 export const totalStars = () => Object.values(game.stars || {}).reduce((a, b) => a + (b || 0), 0);
@@ -31,7 +32,7 @@ export function critterOf (uid) { const i = instanceByUid(uid); return i ? critt
 export function newUid () { return 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
 // ---- persistencia ----
-function snapshot () { return { collection: game.collection, wallet: game.wallet, lineups: game.lineups, activeLineup: game.activeLineup, starterOptions: game.starterOptions, seed: game.seed, cleared: game.cleared, stars: game.stars }; }
+function snapshot () { return { collection: game.collection, wallet: game.wallet, lineups: game.lineups, activeLineup: game.activeLineup, starterOptions: game.starterOptions, seed: game.seed, cleared: game.cleared, stars: game.stars, lastNode: game.lastNode }; }
 let _t = null;
 export function persist () {
   try { localStorage.setItem(LS_KEY, JSON.stringify(snapshot())); } catch {}
@@ -52,6 +53,7 @@ function apply (d) {
   if (d.seed) game.seed = d.seed;
   if (Array.isArray(d.cleared)) game.cleared = d.cleared;
   if (d.stars && typeof d.stars === 'object') game.stars = d.stars;
+  if (d.lastNode) game.lastNode = d.lastNode;
 }
 
 /** Garantiza al menos una alineación y deja game.team apuntando a la activa. */

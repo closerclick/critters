@@ -113,8 +113,12 @@ export function elementMult (element, rarityIndex = 0) {
   return Math.max(0.2, 1 - penalty + reward + grade);
 }
 
+// La RAZA (nombre) es determinística por la FORMA: misma forma → mismo nombre, sin
+// importar seed/elemento/tono. (El apodo personalizado, si existe, va aparte.)
+export const formKey = (a) => [a.head, a.thorax, a.abdomen, a.legs, a.legStyle, a.antennae ? 1 : 0, a.pattern].join('.');
+
 // Cuerpo común: dados elemento/rol/apariencia, deriva rareza (por partes), stats,
-// pasiva/activa, flanqueo y nombre con el rng del id. Comparte salvajes y genomas.
+// pasiva/activa, flanqueo y nombre. El nombre (raza) sale de la FORMA; el resto del seed.
 function buildBody (id, rng, element, role, appearance, nameTier) {
   const rarityIndex = rarityIndexFromParts(partsOf(appearance));
   const rarity = RARITIES[rarityIndex];
@@ -134,7 +138,7 @@ function buildBody (id, rng, element, role, appearance, nameTier) {
   const passive = pick(rng, ROLE_PASSIVE_POOL[role]);
   const active = pick(rng, ROLE_ACTIVE_POOL[role]);
   const flanks = rng() < (FLANK[role] ?? 0.5);
-  const name = makeName(rng, nameTier == null ? rarityIndex : nameTier);   // raza estable (no varía con la rareza en genomas)
+  const name = makeName(rngFrom('race:' + formKey(appearance)), rarityIndex);   // RAZA determinística por la FORMA
   return { id, name, element, role, rarity: rarity.key, rarityIndex, base, passive, active, flanks, appearance };
 }
 

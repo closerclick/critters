@@ -176,18 +176,30 @@ ok('capacidad por rareza (de 3 en 3) + recorte determinista (degradado)', () => 
   assert.equal(clampElement('agua+fuego+planta', 2), 'fuego');       // cap 1 (rareza 3) → recorta a 1
 });
 
-ok('devolución (fusión >1 diferencia) = INTERSECCIÓN; legendaria+legendaria → -tórax', () => {
+ok('reforzar (idénticas) · devolución (≥2 dif, misma rareza) · leyenda+leyenda → -tórax; nombre por FORMA', () => {
   const base = { head: 0, legStyle: 0, antennae: false, hue: 0, pattern: 0 };
-  // >1 diferencia → degrada a la intersección (pierde TODAS las partes diferentes)
-  const A = makeCritter(genomeId({ seed: 'da', element: 'fuego', role: 'dps', appearance: { ...base, thorax: 0, abdomen: 0, legs: 2 } }));  // head+tórax+abd+2patas = 5
-  const B = makeCritter(genomeId({ seed: 'db', element: 'agua', role: 'dps', appearance: { ...base, thorax: -1, abdomen: -1, legs: 2 } })); // head+2patas = 3
-  assert.equal(fuseKind(A, B), 'degrade');                              // onlyA=2 (tórax,abd), onlyB=0
+  // REFORZAR: dos idénticas (misma forma) de rareza media → MISMA araña + ingredientes
+  const M1 = makeCritter(genomeId({ seed: 'm1', element: 'fuego', role: 'dps', appearance: { ...base, thorax: 0, abdomen: 0, legs: 0 } }));  // head+tórax+abd = 3
+  const M2 = makeCritter(genomeId({ seed: 'm2', element: 'agua', role: 'dps', appearance: { ...base, thorax: 0, abdomen: 0, legs: 0 } }));   // misma FORMA, otro elemento/seed
+  assert.equal(M1.name, M2.name);                                      // misma forma → misma raza (nombre determinístico por forma)
+  assert.equal(fuseKind(M1, M2), 'merge');
+  const merged = fuse(M1, M2);
+  assert.equal(partsOf(merged.appearance), 3);                         // misma rareza
+  assert.equal(merged.element.split('+').length, 2);                   // acumuló ingredientes
+  assert.equal(merged.name, M1.name);                                  // sigue siendo la misma araña
+  // DEVOLUCIÓN: misma rareza, ≥2 diferencias → intersección (pierde lo diferente)
+  const A = makeCritter(genomeId({ seed: 'da', element: 'fuego', role: 'dps', appearance: { ...base, thorax: 0, abdomen: 0, legs: 1 } }));   // head+tórax+abd+1pata = 4
+  const B = makeCritter(genomeId({ seed: 'db', element: 'agua', role: 'dps', appearance: { ...base, thorax: -1, abdomen: -1, legs: 3 } }));  // head+3patas = 4
+  assert.equal(fuseKind(A, B), 'degrade');                             // onlyA=2 (tórax,abd) · onlyB=2 (2 patas)
   const inter = fuse(A, B);
-  assert.equal(partsOf(inter.appearance), 3);                          // intersección = head+2patas
-  assert.ok(inter.appearance.thorax < 0 && inter.appearance.abdomen < 0 && inter.appearance.legs === 2);
-  // techo: dos legendarias (9) idénticas en estructura → pierde el tórax (8)
+  assert.equal(partsOf(inter.appearance), 2);                          // intersección = head+1pata
+  assert.ok(inter.appearance.thorax < 0 && inter.appearance.abdomen < 0 && inter.appearance.legs === 1);
+  // distinta rareza → NO fusiona
+  const small = makeCritter(genomeId({ seed: 'sm', element: 'agua', role: 'dps', appearance: { ...base, thorax: -1, abdomen: -1, legs: 1 } })); // 2
+  assert.equal(fuseKind(A, small), null);
+  // TECHO: dos legendarias (9) → -tórax (8)
   const L1 = makeCritter(genomeId({ seed: 'L1', element: 'fuego', role: 'dps', appearance: { head: 0, thorax: 0, abdomen: 0, legs: 6, legStyle: 0, antennae: false, hue: 0, pattern: 0 } }));
-  const L2 = makeCritter(genomeId({ seed: 'L2', element: 'agua', role: 'dps', appearance: { head: 0, thorax: 0, abdomen: 0, legs: 6, legStyle: 0, antennae: false, hue: 1, pattern: 0 } }));
+  const L2 = makeCritter(genomeId({ seed: 'L2', element: 'agua', role: 'dps', appearance: { head: 0, thorax: 0, abdomen: 0, legs: 6, legStyle: 0, antennae: false, hue: 0, pattern: 0 } }));
   assert.equal(partsOf(L1.appearance), 9); assert.equal(fuseKind(L1, L2), 'degrade');
   const demoted = fuse(L1, L2);
   assert.equal(partsOf(demoted.appearance), 8); assert.ok(demoted.appearance.thorax < 0);   // -tórax

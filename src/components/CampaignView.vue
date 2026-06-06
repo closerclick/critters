@@ -33,16 +33,23 @@ const zoom = ref(1);                  // >1 acerca, <1 aleja (rueda / pinch)
 const panX = ref(0), panY = ref(0);
 const viewBox = computed(() => `${(panX.value - vw.value / 2).toFixed(1)} ${(panY.value - vh.value / 2).toFixed(1)} ${vw.value.toFixed(1)} ${vh.value.toFixed(1)}`);
 function measure () { const el = svgEl.value; if (!el) return; const r = el.getBoundingClientRect(); const m = Math.min(r.width, r.height) || 1; const b = BASE / zoom.value; vw.value = b * ((r.width || m) / m); vh.value = b * ((r.height || m) / m); }
-function setZoom (z) { zoom.value = Math.max(0.4, Math.min(3, z)); measure(); }
+function setZoom (z) { zoom.value = Math.max(0.4, Math.min(3, z)); measure(); saveView(); }
+
+// Recordar posición (pan) y zoom entre sesiones.
+const VIEW_KEY = 'critters.map';
+function saveView () { try { localStorage.setItem(VIEW_KEY, JSON.stringify({ x: panX.value, y: panY.value, z: zoom.value })); } catch {} }
+function loadView () { try { const v = JSON.parse(localStorage.getItem(VIEW_KEY) || 'null'); if (v && Number.isFinite(v.x) && Number.isFinite(v.y) && Number.isFinite(v.z)) { panX.value = v.x; panY.value = v.y; zoom.value = Math.max(0.4, Math.min(3, v.z)); return true; } } catch {} return false; }
 
 function recenter () {
   const open = nodes.value.filter(n => unlocked(n.id) && !cleared(n.id));
   const pts = open.length ? open : nodes.value.filter(n => cleared(n.id));
   if (pts.length) { panX.value = pts.reduce((s, n) => s + n.x, 0) / pts.length; panY.value = pts.reduce((s, n) => s + n.y, 0) / pts.length; }
   else { panX.value = 0; panY.value = 0; }
+  saveView();
 }
+function goLast () { const id = game.lastNode; const n = id && nmap.value[id]; if (!n) return; panX.value = n.x; panY.value = n.y; if (zoom.value < 1) setZoom(1); else saveView(); }
 function onResize () { measure(); }
-onMounted(() => { measure(); recenter(); window.addEventListener('resize', onResize); });
+onMounted(() => { const had = loadView(); measure(); if (!had) recenter(); window.addEventListener('resize', onResize); });
 onUnmounted(() => window.removeEventListener('resize', onResize));
 
 // Pan (1 dedo/arrastre) + PINCH (2 dedos) + rueda. tap (sin mover) sobre un nodo = pelear.
@@ -85,12 +92,14 @@ function play (n) { if (movedFlag) { movedFlag = false; return; } if (unlocked(n
         <text v-if="n.id !== 'core'" :x="n.x" :y="n.y + 6" class="lab">{{ access(n.id) ? (n.boss ? '★' : n.diff) : '🔒' }}</text>
         <text v-else :x="n.x" :y="n.y + 7" class="lab">◆</text>
         <text v-if="cleared(n.id)" :x="n.x" :y="n.y - nodeR(n) - 7" class="nstars">{{ starStr(n.id) }}</text>
+        <text v-if="n.id === game.lastNode" :x="n.x" :y="n.y - nodeR(n) - 19" class="lastpin">⚑</text>
       </g>
     </svg>
     <div class="map-ctrl">
       <button @click="setZoom(zoom * 1.25)" title="acercar">＋</button>
       <button @click="setZoom(zoom / 1.25)" title="alejar">－</button>
       <button @click="recenter" title="centrar">⊙</button>
+      <button v-if="game.lastNode && nmap[game.lastNode]" @click="goLast" :title="t('ultimoEnf')">⚑</button>
     </div>
   </div>
   <p class="hint web-hint">{{ t('webHint') }}</p>
@@ -116,6 +125,7 @@ function play (n) { if (movedFlag) { movedFlag = false; return; } if (unlocked(n
 .node.boss .dot{stroke:var(--gold)!important;stroke-width:7}
 .node.boss .lab{fill:var(--gold)}
 .node .nstars{font-size:16px;text-anchor:middle;dominant-baseline:middle;fill:var(--gold);pointer-events:none;letter-spacing:1px}
+.node .lastpin{font-size:20px;text-anchor:middle;dominant-baseline:middle;fill:var(--cyan);pointer-events:none}
 .map-ctrl{position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;gap:6px}
 .map-ctrl button{width:38px;height:38px;border-radius:11px;border:1px solid var(--line2);
   background:rgba(20,16,40,.85);color:var(--cyan);font-size:18px;font-weight:800;backdrop-filter:blur(4px)}
