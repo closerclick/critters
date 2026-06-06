@@ -27,6 +27,13 @@ export const totalStars = () => Object.values(game.stars || {}).reduce((a, b) =>
 const _cache = new Map();
 export function critterById (id) { let c = _cache.get(id); if (!c) { c = makeCritter(id); _cache.set(id, c); } return c; }
 export function instanceByUid (uid) { return game.collection.find(i => i.uid === uid) || null; }
+// Nombre a mostrar: si la instancia tiene APODO → "Apodo (Raza)"; si no, solo la raza
+// (nombre determinístico por la forma). `critter` opcional (se resuelve del id si falta).
+export function displayName (inst, critter) {
+  const c = critter || (inst && critterById(inst.id));
+  if (!c) return '';
+  return (inst && inst.nick) ? `${inst.nick} (${c.name})` : c.name;
+}
 export function critterOf (uid) { const i = instanceByUid(uid); return i ? critterById(i.id) : null; }
 
 export function newUid () { return 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }

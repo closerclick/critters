@@ -96,6 +96,8 @@ function purgeUid (uid) { for (const l of game.lineups) for (let i = 0; i < l.te
 /** Cambia la política de movimiento de una instancia. */
 export function setPolicy (uid, policy) { const i = instanceByUid(uid); if (i) { i.policy = policy; persist(); } }
 export function setRol (uid, rol) { const i = instanceByUid(uid); if (i) { i.rol = rol; persist(); } }
+/** Apodo personalizado (máx 16). Vacío = quita el apodo (vuelve a mostrar solo la raza). */
+export function setNick (uid, nick) { const i = instanceByUid(uid); if (!i) return; const n = String(nick || '').trim().slice(0, 16); if (n) i.nick = n; else delete i.nick; persist(); }
 /** Cambia la preferencia de objetivo de una instancia. */
 export function setTarget (uid, rol, list) { const i = instanceByUid(uid); if (!i) return; const cur = (i.target && !Array.isArray(i.target)) ? { ...i.target } : {}; cur[rol] = list; i.target = cur; persist(); }
 
@@ -145,6 +147,7 @@ export function fuseCritters (uidA, uidB) {
   purgeUid(uidA); purgeUid(uidB);
   game.collection = game.collection.filter(x => x.uid !== uidA && x.uid !== uidB);
   const inst = addCritter(child.id, lx.level); inst.xp = lx.xp;
+  if (a.nick) inst.nick = a.nick;   // conserva el apodo de la primera araña (A)
   persist();
   return { instance: inst, critter: child };
 }

@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue';
-import { critterById } from '../game/state.js';
+import { critterById, displayName } from '../game/state.js';
 import { statsAtLevel, RARITY_BY_KEY, pointsFree } from '../critter/forge.js';
 import { critterSvg } from '../critter/svg.js';
 import { elementInfo } from '../critter/types.js';
@@ -16,7 +16,8 @@ const rar = computed(() => RARITY_BY_KEY[critter.value.rarity]);
 const el = computed(() => elementInfo(critter.value.element));
 const role = computed(() => ROLE_INFO[critter.value.role]);
 
-const CAP = { HP: 1400, ATK: 320, DEF: 320, SPD: 220 };
+// Referencia de las barras (≈ valores fuertes de media partida; el endgame satura al 100%).
+const CAP = { HP: 1200, ATK: 480, DEF: 300, SPD: 340 };
 const w = (k) => Math.max(6, Math.min(100, Math.round(100 * st.value[k] / CAP[k]))) + '%';
 </script>
 
@@ -26,7 +27,7 @@ const w = (k) => Math.max(6, Math.min(100, Math.round(100 * st.value[k] / CAP[k]
     <span class="rar-dot" :style="{ background: rar.color, boxShadow: '0 0 9px ' + rar.color }"></span>
     <span class="pts" v-if="free > 0" :title="t('puntos')">✦{{ free }}</span>
     <div class="portrait"><div class="aura"></div><div class="cs" v-html="svg"></div></div>
-    <div class="nm">{{ critter.name }}</div>
+    <div class="nm">{{ displayName(instance, critter) }}</div>
     <div class="chips">
       <span class="chip el">{{ loc(el) }}</span>
       <span class="chip">{{ loc(role) }}</span>

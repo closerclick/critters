@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { game, instanceByUid, critterById } from '../game/state.js';
+import { game, instanceByUid, critterById, displayName } from '../game/state.js';
 import { fusePreview, fuseCritters, isCompatibleFuse, fuseKindOf } from '../game/actions.js';
 import { openCritter } from '../ui.js';
 import { elementInfo, ELEMENT_INFO, comps } from '../critter/types.js';
@@ -10,7 +10,7 @@ import { t, loc } from '../i18n.js';
 import CritterCard from './CritterCard.vue';
 
 const svgFor = (inst) => inst ? critterSvg(critterById(inst.id), 58) : '';
-const nameOf = (inst) => inst ? critterById(inst.id).name : '';
+const nameOf = (inst) => inst ? displayName(inst, critterById(inst.id)) : '';
 // Ingredientes (bases con multiplicidad) de un descriptor → [{key,n,info}].
 const ingOf = (critter) => {
   if (!critter) return [];
@@ -33,6 +33,8 @@ const svgPrev = computed(() => preview.value ? critterSvg(preview.value, 58) : '
 const prevEl = computed(() => preview.value ? elementInfo(preview.value.element) : null);
 const prevRar = computed(() => preview.value ? RARITY_BY_KEY[preview.value.rarity] : null);
 const prevStats = computed(() => preview.value ? statsAtLevel(preview.value, instA.value ? instA.value.level : 1) : null);
+const statsA = computed(() => instA.value ? statsAtLevel(critterById(instA.value.id), instA.value.level, instA.value.alloc) : null);
+const statsB = computed(() => instB.value ? statsAtLevel(critterById(instB.value.id), instB.value.level, instB.value.alloc) : null);
 const ingA = computed(() => ingOf(critOf(instA.value)));
 const ingB = computed(() => ingOf(critOf(instB.value)));
 const ingRes = computed(() => ingOf(preview.value));
@@ -86,11 +88,17 @@ function doFuse () {
       </div>
     </div>
 
+    <!-- Comparativa de estadísticas: A · B · Resultado -->
+    <div v-if="statsA || statsB" class="fstats">
+      <div class="fst-col" v-if="statsA"><span class="fst-h">A</span><span>❤ {{ statsA.HP }}</span><span>⚔ {{ statsA.ATK }}</span><span>🛡 {{ statsA.DEF }}</span><span>⚡ {{ statsA.SPD }}</span></div>
+      <div class="fst-col" v-if="statsB"><span class="fst-h">B</span><span>❤ {{ statsB.HP }}</span><span>⚔ {{ statsB.ATK }}</span><span>🛡 {{ statsB.DEF }}</span><span>⚡ {{ statsB.SPD }}</span></div>
+      <div class="fst-col res" v-if="prevStats"><span class="fst-h">=</span><span>❤ {{ prevStats.HP }}</span><span>⚔ {{ prevStats.ATK }}</span><span>🛡 {{ prevStats.DEF }}</span><span>⚡ {{ prevStats.SPD }}</span></div>
+    </div>
+
     <div v-if="preview" class="prev-info">
       <div><b :style="{ color: prevEl.color }">{{ preview.name }}</b>
         <span class="dot">·</span> {{ loc(prevEl) }}
         <span class="dot">·</span> <span :style="{ color: prevRar.color }">{{ loc(prevRar) }}</span></div>
-      <div class="prev-stats" v-if="prevStats">❤{{ prevStats.HP }} · ⚔{{ prevStats.ATK }} · 🛡{{ prevStats.DEF }} · ⚡{{ prevStats.SPD }}</div>
       <div class="fnote" :class="kind === 'degrade' ? 'weak' : 'ok'">{{ kind === 'degrade' ? '⬇ ' + t('devolucionaNota') : kind === 'merge' ? '✦ ' + t('reforzarNota') : '✦ ' + t('evolucionaNota') }}</div>
     </div>
 
@@ -125,6 +133,11 @@ function doFuse () {
 .prev-info{text-align:center;font-size:13px;margin:6px 0 8px}
 .prev-info .dot{color:var(--muted);margin:0 4px}
 .prev-stats{font-family:var(--fmono);font-size:11.5px;color:var(--muted);margin-top:3px}
+.fstats{display:flex;justify-content:center;gap:8px;margin:8px auto 0;max-width:360px}
+.fst-col{flex:1 1 0;display:flex;flex-direction:column;align-items:center;gap:2px;font-family:var(--fmono);font-size:11px;color:var(--muted);
+  border:1px solid var(--line);border-radius:10px;padding:6px 4px}
+.fst-col.res{border-color:color-mix(in srgb,var(--cyan) 50%,var(--line2));background:rgba(56,225,214,.06);color:var(--text)}
+.fst-h{font-family:var(--fdisplay);font-weight:800;font-size:12px;color:var(--accent)}
 .fnote{font-family:var(--fmono);font-size:11px;margin-top:3px}
 .fnote.ok{color:var(--good)} .fnote.weak{color:var(--gold)}
 .fsub{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;text-align:center;margin:10px 0 6px}

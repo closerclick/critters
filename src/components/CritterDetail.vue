@@ -1,12 +1,12 @@
 <script setup>
 import { computed, ref, watch, onUnmounted } from 'vue';
-import { instanceByUid, critterById, game } from '../game/state.js';
-import { feed, FEED_COST, setRol, setTarget, adjustAlloc, resetAlloc } from '../game/actions.js';
+import { instanceByUid, critterById, game, displayName } from '../game/state.js';
+import { feed, FEED_COST, setRol, setTarget, adjustAlloc, resetAlloc, setNick } from '../game/actions.js';
 import { critterSvg } from '../critter/svg.js';
 import { statsAtLevel, STAT_KEYS, pointsFree, xpForNext, RARITY_BY_KEY } from '../critter/forge.js';
 import { ACTIVES, PASSIVES } from '../critter/abilities.js';
 import { elementInfo, ELEMENT_INFO, comps } from '../critter/types.js';
-import { ROL_INFO, ROL_KEYS, normalizeRol, normalizeTargets, TARGET_INFO } from '../battle/policies.js';
+import { ROL_INFO, ROL_KEYS, normalizeRol, normalizeTargets, TARGET_INFO, ALLY_INFO } from '../battle/policies.js';
 import { t, loc } from '../i18n.js';
 
 // Perfil + configuración de UNA criatura. Se abre tocando su avatar en cualquier
@@ -66,6 +66,7 @@ watch(() => props.uid, () => {
   tab.value = 'stats';
 }, { immediate: true });
 function pickTgtRol (r) { if (r === tgtRol.value) return; tgtRol.value = r; order.value = targetsObj.value[r].slice(); }
+const tgtInfo = computed(() => tgtRol.value === 'soporte' ? ALLY_INFO : TARGET_INFO);   // soporte = criterios de ALIADOS
 const dragIdx = ref(-1);
 function tDown (e, i) { e.preventDefault(); dragIdx.value = i; window.addEventListener('pointermove', tMove, { passive: false }); window.addEventListener('pointerup', tUp); }
 function tMove (e) {
@@ -100,7 +101,8 @@ onUnmounted(() => { window.removeEventListener('pointermove', tMove); window.rem
         <div v-html="svgBig" style="display:flex;justify-content:center"></div>
         <span v-if="free > 0" class="d-pts" :title="t('lblLibres')">✦{{ free }}</span>
       </div>
-      <h2 style="margin-top:4px">{{ critter.name }}</h2>
+      <h2 style="margin-top:4px">{{ displayName(inst, critter) }}</h2>
+      <input class="nick-in" :value="inst.nick || ''" :placeholder="t('apodoPh') + ' (' + critter.name + ')'" maxlength="16" @change="e => setNick(uid, e.target.value)" :title="t('apodo')" />
       <div class="chips" style="justify-content:center;margin:6px 0 4px">
         <span class="chip">{{ t('nv') }}{{ inst.level }}</span>
         <span v-if="rar" class="chip" :style="{ color: rar.color, borderColor: rar.color }">{{ loc(rar) }}</span>
@@ -169,7 +171,7 @@ onUnmounted(() => { window.removeEventListener('pointermove', tMove); window.rem
           <div v-for="(k, i) in order" :key="k" class="tgt-row" :data-tidx="i" :class="{ drag: dragIdx === i }" @pointerdown="tDown($event, i)">
             <span class="tgt-handle">⠿</span>
             <span class="tgt-num">{{ i + 1 }}</span>
-            <span class="tgt-txt"><b>{{ loc(TARGET_INFO[k]) }}</b><small>{{ loc(TARGET_INFO[k].d) }}</small></span>
+            <span class="tgt-txt"><b>{{ loc(tgtInfo[k]) }}</b><small>{{ loc(tgtInfo[k].d) }}</small></span>
           </div>
         </div>
         <div class="hint" style="margin-top:6px;text-align:center">{{ t('objetivoHint') }}</div>
@@ -189,6 +191,8 @@ onUnmounted(() => { window.removeEventListener('pointermove', tMove); window.rem
 .detail-modal{position:fixed;inset:0;z-index:45;display:flex;align-items:center;justify-content:center;padding:16px;
   background:rgba(2,4,12,.78);backdrop-filter:blur(5px);animation:dfade .22s ease-out}
 @keyframes dfade{from{opacity:0}to{opacity:1}}
+.nick-in{display:block;margin:2px auto 0;max-width:240px;width:100%;text-align:center;background:var(--panel);color:var(--text);border:1px solid var(--line2);border-radius:8px;padding:4px 8px;font-size:12px}
+.nick-in::placeholder{color:var(--muted)}
 .d-portrait{position:relative;width:max-content;margin:0 auto}
 .d-pts{position:absolute;top:2px;right:-6px;font-family:var(--fmono);font-size:12px;font-weight:800;color:var(--ink);background:var(--cyan);border-radius:9px;padding:1px 7px;box-shadow:0 0 8px var(--cyan)}
 .detail-card{width:100%;max-width:360px;max-height:90vh;overflow-y:auto;background:var(--panel2);border:1px solid var(--line2);

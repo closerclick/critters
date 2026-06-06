@@ -166,9 +166,10 @@ const summary = computed(() => {
       </div>
 
       <div class="rc-btns">
+        <button class="btn" @click="emit('next', payload.node)" data-testid="refight-btn">⚔ {{ t('pelearDeNuevo') }}</button>
         <button class="btn sec" @click="start" data-testid="replay-btn">↻ {{ t('repetir') }}</button>
         <button class="btn sec" @click="modalHidden = true" data-testid="view-field-btn">👁 {{ t('verCampo') }}</button>
-        <button class="btn" @click="emit('close')" data-testid="to-map-btn">{{ t('alMapa') }}</button>
+        <button class="btn sec" @click="emit('close')" data-testid="to-map-btn">{{ t('alMapa') }}</button>
       </div>
     </div>
   </div>

@@ -65,28 +65,38 @@ export function defaultTarget (role) {
 export function normalizeTarget (target, role) {
   return normPerm(target, defaultTarget(role));
 }
-function normPerm (target, base) {
+function normPerm (target, base, keys = TARGET_KEYS) {
   if (typeof target === 'string') target = [target];
   if (!Array.isArray(target) || !target.length) return base.slice();
   const seen = new Set(), out = [];
-  for (const k of target) if (TARGET_KEYS.includes(k) && !seen.has(k)) { seen.add(k); out.push(k); }
+  for (const k of target) if (keys.includes(k) && !seen.has(k)) { seen.add(k); out.push(k); }
   for (const k of base) if (!seen.has(k)) out.push(k);   // completa lo que falte
   return out;
 }
 
-// PRIORIDAD de objetivo POR ROL: cada rol (atacante/defensa/soporte) tiene su propia
-// lista. Default distinto por rol; el atacante remata débiles, la defensa pega al
-// cercano/fuerte, el soporte (cuando ataca) va al soporte/distancia enemigo.
+// Criterios de objetivo del SOPORTE: sobre los ALIADOS (a quién ayudar), no enemigos.
+export const ALLY_KEYS = ['herido', 'vida', 'frente', 'mismo'];
+export const ALLY_INFO = {
+  herido: { es: 'Más herido (%)', en: 'Most wounded (%)', d: { es: 'El aliado con menor % de vida.', en: 'Ally with lowest HP %.' } },
+  vida:   { es: 'Menos vida',     en: 'Lowest HP',        d: { es: 'El aliado con menos vida absoluta.', en: 'Ally with lowest raw HP.' } },
+  frente: { es: 'Del frente',     en: 'Frontline',        d: { es: 'El aliado más adelantado (recibe el daño).', en: 'Most advanced ally (takes the hits).' } },
+  mismo:  { es: 'Sí mismo',       en: 'Self',             d: { es: 'Se cura/buffa a sí mismo.', en: 'Heals/buffs itself.' } },
+};
+export const defaultAlly = () => ['herido', 'vida', 'frente', 'mismo'];
+
+// PRIORIDAD de objetivo POR ROL. atacante/defensa = ENEMIGOS; soporte = ALIADOS (ayuda).
 export function defaultTargetForRol (rolKey) {
   if (rolKey === 'defensa') return ['cercano', 'fuerte', 'debil', 'rango', 'soporte'];
-  if (rolKey === 'soporte') return ['soporte', 'rango', 'debil', 'cercano', 'fuerte'];
   return ['debil', 'cercano', 'fuerte', 'rango', 'soporte'];   // atacante
 }
-// Devuelve { atacante:[...], defensa:[...], soporte:[...] }. Acepta legacy (un array para
-// todos) u objeto por rol.
+// Claves válidas según el rol (soporte → aliados).
+export const keysForRol = (rolKey) => (rolKey === 'soporte' ? ALLY_KEYS : TARGET_KEYS);
+// Devuelve { atacante:[enemigos], defensa:[enemigos], soporte:[ALIADOS] }.
 export function normalizeTargets (target) {
   const legacy = Array.isArray(target) ? target : null;
-  const out = {};
-  for (const r of ROL_KEYS) out[r] = normPerm(legacy || (target && target[r]), defaultTargetForRol(r));
-  return out;
+  return {
+    atacante: normPerm(legacy || (target && target.atacante), defaultTargetForRol('atacante')),
+    defensa: normPerm(legacy || (target && target.defensa), defaultTargetForRol('defensa')),
+    soporte: normPerm(target && target.soporte, defaultAlly(), ALLY_KEYS),
+  };
 }

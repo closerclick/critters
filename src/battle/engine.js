@@ -131,6 +131,23 @@ function chooseTarget (u, enemies) {
   return pickBy(u, enemies, 'cercano');
 }
 function farthest (u, enemies) { let b = null; for (const e of enemies) if (e.alive && (!b || cheb(u, e) > cheb(u, b))) b = e; return b; }
+// El SOPORTE elige a quién AYUDAR según su prioridad sobre ALIADOS (no enemigos):
+// herido (menor %vida) · vida (menos vida) · frente (más adelantado) · mismo.
+function chooseAlly (u, allies) {
+  const list = (u.targets && u.targets.soporte) || ['herido'];
+  const alive = allies.filter(a => a.alive);
+  if (!alive.length) return null;
+  for (const crit of list) {
+    if (crit === 'mismo') { if (u.alive) return u; continue; }
+    let b = null, bs = Infinity;
+    for (const a of alive) {
+      const s = crit === 'vida' ? a.hp : crit === 'frente' ? (u.side === 0 ? -a.col : a.col) : (a.hp / a.maxHp);
+      if (b == null || s < bs || (s === bs && a.uid < b.uid)) { bs = s; b = a; }
+    }
+    if (b) return b;
+  }
+  return alive[0];
+}
 
 // Celda de ataque libre alrededor del objetivo (dentro de rango) a la que dirigirse.
 // Depende del ESTILO de la criatura:
@@ -184,8 +201,7 @@ function castActive (u, ab, enemies, allies, rng, log) {
     const tt = chooseTarget(u, enemies);
     if (tt) { attackTarget(u, tt, rng, log, ab.mult, u.active); if (tt.alive) { tt.stunTurns += ab.dur; log.push({ t: 'stun', target: tt.uid, dur: ab.dur }); } }
   } else if (ab.type === 'heal') {
-    let tt = ab.scope === 'self' ? u : null;
-    if (!tt) for (const al of allies) { if (!al.alive) continue; if (!tt || al.hp / al.maxHp < tt.hp / tt.maxHp) tt = al; }
+    const tt = ab.scope === 'self' ? u : chooseAlly(u, allies);   // a quién ayudar: prioridad sobre ALIADOS
     if (tt) { const h = Math.round(eff(u, 'ATK') * ab.mult * u.healFactor); if (h > 0) { tt.hp = Math.min(tt.maxHp, tt.hp + h); log.push({ t: 'heal', by: u.uid, target: tt.uid, heal: h }); } }
   } else if (ab.type === 'buff') {
     const ts = ab.scope === 'allies' ? allies.filter(a => a.alive) : [u];
