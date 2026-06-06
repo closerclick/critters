@@ -11,7 +11,7 @@ export const ACTIVES = {
   meteoro:    { type: 'damage', mult: 0.85, scope: 'all', cost: 100, es: 'Lluvia', en: 'Barrage', d: { es: 'Daña a todos los enemigos.', en: 'Hits all enemies.' } },
   francotiro: { type: 'damage', mult: 2.3, scope: 'backmost', ignoreProtect: true, cost: 100, es: 'Francotiro', en: 'Snipe', d: { es: 'Dispara al enemigo del fondo, ignora bloqueo.', en: 'Shoots the backmost enemy, ignores blocking.' } },
   aturdir:    { type: 'stun', mult: 0.8, dur: 1, scope: 'single', cost: 100, es: 'Aturdir', en: 'Stun', d: { es: 'Daña y salta el próximo turno del objetivo.', en: 'Damages and skips the target\'s next turn.' } },
-  sanar:      { type: 'heal', mult: 1.7, scope: 'lowestAlly', cost: 100, es: 'Sanar', en: 'Heal', d: { es: 'Cura al aliado más herido.', en: 'Heals the most wounded ally.' } },
+  sanar:      { type: 'heal', mult: 1.3, scope: 'lowestAlly', cost: 100, es: 'Sanar', en: 'Heal', d: { es: 'Cura al aliado más herido.', en: 'Heals the most wounded ally.' } },
   muro:       { type: 'buff', stat: 'DEF', mult: 1.5, dur: 3, scope: 'allies', cost: 100, es: 'Muro', en: 'Wall', d: { es: 'Sube la DEF de todo el equipo unos turnos.', en: 'Raises team DEF for a few turns.' } },
   frenesi:    { type: 'buff', stat: 'ATK', mult: 1.4, dur: 3, scope: 'self', cost: 90, es: 'Frenesí', en: 'Frenzy', d: { es: 'Sube su propia ATK unos turnos.', en: 'Raises own ATK for a few turns.' } },
 };

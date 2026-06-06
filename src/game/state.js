@@ -10,7 +10,7 @@ const LS_KEY = 'critters.save';
 export const game = reactive({
   ready: false,
   collection: [],            // [{ uid, id, level, xp }]
-  wallet: { coins: 0, frags: 0 },
+  wallet: { coins: 300, frags: 5 },   // arranque: alcanza para invocar ~3 critters y armar el primer equipo (anti-softlock)
   lineups: [],               // [{ id, name, team:[9] }] — varias alineaciones; una araña puede estar en varias
   activeLineup: null,        // id de la alineación activa
   team: Array(9).fill(null), // alias REACTIVO al team de la alineación activa (lo usan TeamView/acciones)

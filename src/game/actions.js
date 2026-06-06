@@ -34,11 +34,20 @@ export function awardXp (inst, amount) {
 }
 
 /** Invoca una criatura nueva (id fresco → criatura determinista por ese id). */
+// Coloca uid en la alineación activa si queda lugar (≤5), en orden de formación. QoL: la
+// invocada/capturada entra directo al equipo y se puede pelear sin pasar por Equipo.
+export function autoPlaceInTeam (uid) {
+  if (!Array.isArray(game.team) || game.team.includes(uid)) return false;
+  if (game.team.filter(Boolean).length >= TEAM_MAX) return false;
+  for (const s of [4, 0, 2, 6, 8, 1, 3, 5, 7]) { if (!game.team[s]) { game.team[s] = uid; return true; } }
+  return false;
+}
 export function summon () {
   if (game.wallet.coins < SUMMON_COST) return { error: 'coins' };
   game.wallet.coins -= SUMMON_COST;
   const id = 'sm-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
   const inst = addCritter(id, 1);
+  autoPlaceInTeam(inst.uid);
   persist();
   return { instance: inst };
 }
@@ -183,7 +192,7 @@ export function fightCampaign (nodeId) {
       game.cleared.push(node.id);
       payload.firstClear = true;
       const drop = captureDrop(node, game.seed);
-      if (drop) payload.captured = addCritter(drop, 1);
+      if (drop) { payload.captured = addCritter(drop, 1); autoPlaceInTeam(payload.captured.uid); }
     }
     const nb = neighbors(game.seed, node.id).find(id => isUnlocked(id) && !game.cleared.includes(id));
     if (nb) payload.nextNode = nb;

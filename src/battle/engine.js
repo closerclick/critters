@@ -29,10 +29,10 @@ function buildUnits (team, side, terrain) {
     const ranged = RANGED_ROLES.has(critter.role);
     return {
       uid: side + ':' + slot, side, slot,
-      row: srow + ROW_OFFSET, col: side === 0 ? scol : (COLS - 1 - scol),   // jugador izq, enemigo der; 3×3 centrado en filas
+      row: srow + ROW_OFFSET, col: side === 0 ? scol : (6 - scol),   // jugador 0-2, enemigo 4-6 (1 columna de separación: melee engancha más rápido)
       id: m.id, level: lvl, critter, name: critter.name, element: critter.element, role: critter.role, rarity: critter.rarity,
       maxHp: s.HP, hp: s.HP, ATK: s.ATK + (b.atk || 0), DEF: s.DEF + (b.def || 0), SPD: s.SPD,
-      range: (ranged ? 3 : 1) + (b.range || 0),
+      range: (ranged ? 2 : 1) + (b.range || 0),
       rol: normalizeRol(m.rol || m.policy, critter.role),   // PRIORIDAD de rol (atacante/defensa/soporte)
       targets: normalizeTargets(m.target),   // 3 listas de prioridad de objetivo (una por rol)
       flanks: !!critter.flanks,

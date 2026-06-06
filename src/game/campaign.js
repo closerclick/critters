@@ -52,7 +52,7 @@ function build (seed, RINGS) {
   const bossOff = Math.floor(rngFrom(seed + ':boss')() * 10);
   nodes.forEach((n, idx) => {
     if (n.ring === 0) return;
-    n.diff = 1 + n.ring * 2 + Math.floor(rngFrom(seed + ':d:' + n.id)() * 3);
+    n.diff = Math.max(1, (n.ring - 1) * 2 + 1 + Math.floor(rngFrom(seed + ':d:' + n.id)() * 2));   // anillo 1 = diff 1-2 (onboarding suave)
     n.boss = idx % 10 === bossOff;
     if (n.boss) n.diff = Math.round(n.diff * 1.6) + 2;
     n.terrain = terrainFor(seed, n);
@@ -79,7 +79,7 @@ export const neighbors = (seed, id) => graph(seed).adj[id] || [];
 export const nodeById = (seed, id) => graph(seed).byId[id] || null;
 
 export const enemyLevel = (d) => Math.max(1, d);
-export const enemyCount = (d) => Math.min(5, 1 + Math.floor(d / 2));
+export const enemyCount = (d) => Math.min(5, 1 + Math.floor((d - 1) / 2));   // d1-2:1 · d3-4:2 · d5-6:3 · d7-8:4 · d9+:5
 // Límite de ciclos para la 2ª estrella ("ganar rápido"): más enemigos → más margen.
 export const starCycleLimit = (node) => 120 + enemyCount(node.diff) * 90;
 // Las zonas con terreno generan enemigos NATIVOS (de ese elemento, que se benefician

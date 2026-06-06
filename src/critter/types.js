@@ -14,8 +14,8 @@ export const ELEMENT_INFO = {
   sombra: { es: 'Sombra', en: 'Shadow',    color: '#a78bfa', color2: '#4c1d95' },
 };
 
-export const ADV = 1.25;   // multiplicador con ventaja de tipo
-export const DIS = 0.8;    // multiplicador con desventaja
+export const ADV = 1.10;   // multiplicador con ventaja de tipo (suavizado: ventaja = edge, no auto-win)
+export const DIS = 0.93;   // multiplicador con desventaja
 
 // Un SUBELEMENTO (fruto de fusionar dos elementos distintos) se escribe "a+b".
 export const comps = (el) => String(el).split('+');

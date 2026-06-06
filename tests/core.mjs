@@ -2,7 +2,7 @@
 import assert from 'node:assert';
 import { makeCritter, statsAtLevel, power, pointsTotal, pointsFree, partsOf, rarityIndexFromParts, genomeId, elementMult, clampElement, capacityFor } from '../src/critter/forge.js';
 import { critterSvg } from '../src/critter/svg.js';
-import { typeMultiplier, mixElements, elementInfo } from '../src/critter/types.js';
+import { typeMultiplier, mixElements, elementInfo, ADV, DIS } from '../src/critter/types.js';
 import { simulate, battleSeed } from '../src/battle/engine.js';
 import { normalizeTarget } from '../src/battle/policies.js';
 import { canFuse, fuse, fuseKind } from '../src/game/fusion.js';
@@ -30,8 +30,8 @@ ok('critterSvg devuelve SVG válido', () => {
 });
 
 ok('typeMultiplier: ventaja/neutral/desventaja', () => {
-  assert.equal(typeMultiplier('fuego', 'agua'), 1.25);   // fuego le gana al siguiente (agua)
-  assert.equal(typeMultiplier('agua', 'fuego'), 0.8);    // agua en desventaja contra el anterior
+  assert.equal(typeMultiplier('fuego', 'agua'), ADV);   // fuego le gana al siguiente (agua)
+  assert.equal(typeMultiplier('agua', 'fuego'), DIS);    // agua en desventaja contra el anterior
   assert.equal(typeMultiplier('fuego', 'fuego'), 1);   // mismo elemento → neutral
 });
 
@@ -150,7 +150,7 @@ ok('subelemento: ventajas de ambos, sin sumar debilidades', () => {
   assert.equal(mixElements('fuego', 'fuego'), 'fuego+fuego');                          // acumula con multiplicidad
   assert.equal(mixElements('agua+fuego', 'planta'), 'agua+fuego+planta');              // dual + base → triple
   assert.equal(mixElements('agua+fuego+planta', 'agua'), 'agua+agua+fuego+planta');    // en profundidad SIGUE acumulando
-  assert.equal(typeMultiplier('agua+fuego', 'planta'), 1.25);   // atacando: toma la ventaja (agua)
+  assert.equal(typeMultiplier('agua+fuego', 'planta'), ADV);   // atacando: toma la ventaja (agua)
   assert.equal(typeMultiplier('fuego', 'agua+fuego'), 1);       // el dual resiste/neutraliza por sus ingredientes
 });
 
@@ -213,7 +213,7 @@ ok('catálogo de 36 nombres: combinación + intensidad por acumulación', () => 
   assert.equal(elementInfo('agua+fuego+fuego').es, 'Vapor');       // subelemento acumulado
   assert.equal(elementInfo('agua+fuego+planta').es, 'Amalgama');   // triple (ápice, sin Prisma)
   assert.equal(elementInfo('agua+agua+fuego+planta').es, 'Quimera'); // triple acumulado
-  assert.equal(typeMultiplier('agua+agua+fuego+planta', 'planta'), 1.25); // combate por ingredientes (no por nombre)
+  assert.equal(typeMultiplier('agua+agua+fuego+planta', 'planta'), ADV); // combate por ingredientes (no por nombre)
 });
 
 // Muestra: imprime un resumen de una batalla para inspección manual.
