@@ -97,3 +97,14 @@ for (let s = 0; s < T; s++) {
 console.log(`  estancadas (maxTicks): ${pct(stallN / T)}  empates: ${pct(drawN / T)}  ciclos prom: ${Math.round(cyc / T)}`);
 
 console.log('\n======================================\n');
+
+// H) PROGRESIÓN: equipo del jugador (5×, rareza 2 = 2 partes) a nivel L vs nodos por anillo.
+console.log('\n[H] Progresión (equipo 5× rareza2 nivel L vs nodo del anillo):');
+const playerTeam = (L) => team(Array.from({ length: 5 }, (_, i) => ({ el: ['fuego', 'agua', 'planta'][i % 3], role: ['peleador', 'tanque', 'dps', 'distancia', 'soporte'][i], parts: 2, level: L })), 'pp');
+const ringDiff = (r) => (r - 1) * 2 + 2;   // diff medio del anillo
+for (let ring = 1; ring <= 7; ring++) {
+  const d = ringDiff(ring);
+  let need = null;
+  for (const L of [1, 3, 5, 8, 12, 16, 22, 30]) { if (duel(playerTeam(L), enemyTeam(d, 'ring' + ring), 60).winA >= 0.6) { need = L; break; } }
+  console.log(`  anillo ${ring} (diff ~${d}, ${enemyTeam(d, 'x').length} enem lvl${d}): nivel mínimo del equipo para ganar ≥60% = ${need ?? '>30'}`);
+}
