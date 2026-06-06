@@ -96,7 +96,10 @@ onUnmounted(() => { window.removeEventListener('pointermove', tMove); window.rem
 <template>
   <div class="detail-modal" @click.self="emit('close')">
     <div class="detail-card" v-if="critter">
-      <div v-html="svgBig" style="display:flex;justify-content:center"></div>
+      <div class="d-portrait">
+        <div v-html="svgBig" style="display:flex;justify-content:center"></div>
+        <span v-if="free > 0" class="d-pts" :title="t('lblLibres')">✦{{ free }}</span>
+      </div>
       <h2 style="margin-top:4px">{{ critter.name }}</h2>
       <div class="chips" style="justify-content:center;margin:6px 0 4px">
         <span class="chip">{{ t('nv') }}{{ inst.level }}</span>
@@ -186,6 +189,8 @@ onUnmounted(() => { window.removeEventListener('pointermove', tMove); window.rem
 .detail-modal{position:fixed;inset:0;z-index:45;display:flex;align-items:center;justify-content:center;padding:16px;
   background:rgba(2,4,12,.78);backdrop-filter:blur(5px);animation:dfade .22s ease-out}
 @keyframes dfade{from{opacity:0}to{opacity:1}}
+.d-portrait{position:relative;width:max-content;margin:0 auto}
+.d-pts{position:absolute;top:2px;right:-6px;font-family:var(--fmono);font-size:12px;font-weight:800;color:var(--ink);background:var(--cyan);border-radius:9px;padding:1px 7px;box-shadow:0 0 8px var(--cyan)}
 .detail-card{width:100%;max-width:360px;max-height:90vh;overflow-y:auto;background:var(--panel2);border:1px solid var(--line2);
   border-radius:16px;padding:18px;text-align:center;box-shadow:0 22px 60px rgba(0,0,0,.6);animation:dpop .3s cubic-bezier(.2,1.25,.4,1)}
 @keyframes dpop{from{opacity:0;transform:scale(.93)}to{opacity:1;transform:scale(1)}}
