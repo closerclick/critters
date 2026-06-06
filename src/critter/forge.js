@@ -151,19 +151,19 @@ export function makeCritter (id) {
   const role = pick(rng, ROLES);
   const appearance = {
     head: rint(rng, 0, 3),                         // 4 tipos de cabeza
-    thorax: rng() < 0.3 ? rint(rng, 0, 2) : -1,    // tórax opcional
-    abdomen: rng() < 0.25 ? rint(rng, 0, 3) : -1,  // abdomen opcional
-    legs: rint(rng, 0, 1),                          // 0..1 patas (invocada)
+    thorax: -1, abdomen: -1, legs: 0,
     legStyle: rint(rng, 0, 1),                      // recta | articulada
     antennae: rng() < 0.6,                          // antenas
     hue: rint(rng, -18, 18),                        // variación de tono
     pattern: rint(rng, 0, 2),                       // patrón
   };
-  // Tope de 2 partes (rareza 0-1) para invocadas: quita abdomen, luego tórax, luego patas.
-  while (partsOf(appearance) > 2) {
-    if (appearance.abdomen >= 0) appearance.abdomen = -1;
-    else if (appearance.thorax >= 0) appearance.thorax = -1;
-    else appearance.legs--;
+  // Invocadas: rareza 0-1 → cabeza sola (que evoluciona vía cabeza+cabeza → tórax) o
+  // cabeza + 1 pieza. La rareza alta se consigue FUSIONANDO.
+  if (rng() < 0.6) {                                // ~60% trae una segunda pieza
+    const piece = rint(rng, 0, 2);
+    if (piece === 0) appearance.legs = 1;
+    else if (piece === 1) appearance.thorax = rint(rng, 0, 2);
+    else appearance.abdomen = rint(rng, 0, 3);
   }
   return buildBody(id, rng, element, role, appearance);
 }

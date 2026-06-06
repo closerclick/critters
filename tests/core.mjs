@@ -94,7 +94,7 @@ ok('terreno: opts.terrain afecta la simulación y sigue determinista', () => {
   assert.notEqual(JSON.stringify(r0.log), JSON.stringify(r1.log));  // el terreno cambia el combate
 });
 
-ok('rareza por partes: 9 rarezas (1 parte=índice 0 … 9=8); salvajes ≤4 partes', () => {
+ok('rareza por partes: 9 rarezas (1 parte=índice 0 … 9=8); invocadas rareza 0-1 (≤2 partes)', () => {
   for (let k = 0; k < 80; k++) { const c = makeCritter('wild' + k); assert.ok(c.rarityIndex <= 1, 'invocada rareza 0-1'); assert.ok(partsOf(c.appearance) <= 2 && partsOf(c.appearance) >= 1); }
   assert.equal(rarityIndexFromParts(1), 0);
   assert.equal(rarityIndexFromParts(4), 3);
@@ -111,30 +111,38 @@ ok('genoma-id: makeCritter reconstruye exacto y determinista', () => {
   assert.equal(c1.rarityIndex, 5);           // 6 partes → índice 5 (Notable)
 });
 
-ok('fusión: SOLO 1-2 casillas de diferencia; hija con +1 parte (sube rareza); subelemento', () => {
-  const base = { head: 0, thorax: -1, abdomen: -1, legStyle: 0, antennae: false, hue: 0, pattern: 0 };
-  const A = makeCritter(genomeId({ seed: 'sa', element: 'fuego', role: 'dps', appearance: { ...base, legs: 2 } }));   // 3 partes
-  const B = makeCritter(genomeId({ seed: 'sb', element: 'agua', role: 'dps', appearance: { ...base, legs: 3 } }));    // 4 (diff 1)
+ok('evolución: dos del MISMO nº de piezas con un swap → +1 pieza; cabeza+cabeza → tórax', () => {
+  const base = { head: 0, legStyle: 0, antennae: false, hue: 0, pattern: 0 };
+  // swap tórax↔abdomen, ambas de 3 piezas (cabeza + 1 pata + (tórax|abdomen))
+  const A = makeCritter(genomeId({ seed: 'sa', element: 'fuego', role: 'dps', appearance: { ...base, thorax: 0, abdomen: -1, legs: 1 } }));   // 3
+  const B = makeCritter(genomeId({ seed: 'sb', element: 'agua', role: 'dps', appearance: { ...base, thorax: -1, abdomen: 0, legs: 1 } }));    // 3
   assert.ok(canFuse(A, B));
   const child = fuse(A, B);
-  assert.ok(child);
-  assert.equal(partsOf(child.appearance), 5);                          // max(3,4)+1
-  assert.ok(child.rarityIndex > A.rarityIndex);                        // sube de rareza
-  assert.equal(child.element, 'agua+fuego');                           // subelemento canónico
+  assert.equal(partsOf(child.appearance), 4);                          // unión = +1 pieza sobre cada padre
+  assert.ok(child.rarityIndex > A.rarityIndex);
+  assert.equal(child.element, 'agua+fuego');                           // subelemento (4 partes, cap 2)
   assert.deepEqual(fuse(A, B), child);                                 // determinista
-  const C = makeCritter(genomeId({ seed: 'sc', element: 'fuego', role: 'dps', appearance: { ...base, legs: 2, hue: 9 } })); // igual estructura
-  assert.ok(!canFuse(A, C)); assert.equal(fuse(A, C), null);           // 0 casillas → NO fusiona
-  const D = makeCritter(genomeId({ seed: 'sd2', element: 'planta', role: 'dps', appearance: { ...base, legs: 4 } }));        // 5 (diff 2)
-  assert.ok(canFuse(A, D));                                            // 2 casillas → sí
-  const E = makeCritter(genomeId({ seed: 'se', element: 'agua', role: 'dps', appearance: { ...base, legs: 5 } }));           // 6 (diff 3)
-  assert.ok(!canFuse(A, E)); assert.equal(fuse(A, E), null);           // >2 casillas → NO
-  // Si la rareza NO permite un ingrediente nuevo, los ingredientes se ACUMULAN (no se pierden).
-  const A0 = makeCritter(genomeId({ seed: 'sf0', element: 'fuego', role: 'dps', appearance: { ...base, legs: 0 } }));        // 1 parte
-  const B0 = makeCritter(genomeId({ seed: 'sg0', element: 'agua', role: 'dps', appearance: { ...base, legs: 1 } }));         // 2 (diff 1)
-  const ch0 = fuse(A0, B0);                                            // 3 partes → rareza 2 (cap 1)
+  // subconjunto: cabeza sola vs cabeza+pata → NO fusiona (la cabeza no aporta pieza nueva)
+  const head1 = makeCritter(genomeId({ seed: 'h1', element: 'fuego', role: 'dps', appearance: { ...base, thorax: -1, abdomen: -1, legs: 0 } }));  // 1
+  const headLeg = makeCritter(genomeId({ seed: 'hl', element: 'agua', role: 'dps', appearance: { ...base, thorax: -1, abdomen: -1, legs: 1 } }));  // 2
+  assert.ok(!canFuse(head1, headLeg)); assert.equal(fuse(head1, headLeg), null);
+  // CABEZA + CABEZA → tórax (única combinación posible de la cabeza-sola)
+  const head2 = makeCritter(genomeId({ seed: 'h2', element: 'agua', role: 'dps', appearance: { ...base, thorax: -1, abdomen: -1, legs: 0 } }));  // 1
+  assert.ok(canFuse(head1, head2));
+  const torso = fuse(head1, head2);
+  assert.equal(partsOf(torso.appearance), 2);
+  assert.ok(torso.appearance.thorax >= 0 && torso.appearance.legs === 0 && torso.appearance.abdomen < 0);   // tórax, nada más
+  assert.equal(head1.rarityIndex, 0); assert.equal(torso.rarityIndex, 1);
+  // distinto nº de piezas (subconjunto) → NO
+  const big = makeCritter(genomeId({ seed: 'bg', element: 'planta', role: 'dps', appearance: { ...base, thorax: 0, abdomen: 0, legs: 1 } }));  // 4
+  assert.ok(!canFuse(A, big));
+  // Si la rareza no permite un ingrediente nuevo, los ingredientes se ACUMULAN (no se pierden).
+  const P = makeCritter(genomeId({ seed: 'sp', element: 'fuego', role: 'dps', appearance: { ...base, thorax: 0, abdomen: -1, legs: 0 } }));   // 2
+  const Q = makeCritter(genomeId({ seed: 'sq', element: 'agua', role: 'dps', appearance: { ...base, thorax: -1, abdomen: 0, legs: 0 } }));    // 2
+  const ch0 = fuse(P, Q);                                              // 3 partes → rareza 2 (cap 1)
   assert.equal(partsOf(ch0.appearance), 3);
   assert.equal(new Set(ch0.element.split('+')).size, 1);              // no cabe el subelemento (cap 1)
-  assert.equal(ch0.element.split('+').length, 2);                     // pero ACUMULA (no pierde el ingrediente)
+  assert.equal(ch0.element.split('+').length, 2);                     // pero ACUMULA
 });
 
 ok('subelemento: ventajas de ambos, sin sumar debilidades', () => {

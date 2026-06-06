@@ -5,23 +5,27 @@ import { partsOf, genomeId, makeCritter, MAX_PARTS, clampElement, foldElement, r
 import { mixElements } from '../critter/types.js';
 import { hash32 } from '../lib/hash.js';
 
-// Casillas (estructura) en las que difieren dos apariencias: |patas| + tórax presente? + abdomen presente?
-function cellDiff (a, b) {
-  return Math.abs((a.legs || 0) - (b.legs || 0)) + ((a.thorax >= 0) !== (b.thorax >= 0) ? 1 : 0) + ((a.abdomen >= 0) !== (b.abdomen >= 0) ? 1 : 0);
+// Piezas que cada apariencia tiene y la otra NO (estructura: patas anidadas + tórax + abdomen).
+function pieceDiff (a, b) {
+  const onlyA = Math.max(0, (a.legs || 0) - (b.legs || 0)) + (a.thorax >= 0 && b.thorax < 0 ? 1 : 0) + (a.abdomen >= 0 && b.abdomen < 0 ? 1 : 0);
+  const onlyB = Math.max(0, (b.legs || 0) - (a.legs || 0)) + (b.thorax >= 0 && a.thorax < 0 ? 1 : 0) + (b.abdomen >= 0 && a.abdomen < 0 ? 1 : 0);
+  return { onlyA, onlyB };
 }
 const bigger = (cA, cB) => (partsOf(cA.appearance) >= partsOf(cB.appearance) ? cA : cB);
 
-/** Solo se pueden fusionar arañas que difieran en 1 o 2 casillas (ni iguales, ni >2). */
+/** Para EVOLUCIONAR, cada araña debe aportar EXACTAMENTE una pieza que la otra no tiene
+ *  (un "swap"): así la unión suma una pieza sobre ambas. Un subconjunto (cabeza ⊂
+ *  cabeza+brazo) NO aporta nada nuevo → NO es fusionable. Tampoco iguales ni saltos >1. */
 export function canFuse (cA, cB) {
   if (!cA || !cB || cA.id === cB.id) return false;
-  const d = cellDiff(cA.appearance, cB.appearance);
-  if (d < 1 || d > 2) return false;
-  if (Math.max(partsOf(cA.appearance), partsOf(cB.appearance)) >= MAX_PARTS) return false;   // ya llena → no sube
-  return true;
+  const pa = partsOf(cA.appearance), pb = partsOf(cB.appearance);
+  if (Math.max(pa, pb) >= MAX_PARTS) return false;            // ya llena
+  if (pa === 1 && pb === 1) return true;                      // CABEZA + CABEZA → tórax (única opción de la cabeza-sola)
+  const { onlyA, onlyB } = pieceDiff(cA.appearance, cB.appearance);
+  return onlyA === 1 && onlyB === 1;
 }
 
-// Agrega/quita UNA pieza (orden: abdomen → tórax → +pata / inverso al quitar).
-function addPiece (a) { const r = { ...a }; if (r.abdomen < 0) r.abdomen = a.head % 4; else if (r.thorax < 0) r.thorax = a.head % 3; else if (r.legs < 6) r.legs = r.legs + 1; return r; }
+// Quita UNA pieza (orden inverso: pata → tórax → abdomen) — para el degradado.
 function removePiece (a) { const r = { ...a }; if (r.legs > 0) r.legs--; else if (r.thorax >= 0) r.thorax = -1; else if (r.abdomen >= 0) r.abdomen = -1; return r; }
 // Unión de estructuras (todas las piezas de ambas).
 function unionApp (a, b) {
@@ -33,16 +37,17 @@ function unionApp (a, b) {
 }
 const fuseSeed = (cA, cB) => 's' + ((hash32(cA.id + '|' + cB.id) >>> 0).toString(36));
 
-/** Fusiona dos arañas compatibles (difieren en 1-2 casillas) → hija con UNA parte más
- *  que la mayor (sube de rareza). Elemento = unión recortada a la capacidad. null si no
+/** EVOLUCIÓN: dos arañas del MISMO nº de piezas que difieren en un "swap" (cada una
+ *  aporta 1 pieza que la otra no tiene) → hija = la UNIÓN, que tiene UNA pieza más que
+ *  cada padre (sube de rareza). Elemento = mezcla acumulada a la capacidad. null si no
  *  son fusionables. */
 export function fuse (cA, cB) {
   if (!canFuse(cA, cB)) return null;
   const big = bigger(cA, cB);
-  const target = Math.min(MAX_PARTS, Math.max(partsOf(cA.appearance), partsOf(cB.appearance)) + 1);
-  let app = unionApp(cA.appearance, cB.appearance);
-  let guard = 0;
-  while (partsOf(app) < target && partsOf(app) < MAX_PARTS && guard++ < 12) app = addPiece(app);
+  const headOnly = partsOf(cA.appearance) === 1 && partsOf(cB.appearance) === 1;
+  const app = headOnly
+    ? { ...big.appearance, thorax: 0, abdomen: -1, legs: 0 }   // cabeza + cabeza → SIEMPRE tórax
+    : unionApp(cA.appearance, cB.appearance);                  // swap → +1 pieza sobre cada padre
   const ri = rarityIndexFromParts(partsOf(app));
   const element = foldElement(mixElements(cA.element, cB.element), ri);   // si la rareza no alcanza, acumula (no descarta)
   return makeCritter(genomeId({ seed: fuseSeed(cA, cB), element, role: big.role, appearance: app }));
