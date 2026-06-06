@@ -13,7 +13,7 @@ function choose (id) { chooseStarter(id); }
     <h2 class="st-title">{{ t('eligeInicial') }}</h2>
     <p class="hint" style="text-align:center;max-width:340px">{{ t('eligeInicialHint') }}</p>
     <div class="grid-cards" style="max-width:520px;width:100%">
-      <div v-for="id in game.starterOptions" :key="id" class="pick" @click="choose(id)">
+      <div v-for="(id, i) in game.starterOptions" :key="id" class="pick" @click="choose(id)" :data-testid="'starter-' + i">
         <CritterCard :instance="{ id, level: 1 }" :size="92" />
         <button class="btn block" style="margin-top:8px">{{ t('elegir') }}</button>
       </div>

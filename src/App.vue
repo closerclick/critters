@@ -77,24 +77,25 @@ watch(() => ui.detailUid, (v) => { if (v && !detailNav) detailNav = nav.open(() 
   <StarterView v-if="needsStarter" />
   <template v-else>
   <div class="topbar">
-    <closer-click-back style="color:var(--text);--cc-back-size:34px"></closer-click-back>
+    <closer-click-back style="color:var(--text);--cc-back-size:34px" data-testid="back"></closer-click-back>
     <div class="brand"><img src="/icon.svg" alt="" /><span>Critters</span></div>
     <div class="spacer"></div>
-    <div class="wallet">
+    <div class="wallet" data-testid="wallet">
       <span class="coin">🪙 {{ game.wallet.coins }}</span>
       <span class="frag">🔹 {{ game.wallet.frags }}</span>
     </div>
-    <button class="tb-btn" @click="toggleSfx" title="sonido">{{ sfxMuted ? '🔇' : '🔊' }}</button>
-    <button class="tb-btn" @click="toggleLang">{{ i18n.lang === 'es' ? 'EN' : 'ES' }}</button>
-    <button class="tb-btn danger" :title="t('borrarTitulo')" @click="showReset = true">🗑</button>
-    <closer-click-install class="cc-install"></closer-click-install>
+    <button class="tb-btn" @click="toggleSfx" title="sonido" data-testid="sound-btn">{{ sfxMuted ? '🔇' : '🔊' }}</button>
+    <button class="tb-btn" @click="toggleLang" data-testid="lang-btn">{{ i18n.lang === 'es' ? 'EN' : 'ES' }}</button>
+    <button class="tb-btn danger" :title="t('borrarTitulo')" @click="showReset = true" data-testid="reset-btn">🗑</button>
+    <closer-click-install class="cc-install" :lang="i18n.lang" data-testid="install-btn"></closer-click-install>
+    <closer-click-support class="cc-support" :lang="i18n.lang" href="https://ko-fi.com/closerclick" repo="closerclick/critters" discord="https://discord.gg/D648uq7cth" data-testid="support"></closer-click-support>
   </div>
 
   <nav class="tabs">
-    <button :class="{ on: tab === 'campana' }" @click="goTab('campana')">{{ t('campana') }}</button>
-    <button :class="{ on: tab === 'equipo' }" @click="goTab('equipo')">{{ t('equipo') }}</button>
-    <button :class="{ on: tab === 'coleccion' }" @click="goTab('coleccion')">{{ t('coleccion') }}</button>
-    <button :class="{ on: tab === 'fusion' }" @click="goTab('fusion')">{{ t('fusion') }}</button>
+    <button :class="{ on: tab === 'campana' }" @click="goTab('campana')" data-testid="tab-campana">{{ t('campana') }}</button>
+    <button :class="{ on: tab === 'equipo' }" @click="goTab('equipo')" data-testid="tab-equipo">{{ t('equipo') }}</button>
+    <button :class="{ on: tab === 'coleccion' }" @click="goTab('coleccion')" data-testid="tab-coleccion">{{ t('coleccion') }}</button>
+    <button :class="{ on: tab === 'fusion' }" @click="goTab('fusion')" data-testid="tab-fusion">{{ t('fusion') }}</button>
   </nav>
 
   <main class="view" v-if="game.ready">

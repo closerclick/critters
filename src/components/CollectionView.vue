@@ -14,7 +14,7 @@ function doSummon () { const r = summon(); if (r && r.error === 'coins') { err.v
 
 <template>
   <div class="col-head">
-    <button class="btn col-summon" :disabled="game.wallet.coins < SUMMON_COST" @click="doSummon">✦ {{ t('invocarBtn') }} · 🪙{{ SUMMON_COST }}</button>
+    <button class="btn col-summon" :disabled="game.wallet.coins < SUMMON_COST" @click="doSummon" data-testid="summon-btn">✦ {{ t('invocarBtn') }} · 🪙{{ SUMMON_COST }}</button>
   </div>
   <p class="hint" v-if="err" style="color:var(--bad)">{{ err }}</p>
   <p class="hint">{{ t('invocarHint') }}</p>

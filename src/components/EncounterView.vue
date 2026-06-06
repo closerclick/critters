@@ -60,8 +60,8 @@ const cycLimit = computed(() => node.value ? starCycleLimit(node.value) : 0);
       </div>
 
       <div class="row-btns">
-        <button class="btn sec" @click="emit('close')">{{ t('cancelar') }}</button>
-        <button class="btn" @click="emit('fight')">⚔ {{ t('pelear') }}</button>
+        <button class="btn sec" @click="emit('close')" data-testid="enc-cancel">{{ t('cancelar') }}</button>
+        <button class="btn" @click="emit('fight')" data-testid="fight-btn">⚔ {{ t('pelear') }}</button>
       </div>
     </div>
   </div>

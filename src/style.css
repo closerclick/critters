@@ -58,6 +58,7 @@ button{font-family:inherit;cursor:pointer;color:inherit}
 .wallet .coin{color:var(--gold)} .wallet .frag{color:var(--cyan)}
 .tb-btn{border:1px solid var(--line2);background:rgba(167,139,250,.08);color:var(--text);font-weight:800;font-size:12px;padding:6px 10px;border-radius:10px}
 .tb-btn:active{background:rgba(167,139,250,.2)}
+.cc-install,.cc-support{display:inline-flex;align-items:center}
 .cc-install{--cc-install-color:var(--text);--cc-install-icon:16px;--cc-install-radius:10px;--cc-install-font-size:.78rem}
 
 /* ---- tabs (segmentado) ---- */
