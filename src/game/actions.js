@@ -4,7 +4,7 @@ import { game, persist, newUid, instanceByUid, critterById } from './state.js';
 import { neighbors, nodeById, enemyTeam, reward, captureDrop, nodeBattleSeed, starCycleLimit } from './campaign.js';
 import { simulate } from '../battle/engine.js';
 import { xpForNext, pointsFree, totalXp, levelXpFromTotal } from '../critter/forge.js';
-import { canFuse, fuse, degrade } from './fusion.js';
+import { canFuse, fuse, fuseKind } from './fusion.js';
 
 export const SUMMON_COST = 100;   // monedas por invocación
 export const FEED_XP = 60;        // XP por alimentar
@@ -107,20 +107,28 @@ export function resetAlloc (uid) { const i = instanceByUid(uid); if (i) { i.allo
 export function fusablePartners (uid) {
   return game.collection.filter(b => b.uid !== uid).map(b => b.uid);
 }
-/** ¿La fusión A+B es COMPATIBLE (sube rareza) o incompatible (débil)? */
+/** ¿A+B son fusionables? EVOLUCIÓN y DEVOLUCIÓN exigen MISMO NIVEL + estructura válida. */
 export function isCompatibleFuse (uidA, uidB) {
   const a = instanceByUid(uidA), b = instanceByUid(uidB);
-  return !!(a && b) && canFuse(critterById(a.id), critterById(b.id));
+  return !!(a && b) && a.level === b.level && canFuse(critterById(a.id), critterById(b.id));
 }
-/** Vista previa del descriptor resultante (no consume nada). */
+/** 'evolve' | 'degrade' | null para el par (solo si son del mismo nivel). Para la UI. */
+export function fuseKindOf (uidA, uidB) {
+  const a = instanceByUid(uidA), b = instanceByUid(uidB);
+  if (!a || !b || a.level !== b.level) return null;
+  return fuseKind(critterById(a.id), critterById(b.id));
+}
+/** Vista previa del descriptor resultante (no consume nada). Solo pares fusionables. */
 export function fusePreview (uidA, uidB) {
   const a = instanceByUid(uidA), b = instanceByUid(uidB);
-  return (a && b) ? fuse(critterById(a.id), critterById(b.id)) : null;
+  if (!a || !b || a.level !== b.level) return null;
+  return fuse(critterById(a.id), critterById(b.id));
 }
-/** Fusiona dos instancias: crea la hija (nivel 1) y CONSUME ambas (colección y equipo). */
+/** Fusiona dos instancias del MISMO NIVEL (evoluciona o degrada) y CONSUME ambas. */
 export function fuseCritters (uidA, uidB) {
   const a = instanceByUid(uidA), b = instanceByUid(uidB);
   if (!a || !b || uidA === uidB) return { error: 'pick' };
+  if (a.level !== b.level) return { error: 'level' };
   const child = fuse(critterById(a.id), critterById(b.id));
   if (!child) return { error: 'incompat' };
   // La hija HEREDA la XP combinada de las dos (no se pierde lo invertido).
@@ -130,22 +138,6 @@ export function fuseCritters (uidA, uidB) {
   const inst = addCritter(child.id, lx.level); inst.xp = lx.xp;
   persist();
   return { instance: inst, critter: child };
-}
-
-/** Vista previa del resultado de degradar `uid`. */
-export function degradePreview (uid) { const a = instanceByUid(uid); return a ? degrade(critterById(a.id)) : null; }
-/** Degrada la araña `uidA` un tramo de rareza CONSUMIENDO a `uidB`. Muta A en sitio
- *  (conserva uid/level/xp/alloc); B se descarta. Piso = común. */
-export function degradeCritter (uidA, uidB) {
-  const a = instanceByUid(uidA), b = instanceByUid(uidB);
-  if (!a || !b || uidA === uidB) return { error: 'pick' };
-  const child = degrade(critterById(a.id));
-  if (!child) return { error: 'floor' };   // ya en común
-  purgeUid(uidB);
-  game.collection = game.collection.filter(x => x.uid !== uidB);
-  a.id = child.id;   // muta en sitio: nuevo genoma recortado, misma identidad/uid/level/xp
-  persist();
-  return { instance: a, critter: child };
 }
 
 // ---- telaraña de campaña ----

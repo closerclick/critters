@@ -1,68 +1,54 @@
-// Fusión y DEGRADADO deterministas basados en PARTES. La rareza la dan las partes;
-// el elemento se EXPRESA hasta la capacidad de esa rareza (clampElement). La SEMILLA
-// genética (identidad) se conserva al degradar.
-import { partsOf, genomeId, makeCritter, MAX_PARTS, clampElement, foldElement, rarityIndexFromParts, seedOfId } from '../critter/forge.js';
+// FUSIÓN unificada (determinista, por PARTES). Dos arañas → una:
+//  - EVOLUCIONA: cabeza+cabeza (→tórax) o un "swap" exacto (cada una aporta 1 pieza que la
+//    otra no tiene; mismo nº de piezas) → la UNIÓN, con +1 pieza (sube de rareza).
+//  - DEGRADA: si difieren en MÁS de una pieza → la hija pierde TODAS las partes diferentes
+//    (queda la INTERSECCIÓN), bajando de rareza.
+//  - null: subconjunto de 1 (no aporta) o idénticas.
+// El elemento al evolucionar se ACUMULA (foldElement); al degradar se descarta lo que no
+// cabe (clampElement, destructivo). La restricción de MISMO NIVEL se aplica en actions.js.
+import { partsOf, genomeId, makeCritter, MAX_PARTS, clampElement, foldElement, rarityIndexFromParts } from '../critter/forge.js';
 import { mixElements } from '../critter/types.js';
 import { hash32 } from '../lib/hash.js';
 
-// Piezas que cada apariencia tiene y la otra NO (estructura: patas anidadas + tórax + abdomen).
+// Piezas que cada apariencia tiene y la otra NO (patas anidadas + tórax + abdomen).
 function pieceDiff (a, b) {
   const onlyA = Math.max(0, (a.legs || 0) - (b.legs || 0)) + (a.thorax >= 0 && b.thorax < 0 ? 1 : 0) + (a.abdomen >= 0 && b.abdomen < 0 ? 1 : 0);
   const onlyB = Math.max(0, (b.legs || 0) - (a.legs || 0)) + (b.thorax >= 0 && a.thorax < 0 ? 1 : 0) + (b.abdomen >= 0 && a.abdomen < 0 ? 1 : 0);
   return { onlyA, onlyB };
 }
 const bigger = (cA, cB) => (partsOf(cA.appearance) >= partsOf(cB.appearance) ? cA : cB);
-
-/** Para EVOLUCIONAR, cada araña debe aportar EXACTAMENTE una pieza que la otra no tiene
- *  (un "swap"): así la unión suma una pieza sobre ambas. Un subconjunto (cabeza ⊂
- *  cabeza+brazo) NO aporta nada nuevo → NO es fusionable. Tampoco iguales ni saltos >1. */
-export function canFuse (cA, cB) {
-  if (!cA || !cB || cA.id === cB.id) return false;
-  const pa = partsOf(cA.appearance), pb = partsOf(cB.appearance);
-  if (Math.max(pa, pb) >= MAX_PARTS) return false;            // ya llena
-  if (pa === 1 && pb === 1) return true;                      // CABEZA + CABEZA → tórax (única opción de la cabeza-sola)
-  const { onlyA, onlyB } = pieceDiff(cA.appearance, cB.appearance);
-  return onlyA === 1 && onlyB === 1;
-}
-
-// Quita UNA pieza (orden inverso: pata → tórax → abdomen) — para el degradado.
-function removePiece (a) { const r = { ...a }; if (r.legs > 0) r.legs--; else if (r.thorax >= 0) r.thorax = -1; else if (r.abdomen >= 0) r.abdomen = -1; return r; }
-// Unión de estructuras (todas las piezas de ambas).
-function unionApp (a, b) {
-  return { ...a,
-    thorax: (a.thorax >= 0) ? a.thorax : (b.thorax >= 0 ? b.thorax : -1),
-    abdomen: (a.abdomen >= 0) ? a.abdomen : (b.abdomen >= 0 ? b.abdomen : -1),
-    legs: Math.max(a.legs || 0, b.legs || 0),
-  };
-}
+// Unión (todas las piezas de ambas) e intersección (solo las comunes).
+function unionApp (a, b) { return { ...a, thorax: a.thorax >= 0 ? a.thorax : (b.thorax >= 0 ? b.thorax : -1), abdomen: a.abdomen >= 0 ? a.abdomen : (b.abdomen >= 0 ? b.abdomen : -1), legs: Math.max(a.legs || 0, b.legs || 0) }; }
+function interApp (a, b) { return { ...a, thorax: (a.thorax >= 0 && b.thorax >= 0) ? a.thorax : -1, abdomen: (a.abdomen >= 0 && b.abdomen >= 0) ? a.abdomen : -1, legs: Math.min(a.legs || 0, b.legs || 0) }; }
 const fuseSeed = (cA, cB) => 's' + ((hash32(cA.id + '|' + cB.id) >>> 0).toString(36));
 
-/** EVOLUCIÓN: dos arañas del MISMO nº de piezas que difieren en un "swap" (cada una
- *  aporta 1 pieza que la otra no tiene) → hija = la UNIÓN, que tiene UNA pieza más que
- *  cada padre (sube de rareza). Elemento = mezcla acumulada a la capacidad. null si no
- *  son fusionables. */
+/** 'evolve' | 'degrade' | null (ver cabecera). NO mira el nivel (eso lo valida la acción). */
+export function fuseKind (cA, cB) {
+  if (!cA || !cB || cA.id === cB.id) return null;
+  const pa = partsOf(cA.appearance), pb = partsOf(cB.appearance);
+  if (pa === 1 && pb === 1) return 'evolve';                                    // cabeza + cabeza → +tórax (piso)
+  if (pa === MAX_PARTS && pb === MAX_PARTS) return 'degrade';                   // legendaria + legendaria → -tórax (techo)
+  const { onlyA, onlyB } = pieceDiff(cA.appearance, cB.appearance);
+  if (onlyA === 1 && onlyB === 1) return Math.max(pa, pb) >= MAX_PARTS ? null : 'evolve';   // swap → +1
+  if (onlyA > 1 || onlyB > 1) return 'degrade';                                 // >1 diferencia → intersección
+  return null;                                                                  // subconjunto de 1 / idénticas
+}
+export const canFuse = (cA, cB) => fuseKind(cA, cB) !== null;
+
+/** Resultado determinista de fusionar A y B (evolución o degradación). null si no aplica. */
 export function fuse (cA, cB) {
-  if (!canFuse(cA, cB)) return null;
+  const kind = fuseKind(cA, cB);
+  if (!kind) return null;
   const big = bigger(cA, cB);
   const headOnly = partsOf(cA.appearance) === 1 && partsOf(cB.appearance) === 1;
-  const app = headOnly
-    ? { ...big.appearance, thorax: 0, abdomen: -1, legs: 0 }   // cabeza + cabeza → SIEMPRE tórax
-    : unionApp(cA.appearance, cB.appearance);                  // swap → +1 pieza sobre cada padre
-  const ri = rarityIndexFromParts(partsOf(app));
-  const element = foldElement(mixElements(cA.element, cB.element), ri);   // si la rareza no alcanza, acumula (no descarta)
+  const fullBoth = partsOf(cA.appearance) === MAX_PARTS && partsOf(cB.appearance) === MAX_PARTS;
+  let app, element;
+  if (kind === 'evolve') {
+    app = headOnly ? { ...big.appearance, thorax: 0, abdomen: -1, legs: 0 } : unionApp(cA.appearance, cB.appearance);
+    element = foldElement(mixElements(cA.element, cB.element), rarityIndexFromParts(partsOf(app)));   // acumula
+  } else {
+    app = fullBoth ? { ...big.appearance, thorax: -1 } : interApp(cA.appearance, cB.appearance);      // techo: -tórax; resto: intersección
+    element = clampElement(mixElements(cA.element, cB.element), rarityIndexFromParts(partsOf(app)));   // destructivo
+  }
   return makeCritter(genomeId({ seed: fuseSeed(cA, cB), element, role: big.role, appearance: app }));
-}
-
-/** Degrada UNA araña un TRAMO de rareza (piso = común): quita partes hasta bajar de
- *  rareza, recorta el elemento a la nueva capacidad (DESTRUCTIVO) y CONSERVA la semilla.
- *  null si ya en común. (Consume un compañero como costo; eso lo maneja la acción.) */
-export function degrade (c) {
-  if (!c || partsOf(c.appearance) <= 1) return null;
-  const target = rarityIndexFromParts(partsOf(c.appearance)) - 1;
-  if (target < 0) return null;
-  let app = { ...c.appearance };
-  while (partsOf(app) > 1 && rarityIndexFromParts(partsOf(app)) > target) app = removePiece(app);
-  const ri = rarityIndexFromParts(partsOf(app));
-  const element = clampElement(c.element, ri);
-  return makeCritter(genomeId({ seed: seedOfId(c.id), element, role: c.role, appearance: app }));
 }

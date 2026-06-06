@@ -5,7 +5,7 @@ import { critterSvg } from '../src/critter/svg.js';
 import { typeMultiplier, mixElements, elementInfo } from '../src/critter/types.js';
 import { simulate, battleSeed } from '../src/battle/engine.js';
 import { normalizeTarget } from '../src/battle/policies.js';
-import { canFuse, fuse, degrade } from '../src/game/fusion.js';
+import { canFuse, fuse, fuseKind } from '../src/game/fusion.js';
 
 let failed = 0;
 const ok = (name, fn) => { try { fn(); console.log('  ✓', name); } catch (e) { failed++; console.error('  ✗', name, '\n   ', e.message); } };
@@ -176,18 +176,22 @@ ok('capacidad por rareza (de 3 en 3) + recorte determinista (degradado)', () => 
   assert.equal(clampElement('agua+fuego+planta', 2), 'fuego');       // cap 1 (rareza 3) → recorta a 1
 });
 
-ok('degradar: -1 tramo por vez, recorta a la capacidad, conserva identidad (semilla)', () => {
-  const leg = makeCritter(genomeId({ seed: 'sd', element: 'agua+fuego+planta', role: 'dps', appearance: { head: 0, thorax: 0, abdomen: 0, legs: 6, legStyle: 0, antennae: false, hue: 0, pattern: 0 } }));
-  assert.equal(partsOf(leg.appearance), 9);
-  assert.equal(leg.rarityIndex, 8);
-  let c = degrade(leg);
-  assert.equal(partsOf(c.appearance), 8); assert.equal(c.rarityIndex, 7);    // -1 parte = -1 rareza
-  assert.equal(new Set(c.element.split('+')).size, 3);                        // 8 partes (cap 3) aún triple
-  assert.equal(c.name, leg.name);                                            // identidad estable (semilla)
-  while (c && partsOf(c.appearance) > 6) c = degrade(c);                     // bajar a 6 partes
-  assert.equal(partsOf(c.appearance), 6); assert.equal(c.rarityIndex, 5);
-  assert.equal(new Set(c.element.split('+')).size, 2);                        // 6 partes (cap 2) → subelemento
-  assert.equal(c.name, leg.name);
+ok('devolución (fusión >1 diferencia) = INTERSECCIÓN; legendaria+legendaria → -tórax', () => {
+  const base = { head: 0, legStyle: 0, antennae: false, hue: 0, pattern: 0 };
+  // >1 diferencia → degrada a la intersección (pierde TODAS las partes diferentes)
+  const A = makeCritter(genomeId({ seed: 'da', element: 'fuego', role: 'dps', appearance: { ...base, thorax: 0, abdomen: 0, legs: 2 } }));  // head+tórax+abd+2patas = 5
+  const B = makeCritter(genomeId({ seed: 'db', element: 'agua', role: 'dps', appearance: { ...base, thorax: -1, abdomen: -1, legs: 2 } })); // head+2patas = 3
+  assert.equal(fuseKind(A, B), 'degrade');                              // onlyA=2 (tórax,abd), onlyB=0
+  const inter = fuse(A, B);
+  assert.equal(partsOf(inter.appearance), 3);                          // intersección = head+2patas
+  assert.ok(inter.appearance.thorax < 0 && inter.appearance.abdomen < 0 && inter.appearance.legs === 2);
+  // techo: dos legendarias (9) idénticas en estructura → pierde el tórax (8)
+  const L1 = makeCritter(genomeId({ seed: 'L1', element: 'fuego', role: 'dps', appearance: { head: 0, thorax: 0, abdomen: 0, legs: 6, legStyle: 0, antennae: false, hue: 0, pattern: 0 } }));
+  const L2 = makeCritter(genomeId({ seed: 'L2', element: 'agua', role: 'dps', appearance: { head: 0, thorax: 0, abdomen: 0, legs: 6, legStyle: 0, antennae: false, hue: 1, pattern: 0 } }));
+  assert.equal(partsOf(L1.appearance), 9); assert.equal(fuseKind(L1, L2), 'degrade');
+  const demoted = fuse(L1, L2);
+  assert.equal(partsOf(demoted.appearance), 8); assert.ok(demoted.appearance.thorax < 0);   // -tórax
+  assert.equal(demoted.rarityIndex, 7);
 });
 
 ok('catálogo de 36 nombres: combinación + intensidad por acumulación', () => {

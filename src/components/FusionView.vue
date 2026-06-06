@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { game, instanceByUid, critterById } from '../game/state.js';
-import { fusePreview, fuseCritters, isCompatibleFuse, degradePreview, degradeCritter } from '../game/actions.js';
+import { fusePreview, fuseCritters, isCompatibleFuse, fuseKindOf } from '../game/actions.js';
 import { openCritter } from '../ui.js';
 import { elementInfo } from '../critter/types.js';
 import { RARITY_BY_KEY, statsAtLevel } from '../critter/forge.js';
@@ -19,12 +19,12 @@ const instA = computed(() => selA.value ? instanceByUid(selA.value) : null);
 const instB = computed(() => selB.value ? instanceByUid(selB.value) : null);
 const others = computed(() => game.collection.filter(i => i.uid !== selA.value));
 const compatOf = (uid) => isCompatibleFuse(selA.value, uid);
-const previewCompatible = computed(() => (selA.value && selB.value) ? isCompatibleFuse(selA.value, selB.value) : false);
+const kind = computed(() => (selA.value && selB.value) ? fuseKindOf(selA.value, selB.value) : null);
 const preview = computed(() => (selA.value && selB.value) ? fusePreview(selA.value, selB.value) : null);
 const svgPrev = computed(() => preview.value ? critterSvg(preview.value, 58) : '');
 const prevEl = computed(() => preview.value ? elementInfo(preview.value.element) : null);
 const prevRar = computed(() => preview.value ? RARITY_BY_KEY[preview.value.rarity] : null);
-const prevStats = computed(() => preview.value ? statsAtLevel(preview.value, 1) : null);
+const prevStats = computed(() => preview.value ? statsAtLevel(preview.value, instA.value ? instA.value.level : 1) : null);
 
 const gridList = computed(() => {
   if (!selA.value) return game.collection;
@@ -47,14 +47,7 @@ function reset () { selA.value = null; selB.value = null; }
 function doFuse () {
   const r = fuseCritters(selA.value, selB.value);
   reset();
-  if (r && r.instance) openCritter(r.instance.uid);   // muestra la nueva criatura
-}
-// Degradar A consumiendo B: baja un tramo de rareza (piso común), recorta el elemento.
-const degradable = computed(() => !!(selA.value && selB.value && degradePreview(selA.value)));
-function doDegrade () {
-  const r = degradeCritter(selA.value, selB.value);
-  reset();
-  if (r && r.instance) openCritter(r.instance.uid);
+  if (r && r.instance) openCritter(r.instance.uid);   // muestra la criatura resultante
 }
 </script>
 
@@ -84,13 +77,12 @@ function doDegrade () {
         <span class="dot">·</span> {{ loc(prevEl) }}
         <span class="dot">·</span> <span :style="{ color: prevRar.color }">{{ loc(prevRar) }}</span></div>
       <div class="prev-stats" v-if="prevStats">❤{{ prevStats.HP }} · ⚔{{ prevStats.ATK }} · 🛡{{ prevStats.DEF }} · ⚡{{ prevStats.SPD }}</div>
-      <div class="fnote" :class="previewCompatible ? 'ok' : 'weak'">{{ previewCompatible ? '✓ ' + t('fusionSube') : '⚠ ' + t('fusionDebil') }}</div>
+      <div class="fnote" :class="kind === 'degrade' ? 'weak' : 'ok'">{{ kind === 'degrade' ? '⬇ ' + t('devolucionaNota') : '✦ ' + t('evolucionaNota') }}</div>
     </div>
 
     <div class="row-btns" v-if="selA || selB">
       <button class="btn sec" @click="reset">{{ t('cancelar') }}</button>
-      <button v-if="degradable" class="btn sec" @click="doDegrade" :title="t('degradar') + ' A'">⬇ {{ t('degradar') }} A</button>
-      <button class="btn" :disabled="!preview" @click="doFuse">✦ {{ t('fusionar') }}</button>
+      <button class="btn" :class="{ sec: kind === 'degrade' }" :disabled="!preview" @click="doFuse">{{ kind === 'degrade' ? '⬇ ' + t('devolucionar') : '✦ ' + t('evolucionar') }}</button>
     </div>
 
     <div class="fsub" v-if="subLabel">{{ subLabel }}</div>
