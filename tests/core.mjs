@@ -1,6 +1,6 @@
 // Test Node (sin navegador) del núcleo determinista: forge, svg y motor de batalla.
 import assert from 'node:assert';
-import { makeCritter, statsAtLevel, power, pointsTotal, pointsFree, partsOf, rarityIndexFromParts, genomeId } from '../src/critter/forge.js';
+import { makeCritter, statsAtLevel, power, pointsTotal, pointsFree, partsOf, rarityIndexFromParts, genomeId, mixFactor } from '../src/critter/forge.js';
 import { critterSvg } from '../src/critter/svg.js';
 import { typeMultiplier, mixElements, elementInfo } from '../src/critter/types.js';
 import { simulate, battleSeed } from '../src/battle/engine.js';
@@ -32,7 +32,7 @@ ok('critterSvg devuelve SVG válido', () => {
 ok('typeMultiplier: ventaja/neutral/desventaja', () => {
   assert.equal(typeMultiplier('fuego', 'agua'), 1.25);   // fuego le gana al siguiente (agua)
   assert.equal(typeMultiplier('agua', 'fuego'), 0.8);    // agua en desventaja contra el anterior
-  assert.equal(typeMultiplier('fuego', 'fuego'), 1.1);   // neutral = leve debilidad
+  assert.equal(typeMultiplier('fuego', 'fuego'), 1);   // mismo elemento → neutral
 });
 
 // Equipos de 5 en la 3×3 (slots 0..4: frente 0,1,2 / fondo 3,4).
@@ -132,7 +132,16 @@ ok('subelemento: ventajas de ambos, sin sumar debilidades', () => {
   assert.equal(mixElements('agua+fuego', 'planta'), 'agua+fuego+planta');              // dual + base → triple
   assert.equal(mixElements('agua+fuego+planta', 'agua'), 'agua+agua+fuego+planta');    // en profundidad SIGUE acumulando
   assert.equal(typeMultiplier('agua+fuego', 'planta'), 1.25);   // atacando: toma la ventaja (agua)
-  assert.equal(typeMultiplier('fuego', 'agua+fuego'), 1.1);     // neutral → leve debilidad (no resiste de gratis)
+  assert.equal(typeMultiplier('fuego', 'agua+fuego'), 1);       // el dual resiste/neutraliza por sus ingredientes
+});
+
+ok('impuesto de mezcla: pura 100%, mezclada nace débil y se recupera a legendaria', () => {
+  assert.equal(mixFactor('fuego', 0), 1);                                  // pura sin impuesto (cualquier rareza)
+  assert.equal(mixFactor('fuego', 4), 1);
+  assert.equal(Math.round(mixFactor('agua+fuego', 0) * 100), 80);          // dual común −20%
+  assert.equal(mixFactor('agua+fuego', 4), 1);                             // dual legendaria 100%
+  assert.equal(Math.round(mixFactor('agua+fuego+planta', 0) * 100), 60);   // triple común −40% (héroe débil)
+  assert.equal(mixFactor('agua+fuego+planta', 4), 1);                      // triple legendaria 100% en todo
 });
 
 ok('catálogo de 36 nombres: combinación + intensidad por acumulación', () => {

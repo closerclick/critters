@@ -16,8 +16,6 @@ export const ELEMENT_INFO = {
 
 export const ADV = 1.25;   // multiplicador con ventaja de tipo
 export const DIS = 0.8;    // multiplicador con desventaja
-export const NEU = 1.1;    // neutral = leve DEBILIDAD: sin ventaja elemental estás expuesto
-                           // (poné 0.9 para que el neutral sea ventaja defensiva en vez de débil)
 
 // Un SUBELEMENTO (fruto de fusionar dos elementos distintos) se escribe "a+b".
 export const comps = (el) => String(el).split('+');
@@ -47,8 +45,7 @@ export function typeMultiplier (att, def) {
   const A = comps(att), D = comps(def);
   let best = -Infinity;
   for (const a of A) { let worst = Infinity; for (const d of D) { const m = baseMult(a, d); if (m < worst) worst = m; } if (worst > best) best = worst; }
-  const r = best === -Infinity ? 1 : best;
-  return r === 1 ? NEU : r;   // el neutral pasa a ser leve debilidad (defensa real = resistir, 0.8)
+  return best === -Infinity ? 1 : best;
 }
 
 const hx = (h) => { h = String(h).replace('#', ''); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16) || 0); };

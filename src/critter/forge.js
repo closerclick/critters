@@ -44,13 +44,23 @@ function parseGenome (id) {
   };
 }
 
+// "Impuesto de mezcla": una araña PURA (1 elemento) nace al 100%; cuantos más
+// elementos distintos mezcla, más penalización en rarezas bajas (el "héroe débil"),
+// pero el impuesto SE DESVANECE hacia la legendaria → la triple balanceada legendaria
+// llega al 100% en todo. Pura: sin impuesto. Tunable con MIX_TAX.
+const MIX_TAX = 0.2;
+export function mixFactor (element, rarityIndex = 0) {
+  const d = new Set(String(element).split('+').filter(e => ELEMENTS.includes(e))).size || 1;
+  return 1 - MIX_TAX * (d - 1) * (1 - Math.max(0, Math.min(4, rarityIndex)) / 4);
+}
+
 // Cuerpo común: dados elemento/rol/apariencia, deriva rareza (por partes), stats,
 // pasiva/activa, flanqueo y nombre con el rng del id. Comparte salvajes y genomas.
 function buildBody (id, rng, element, role, appearance) {
   const rarityIndex = rarityIndexFromParts(partsOf(appearance));
   const rarity = RARITIES[rarityIndex];
   const w = ROLE_WEIGHTS[role] || ROLE_WEIGHTS[ROLES[0]];
-  const budget = BASE_BUDGET * rarity.budget;
+  const budget = BASE_BUDGET * rarity.budget * mixFactor(element, rarityIndex);
   const j = () => 0.85 + rng() * 0.30;   // jitter por stat
   const base = {
     HP: Math.round(budget * w.HP * j() * HP_FACTOR),
