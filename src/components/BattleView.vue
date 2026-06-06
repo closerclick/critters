@@ -3,6 +3,8 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import { critterById } from '../game/state.js';
 import { critterSvg } from '../critter/svg.js';
 import { COLS, ROWS } from '../battle/engine.js';
+import { BAL } from '../battle/balance.js';
+import { ACTIVES } from '../critter/abilities.js';
 import * as sfx from '../sfx.js';
 import { SPEEDS, speed, setSpeed } from '../speed.js';
 import { elementInfo } from '../critter/types.js';
@@ -14,25 +16,29 @@ const emit = defineEmits(['close', 'next']);
 const U = reactive({});           // uid → estado vivo
 const list = ref([]);             // uids para render
 const finished = ref(false);
-let timer = null, endTimer = null, i = 0, alive = true, ended = false;
-const modalHidden = ref(false);   // "Ver campo": oculta el modal de resultado para mirar el campo
+const modalHidden = ref(false);   // "Ver campo": oculta el modal de resultado
+let alive = true, ended = false, rafId = 0, idx = 0, clock = 0, lastTs = 0, endTimer = null;
 
-// Velocidad de reproducción (compartida/persistida; se elige en el modal de encuentro).
-// El replay apunta a ~8 s a 1×; 2×/5×/10× dividen el intervalo por evento.
-let baseMs = 120;
-const curMs = () => Math.max(8, Math.round(baseMs / speed.value));
+// Replay POR CICLOS: el reloj avanza en ciclos de simulación (no por evento). Cada evento
+// trae su `cyc` (tick) y se reproduce cuando el reloj lo alcanza → los tiempos reflejan los
+// ciclos reales (una araña rápida actúa más seguido; los huecos = carga). CYCLE_MS = 1×.
+const CYCLE_MS = 24;              // ms por ciclo a 1× (unidad ciclo-tiempo)
+const CH = BAL.charge;            // carga necesaria para actuar
 
 const res = () => props.payload.result;
 function initUnits () {
   for (const k in U) delete U[k];
-  for (const u of res().units) U[u.uid] = { ...u, hp: u.maxHp, dead: false, flash: false, dmg: null, dmgClass: '', face: u.side === 0 ? 1 : -1 };
+  for (const u of res().units) {
+    const cost = (ACTIVES[critterById(u.id).active] || {}).cost || 100;
+    U[u.uid] = { ...u, hp: u.maxHp, dead: false, flash: false, dmg: null, dmgClass: '', face: u.side === 0 ? 1 : -1, energy: 0, cost, lastAct: 0, cy: 0 };
+  }
   list.value = res().units.map(u => u.uid);
 }
 const svgFor = (u) => critterSvg(critterById(u.id), 40, { frame: false });
 const leftOf = (u) => (u.col / COLS * 100) + '%';
 const topOf = (u) => (u.row / ROWS * 100) + '%';
 
-// Estela de golpe: línea atacante→objetivo en cada ataque (hace visible el diagonal).
+// Estela de golpe: línea atacante→objetivo en cada ataque básico.
 const trails = ref([]);
 let trailN = 0;
 const cxU = (u) => ((u.col + 0.5) / COLS * 100);
@@ -43,39 +49,79 @@ function addTrail (by, tgt, crit) {
   setTimeout(() => { if (alive) trails.value = trails.value.filter(t => t.k !== k); }, 300);
 }
 
-function showDmg (u, val, cls) { u.dmg = val; u.dmgClass = cls; u.flash = true; setTimeout(() => { if (alive) u.flash = false; }, 220); }
-function applyEv (ev, silent) {
-  const u = ev.target && U[ev.target], by = ev.by && U[ev.by];
-  if (ev.t === 'move') { if (by) { if (ev.c !== by.col) by.face = ev.c > by.col ? 1 : -1; by.row = ev.r; by.col = ev.c; } }
-  else if (ev.t === 'attack' || ev.t === 'thorns') {
-    if (ev.t === 'attack' && by && u && u.col !== by.col) by.face = u.col > by.col ? 1 : -1;   // mira al objetivo
-    if (u) { u.hp = Math.max(0, u.hp - (ev.dmg || 0)); if (!silent) { showDmg(u, ev.dmg, ev.crit ? 'crit' : ''); if (ev.t === 'attack') { sfx.hit(ev.crit); if (by && !ev.ability) addTrail(by, u, ev.crit); } } }   // estela solo en ataque BÁSICO
-  }
-  else if (ev.t === 'heal' || ev.t === 'lifesteal' || ev.t === 'regen') { if (u) { u.hp = Math.min(u.maxHp, u.hp + (ev.heal || 0)); if (!silent) { showDmg(u, '+' + (ev.heal || 0), 'heal'); if (ev.t === 'heal') sfx.heal(); } } }
-  else if (ev.t === 'active') { if (!silent) sfx.active(); }
-  else if (ev.t === 'faint') { if (u) { u.hp = 0; u.dead = true; if (!silent) sfx.faint(); } }
+// Toasts de EVENTOS ESPECIALES sobre cada unidad (suben y dejan ver el siguiente).
+const floaters = ref([]);
+let floatN = 0;
+const floatersFor = (uid) => floaters.value.filter(f => f.uid === uid);
+function addFloater (uid, text, cls) {
+  if (!uid || !U[uid]) return;
+  const off = Math.min(3, floaters.value.filter(f => f.uid === uid).length);
+  const k = ++floatN;
+  floaters.value.push({ k, uid, text, cls, off });
+  setTimeout(() => { if (alive) floaters.value = floaters.value.filter(f => f.k !== k); }, 1000);
 }
-function step () { const log = res().log; if (i >= log.length) { endBattle(); return; } applyEv(log[i++]); }
+const gainEnergy = (u, amt) => { if (u) u.energy = Math.max(0, Math.min(u.cost, u.energy + amt)); };
+function showDmg (u, val, cls) { u.dmg = val; u.dmgClass = cls; u.flash = true; setTimeout(() => { if (alive) u.flash = false; }, 220); }
+
+function applyEv (ev, silent) {
+  const u = ev.target && U[ev.target], by = ev.by && U[ev.by], actor = ev.actor && U[ev.actor];
+  if (actor && ev.cyc != null) actor.lastAct = ev.cyc;   // al actuar, su barra de ciclo se reinicia
+  if (ev.t === 'move') {
+    if (by) {
+      if (ev.c !== by.col) by.face = ev.c > by.col ? 1 : -1;
+      by.row = ev.r; by.col = ev.c;
+      if (ev.kb) { if (!silent) addFloater(ev.by, '↩', 'fl-kb'); }
+      else if (ev.by === ev.actor) gainEnergy(by, 6);
+    }
+  } else if (ev.t === 'attack' || ev.t === 'thorns') {
+    if (ev.t === 'attack' && by && u && u.col !== by.col) by.face = u.col > by.col ? 1 : -1;   // mira al objetivo
+    if (u) { u.hp = Math.max(0, u.hp - (ev.dmg || 0)); gainEnergy(u, BAL.energyPerHit); if (!silent) { showDmg(u, ev.dmg, ev.crit ? 'crit' : ''); if (ev.t === 'attack') { sfx.hit(ev.crit); if (by && !ev.ability) addTrail(by, u, ev.crit); } } }
+    if (ev.t === 'attack' && by && !ev.ability && ev.by === ev.actor) gainEnergy(by, BAL.energyPerAction);   // básico: el atacante carga
+  } else if (ev.t === 'heal' || ev.t === 'lifesteal' || ev.t === 'regen') {
+    if (u) { u.hp = Math.min(u.maxHp, u.hp + (ev.heal || 0)); if (!silent) { addFloater(ev.target, '+' + (ev.heal || 0), 'fl-heal'); if (ev.t === 'heal') sfx.heal(); } }
+  } else if (ev.t === 'active') {
+    if (actor) actor.energy = 0;   // gastó la barra de energía
+    if (!silent) { sfx.active(); addFloater(ev.by || ev.actor, loc(ACTIVES[ev.ability] || {}) || '✦', 'fl-active'); }
+  } else if (ev.t === 'buff') {
+    if (!silent && Array.isArray(ev.targets)) for (const tid of ev.targets) addFloater(tid, '+' + (ev.stat || 'BUFF'), 'fl-buff');
+  } else if (ev.t === 'stun') {
+    if (!silent) addFloater(ev.target, t('aturdido'), 'fl-stun');
+  } else if (ev.t === 'faint') {
+    if (u) { u.hp = 0; u.dead = true; u.cy = 0; if (!silent) sfx.faint(); }
+  }
+}
+function updateCharge () { for (const uid of list.value) { const u = U[uid]; if (u && !u.dead) u.cy = Math.min(1, (clock - u.lastAct) * (u.spd || 1) / CH); } }
+
+function frame (ts) {
+  if (!alive) return;
+  if (!lastTs) lastTs = ts;
+  const dt = Math.min(120, ts - lastTs); lastTs = ts;
+  clock += (dt / CYCLE_MS) * speed.value;
+  const log = res().log;
+  while (idx < log.length && (log[idx].cyc == null ? 0 : log[idx].cyc) <= clock) applyEv(log[idx++]);
+  updateCharge();
+  if (idx >= log.length) { endBattle(); return; }
+  rafId = requestAnimationFrame(frame);
+}
 function playOutcome () { if (props.payload.win) { sfx.victory(); if (props.payload.captured) setTimeout(() => { if (alive) sfx.capture(); }, 800); } else sfx.defeat(); }
-// El replay terminó: suena el jingle y se deja ~3 s viendo el campo antes del modal.
+// El replay terminó: jingle + ~1.5 s viendo el campo antes del modal.
 function endBattle () {
   if (ended) return; ended = true;
-  clearInterval(timer); timer = null;
+  cancelAnimationFrame(rafId); updateCharge();
   playOutcome();
   clearTimeout(endTimer); endTimer = setTimeout(() => { if (alive) finished.value = true; }, 1500);
 }
-function skip () { if (finished.value || ended) return; const log = res().log; while (i < log.length) applyEv(log[i++], true); endBattle(); }
+function skip () { if (finished.value || ended) return; const log = res().log; while (idx < log.length) applyEv(log[idx++], true); endBattle(); }
 function onArena () {
-  if (finished.value) { if (modalHidden.value) modalHidden.value = false; return; }   // modal oculto → restaurar
-  if (ended) { clearTimeout(endTimer); finished.value = true; return; }                // saltar la pausa de 3 s
-  skip();                                                                              // saltar el replay
+  if (finished.value) { if (modalHidden.value) modalHidden.value = false; return; }
+  if (ended) { clearTimeout(endTimer); finished.value = true; return; }
+  skip();
 }
-function start () { initUnits(); finished.value = false; modalHidden.value = false; ended = false; i = 0; clearInterval(timer); clearTimeout(endTimer); baseMs = Math.max(120, Math.min(500, Math.round(16000 / Math.max(1, res().log.length)))); timer = setInterval(step, curMs()); }
+function start () { initUnits(); finished.value = false; modalHidden.value = false; ended = false; idx = 0; clock = 0; lastTs = 0; floaters.value = []; trails.value = []; cancelAnimationFrame(rafId); clearTimeout(endTimer); rafId = requestAnimationFrame(frame); }
 
 onMounted(start);
-onUnmounted(() => { alive = false; clearInterval(timer); clearTimeout(endTimer); });
-watch(() => props.payload, start);
-watch(speed, () => { if (timer) { clearInterval(timer); timer = setInterval(step, curMs()); } });   // aplica el cambio de velocidad en vivo
+onUnmounted(() => { alive = false; cancelAnimationFrame(rafId); clearTimeout(endTimer); });
+watch(() => props.payload, start);   // la velocidad se lee en vivo dentro de frame()
 
 const terrainInfo = computed(() => props.payload.terrain ? elementInfo(props.payload.terrain) : null);
 const outcome = computed(() => props.payload.win ? 'win' : (res().winner === 'draw' ? 'draw' : 'lose'));
@@ -116,8 +162,13 @@ const summary = computed(() => {
         <div v-for="uid in list" :key="uid" class="fu" :class="{ dead: U[uid].dead, hit: U[uid].flash, foe: U[uid].side === 1, fav: U[uid].terrainFav, faceR: U[uid].face > 0, faceL: U[uid].face < 0 }"
              :style="{ left: leftOf(U[uid]), top: topOf(U[uid]) }">
           <span v-if="U[uid].flash && U[uid].dmg != null" class="dmgnum" :class="U[uid].dmgClass">{{ U[uid].dmg }}</span>
+          <span v-for="f in floatersFor(uid)" :key="f.k" class="floater" :class="f.cls" :style="{ '--off': f.off }">{{ f.text }}</span>
           <div class="fu-svg" v-html="svgFor(U[uid])"></div>
-          <div class="hpbar" :class="{ low: U[uid].hp / U[uid].maxHp < 0.35 }"><i :style="{ width: (100 * U[uid].hp / U[uid].maxHp) + '%' }"></i></div>
+          <div class="bars">
+            <div class="hpbar" :class="{ low: U[uid].hp / U[uid].maxHp < 0.35 }"><i :style="{ width: (100 * U[uid].hp / U[uid].maxHp) + '%' }"></i></div>
+            <div class="enbar"><i :style="{ width: (100 * U[uid].energy / U[uid].cost) + '%' }"></i></div>
+            <div class="cybar"><i :style="{ width: (100 * (U[uid].cy || 0)) + '%' }"></i></div>
+          </div>
         </div>
       </div>
       <div class="field-tags"><span>◀ {{ t('tuEquipo') }}</span><span>{{ t('rival') }} ▶</span></div>
@@ -197,8 +248,21 @@ const summary = computed(() => {
 .trail{stroke:rgba(255,255,255,.85);stroke-width:.7;stroke-linecap:round;animation:trailFade .3s ease-out forwards}
 .trail.crit{stroke:var(--gold);stroke-width:1.1}
 @keyframes trailFade{0%{opacity:0;stroke-width:1.4}25%{opacity:.95}100%{opacity:0}}
-.hpbar{width:80%;height:4px;background:rgba(7,6,17,.85);border-radius:3px;overflow:hidden;margin-top:1px}
+.bars{width:84%;display:flex;flex-direction:column;gap:1px;margin-top:1px}
+.hpbar{width:100%;height:4px;background:rgba(7,6,17,.85);border-radius:3px;overflow:hidden}
 .hpbar i{display:block;height:100%;background:linear-gradient(90deg,#4ade80,#a3e635);transition:width .22s}
+.enbar{width:100%;height:3px;background:rgba(7,6,17,.85);border-radius:3px;overflow:hidden}   /* energía → activa */
+.enbar i{display:block;height:100%;background:linear-gradient(90deg,#f59e0b,#fde047);transition:width .1s}
+.cybar{width:100%;height:3px;background:rgba(7,6,17,.85);border-radius:3px;overflow:hidden}    /* ciclo → próximo turno */
+.cybar i{display:block;height:100%;background:linear-gradient(90deg,#38bdf8,#a78bfa)}
+.floater{position:absolute;top:-2px;font-family:var(--fdisplay);font-weight:800;font-size:11px;white-space:nowrap;pointer-events:none;z-index:5;
+  text-shadow:0 1px 4px #000;animation:floatUp 1s ease-out forwards;transform:translateY(calc(var(--off,0)*-13px))}
+.floater.fl-active{color:#c4b5fd}
+.floater.fl-buff{color:#fde047}
+.floater.fl-heal{color:#86efac}
+.floater.fl-kb{color:#67e8f9;font-size:14px}
+.floater.fl-stun{color:#fca5a5}
+@keyframes floatUp{0%{opacity:0;transform:translateY(calc(var(--off,0)*-13px)) scale(.8)}20%{opacity:1}100%{opacity:0;transform:translateY(calc(var(--off,0)*-13px - 34px))}}
 .hpbar.low i{background:linear-gradient(90deg,#ff5d6c,#fb923c)}
 .fu.foe .hpbar i{background:linear-gradient(90deg,#ef4444,#b91c1c)}   /* rivales: HP en rojo */
 .dmgnum{position:absolute;top:-2px;font-family:var(--fdisplay);font-weight:900;font-size:14px;color:#fff;text-shadow:0 2px 6px #000;pointer-events:none;animation:rise .7s ease-out forwards;z-index:4}

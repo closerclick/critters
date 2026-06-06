@@ -175,8 +175,18 @@ export function fightCampaign (nodeId) {
   const result = simulate(mine, enemies, nodeBattleSeed(mine, node, game.seed), { terrain: node.terrain || null });
   const win = result.winner === 'A';
   const winXp = 18 + node.diff * 4;
-  // XP: ganar da winXp; perder da un CUARTO (entrena igual → anti-softlock).
-  const gain = win ? winXp : Math.max(1, Math.round(winXp / 4));
+  // XP al PERDER: proporcional a TU DESEMPEÑO (daño hecho al rival), NO a la fuerza del
+  // enemigo. Si un boss te humilla → poca XP; si casi ganás → bastante. No se gana más solo
+  // por pelear con alguien fuerte.
+  let gain;
+  if (win) gain = winXp;
+  else {
+    const enemyMax = result.units.filter(u => u.side === 1).reduce((s, u) => s + (u.maxHp || 0), 0) || 1;
+    let dealt = 0;
+    for (const e of result.log) if ((e.t === 'attack' || e.t === 'thorns') && String(e.target).startsWith('1:')) dealt += (e.dmg || 0);
+    const perf = Math.min(1, dealt / enemyMax);   // fracción de la vida enemiga que removiste
+    gain = Math.max(1, Math.round(22 * perf));
+  }
   const payload = { result, win, node: node.id, level: node.diff, boss: node.boss, terrain: node.terrain || null, xp: {} };
   // Aplica XP a cada miembro y registra lo ganado por SLOT (para el resumen).
   for (const x of ti) {

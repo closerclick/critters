@@ -98,7 +98,7 @@ function basicAttack (u, target, occ, rng, log) {
   if (cell && target.alive) {
     delete occ[target.row + ',' + target.col];
     target.row = cell.row; target.col = cell.col; occ[cell.row + ',' + cell.col] = target.uid;
-    log.push({ t: 'move', by: target.uid, r: cell.row, c: cell.col });
+    log.push({ t: 'move', by: target.uid, r: cell.row, c: cell.col, kb: true });   // kb = empujón (no es su turno)
   }
 }
 
@@ -260,7 +260,7 @@ function takeTurn (u, enemies, allies, occ, rng, log, force) {
 
 const aliveN = (t) => t.reduce((n, u) => n + (u.alive ? 1 : 0), 0);
 const totHp = (t) => t.reduce((n, u) => n + Math.max(0, u.hp), 0);
-const snap = (u) => ({ uid: u.uid, side: u.side, slot: u.slot, row: u.row, col: u.col, id: u.id, level: u.level, name: u.name, element: u.element, role: u.role, rarity: u.rarity, maxHp: u.maxHp, range: u.range, terrainFav: u.terrainFav });
+const snap = (u) => ({ uid: u.uid, side: u.side, slot: u.slot, row: u.row, col: u.col, id: u.id, level: u.level, name: u.name, element: u.element, role: u.role, rarity: u.rarity, maxHp: u.maxHp, range: u.range, spd: Math.round(eff(u, 'SPD')), terrainFav: u.terrainFav });
 
 export function simulate (teamA, teamB, seed, opts) {
   const terrain = (opts && opts.terrain) || null;
@@ -289,6 +289,7 @@ export function simulate (teamA, teamB, seed, opts) {
       const before = log.length;
       takeTurn(u, u.side === 0 ? B : A, u.side === 0 ? A : B, occ, rng, log, force);
       freeDead();   // los muertos no ocupan casilla
+      for (let k = before; k < log.length; k++) if (log[k].cyc == null) { log[k].cyc = ticks; log[k].actor = u.uid; }   // ciclo (tick) y quién actuó
       const progressed = log.slice(before).some(e => e.t === 'attack' || e.t === 'move');
       sinceProgress = progressed ? 0 : sinceProgress + 1;
       force = sinceProgress >= 6;   // anti-estancamiento: si muchas acciones sin avance, fuerza avanzar
