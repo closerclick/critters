@@ -8,12 +8,18 @@ import { ROLES, ROLE_WEIGHTS } from './roles.js';
 import { PASSIVES, ROLE_ACTIVE_POOL, ROLE_PASSIVE_POOL } from './abilities.js';
 import { makeName } from './names.js';
 
+// 9 rarezas = nº de partes (1 = solo cabeza … 9 = grilla llena). Presupuesto de stats
+// en rampa y color en degradé.
 export const RARITIES = [
-  { key: 'comun',       es: 'Común',       en: 'Common',    weight: 50, budget: 1.00, color: '#94a3b8' },
-  { key: 'infrecuente', es: 'Infrecuente', en: 'Uncommon',  weight: 28, budget: 1.15, color: '#22c55e' },
-  { key: 'raro',        es: 'Raro',        en: 'Rare',      weight: 14, budget: 1.32, color: '#3b82f6' },
-  { key: 'epico',       es: 'Épico',       en: 'Epic',      weight:  6, budget: 1.52, color: '#a855f7' },
-  { key: 'legendario',  es: 'Legendario',  en: 'Legendary', weight:  2, budget: 1.78, color: '#f59e0b' },
+  { key: 'cria',        es: 'Cría',        en: 'Hatchling', budget: 1.00, color: '#94a3b8' },
+  { key: 'comun',       es: 'Común',       en: 'Common',    budget: 1.10, color: '#cbd5e1' },
+  { key: 'infrecuente', es: 'Infrecuente', en: 'Uncommon',  budget: 1.22, color: '#22c55e' },
+  { key: 'inusual',     es: 'Inusual',     en: 'Unusual',   budget: 1.34, color: '#14b8a6' },
+  { key: 'raro',        es: 'Raro',        en: 'Rare',      budget: 1.46, color: '#3b82f6' },
+  { key: 'notable',     es: 'Notable',     en: 'Notable',   budget: 1.58, color: '#8b5cf6' },
+  { key: 'epico',       es: 'Épico',       en: 'Epic',      budget: 1.70, color: '#a855f7' },
+  { key: 'mitico',      es: 'Mítico',      en: 'Mythic',    budget: 1.82, color: '#ec4899' },
+  { key: 'legendario',  es: 'Legendario',  en: 'Legendary', budget: 1.95, color: '#f59e0b' },
 ];
 export const RARITY_BY_KEY = Object.fromEntries(RARITIES.map((r, i) => [r.key, { ...r, index: i }]));
 
@@ -23,8 +29,8 @@ export const MAX_PARTS = 9;   // grilla 3×3 llena (cabeza + tórax + abdomen + 
 
 // Nº de PARTES ocupadas en la grilla 3×3: cabeza (siempre) + tórax? + abdomen? + patas.
 export function partsOf (a) { return 1 + (a.thorax >= 0 ? 1 : 0) + (a.abdomen >= 0 ? 1 : 0) + (a.legs || 0); }
-// La RAREZA la da el nº de partes: 1-2 común, 3-4 infrecuente, 5-6 raro, 7-8 épico, 9 legendaria.
-export function rarityIndexFromParts (parts) { return parts >= 9 ? 4 : parts >= 7 ? 3 : parts >= 5 ? 2 : parts >= 3 ? 1 : 0; }
+// La RAREZA la da el nº de partes: 1 parte = índice 0 (Cría) … 9 partes = índice 8 (Legendario).
+export function rarityIndexFromParts (parts) { return Math.max(0, Math.min(8, (parts | 0) - 1)); }
 export function rarityFromParts (parts) { return RARITIES[rarityIndexFromParts(parts)]; }
 
 // Estilo de combate (rasgo): probabilidad de flanquear según el rol.
@@ -53,9 +59,10 @@ function parseGenome (id) {
 /** Semilla genética estable de un id (la del genoma, o el id mismo si es salvaje). */
 export function seedOfId (id) { return (typeof id === 'string' && id.startsWith('g:')) ? parseGenome(id).seed : id; }
 
-// CAPACIDAD elemental por rareza: cuántos elementos DISTINTOS puede EXPRESAR.
-export const CAP_DISTINCT = [1, 1, 2, 3, 3];   // rarityIndex 0..4 (común..legendaria)
-export const capacityFor = (ri) => CAP_DISTINCT[Math.max(0, Math.min(4, ri | 0))];
+// CAPACIDAD elemental por rareza (elementos DISTINTOS que puede EXPRESAR), por rarityIndex 0..8.
+// DE 3 EN 3: rarezas 1-3 → 1 (base/puro), 4-6 → 2 (subelemento), 7-9 → 3 (triple).
+export const CAP_DISTINCT = [1, 1, 1, 2, 2, 2, 3, 3, 3];
+export const capacityFor = (ri) => CAP_DISTINCT[Math.max(0, Math.min(8, ri | 0))];
 const canonEl = (counts) => { const a = []; for (const k in counts) for (let i = 0; i < counts[k]; i++) a.push(k); return (a.length ? a.sort() : ['fuego']).join('+'); };
 /** Recorta el multiset a la capacidad (distintos) de la rareza: conserva los más
  *  acumulados (multiplicidad desc, luego orden canónico). Determinista. */
@@ -67,6 +74,22 @@ export function clampElement (element, rarityIndex) {
   if (distinct.length <= cap) return canonEl(counts);
   distinct.sort((a, b) => (counts[b] - counts[a]) || (ELEMENTS.indexOf(a) - ELEMENTS.indexOf(b)));
   const kept = {}; for (const k of distinct.slice(0, cap)) kept[k] = counts[k];
+  return canonEl(kept);
+}
+/** Como clampElement pero ACUMULATIVO (para la FUSIÓN): si la rareza no permite expresar
+ *  un ingrediente nuevo (distinto), los sobrantes se SUMAN a los que sí caben — no se
+ *  pierden. (El degradado, en cambio, sí descarta: usa clampElement.) */
+export function foldElement (element, rarityIndex) {
+  const cap = capacityFor(rarityIndex);
+  const counts = {}; for (const c of String(element).split('+')) if (ELEMENTS.includes(c)) counts[c] = (counts[c] || 0) + 1;
+  const distinct = Object.keys(counts);
+  if (!distinct.length) return 'fuego';
+  if (distinct.length <= cap) return canonEl(counts);
+  distinct.sort((a, b) => (counts[b] - counts[a]) || (ELEMENTS.indexOf(a) - ELEMENTS.indexOf(b)));
+  const keep = distinct.slice(0, cap);
+  let extra = 0; for (const d of distinct.slice(cap)) extra += counts[d];
+  const kept = {}; for (const k of keep) kept[k] = counts[k];
+  kept[keep[0]] += extra;                              // los sobrantes se acumulan en el más acumulado
   return canonEl(kept);
 }
 
@@ -81,7 +104,7 @@ export function elementMult (element, rarityIndex = 0) {
   const all = String(element).split('+').filter(e => ELEMENTS.includes(e));
   const distinct = new Set(all).size || 1;
   const extra = Math.max(0, all.length - distinct);   // ingredientes duplicados acumulados
-  const mat = Math.max(0, Math.min(4, rarityIndex)) / 4;
+  const mat = Math.max(0, Math.min(8, rarityIndex)) / 8;   // 0 = mínima · 1 = legendaria (índice 8)
   const reward = 0.5 * (distinct - 1) * mat;          // subelemento/triple más potentes al madurar
   const penalty = 0.4 * (distinct - 1) * (1 - mat);   // débil al nacer (mezcladas)
   const grade = distinct >= 3 ? 0.2 * extra                          // triple: LINEAL (leyendas, sin tope)
@@ -128,16 +151,16 @@ export function makeCritter (id) {
   const role = pick(rng, ROLES);
   const appearance = {
     head: rint(rng, 0, 3),                         // 4 tipos de cabeza
-    thorax: rng() < 0.35 ? rint(rng, 0, 2) : -1,   // tórax opcional
-    abdomen: rng() < 0.35 ? rint(rng, 0, 3) : -1,  // abdomen opcional
-    legs: rint(rng, 0, 3),                          // 0..3 patas (salvaje)
+    thorax: rng() < 0.3 ? rint(rng, 0, 2) : -1,    // tórax opcional
+    abdomen: rng() < 0.25 ? rint(rng, 0, 3) : -1,  // abdomen opcional
+    legs: rint(rng, 0, 1),                          // 0..1 patas (invocada)
     legStyle: rint(rng, 0, 1),                      // recta | articulada
     antennae: rng() < 0.6,                          // antenas
     hue: rint(rng, -18, 18),                        // variación de tono
     pattern: rint(rng, 0, 2),                       // patrón
   };
-  // Tope de 4 partes (rareza ≤ 1) para salvajes: quita abdomen, luego tórax, luego patas.
-  while (partsOf(appearance) > 4) {
+  // Tope de 2 partes (rareza 0-1) para invocadas: quita abdomen, luego tórax, luego patas.
+  while (partsOf(appearance) > 2) {
     if (appearance.abdomen >= 0) appearance.abdomen = -1;
     else if (appearance.thorax >= 0) appearance.thorax = -1;
     else appearance.legs--;

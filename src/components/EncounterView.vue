@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import { game } from '../game/state.js';
-import { nodeById, enemyTeam } from '../game/campaign.js';
+import { nodeById, enemyTeam, starCycleLimit } from '../game/campaign.js';
 import { setActiveLineup } from '../game/actions.js';
 import { elementInfo } from '../critter/types.js';
 import { SPEEDS, speed, setSpeed } from '../speed.js';
@@ -18,6 +18,8 @@ const node = computed(() => nodeById(game.seed, props.nodeId));
 const revealed = computed(() => { const n = node.value; return !!n && (!n.boss || game.cleared.includes(n.id)); });
 const enemies = computed(() => node.value ? enemyTeam(node.value, game.seed).map(e => ({ id: e.id, level: e.level })) : []);
 const terrainEl = computed(() => node.value && node.value.terrain ? elementInfo(node.value.terrain) : null);
+const curStars = computed(() => (game.stars && game.stars[props.nodeId]) || 0);
+const cycLimit = computed(() => node.value ? starCycleLimit(node.value) : 0);
 </script>
 
 <template>
@@ -27,6 +29,11 @@ const terrainEl = computed(() => node.value && node.value.terrain ? elementInfo(
       <div v-if="terrainEl" class="enc-terrain">
         🌍 {{ t('terreno') }}: <b :style="{ color: terrainEl.color }">{{ loc(terrainEl) }}</b>
         <span class="muted"> · {{ t('favorece') }}</span>
+      </div>
+
+      <div class="enc-stars">
+        <span class="es-have">{{ '★'.repeat(curStars) }}<span class="es-empty">{{ '☆'.repeat(3 - curStars) }}</span></span>
+        <div class="es-obj">1★ {{ t('star1') }} · 2★ {{ t('star2obj').replace('{n}', cycLimit) }} · 3★ {{ t('star3') }}</div>
       </div>
 
       <div class="enc-sub">{{ t('enemigos') }}</div>

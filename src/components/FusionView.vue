@@ -40,7 +40,7 @@ const subLabel = computed(() => {
 function choose (uid) {
   if (!selA.value) { selA.value = uid; selB.value = null; return; }
   if (uid === selA.value) return;
-  if (!selB.value) selB.value = uid;   // cualquiera: compatible (sube) o incompatible (débil)
+  if (!selB.value && compatOf(uid)) selB.value = uid;   // solo fusionables (1-2 casillas de diferencia)
 }
 function clearA () { selA.value = null; selB.value = null; }
 function reset () { selA.value = null; selB.value = null; }
@@ -95,8 +95,8 @@ function doDegrade () {
 
     <div class="fsub" v-if="subLabel">{{ subLabel }}</div>
     <div class="grid-cards" v-if="gridList.length">
-      <div v-for="i in gridList" :key="i.uid" @click="choose(i.uid)" class="fcell">
-        <span v-if="selA && !selB" class="ftag" :class="compatOf(i.uid) ? 'ok' : 'weak'">{{ compatOf(i.uid) ? '✓' : t('fusionDebil') }}</span>
+      <div v-for="i in gridList" :key="i.uid" @click="choose(i.uid)" class="fcell" :class="{ dim: selA && !selB && !compatOf(i.uid) }">
+        <span v-if="selA && !selB && compatOf(i.uid)" class="ftag ok">✓</span>
         <CritterCard :instance="i" :size="78" />
       </div>
     </div>
@@ -121,6 +121,7 @@ function doDegrade () {
 .fnote.ok{color:var(--good)} .fnote.weak{color:var(--gold)}
 .fsub{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;text-align:center;margin:10px 0 6px}
 .fcell{position:relative;cursor:pointer}
+.fcell.dim{opacity:.28;pointer-events:none;filter:grayscale(.6)}
 .ftag{position:absolute;top:4px;left:50%;transform:translateX(-50%);z-index:3;font-family:var(--fmono);font-size:9px;font-weight:800;
   padding:1px 6px;border-radius:7px}
 .ftag.ok{background:var(--good);color:#062b12}

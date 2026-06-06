@@ -94,12 +94,12 @@ ok('terreno: opts.terrain afecta la simulación y sigue determinista', () => {
   assert.notEqual(JSON.stringify(r0.log), JSON.stringify(r1.log));  // el terreno cambia el combate
 });
 
-ok('rareza por partes: salvajes 0/1 (≤4 partes); 9 = legendaria', () => {
-  for (let k = 0; k < 80; k++) { const c = makeCritter('wild' + k); assert.ok(c.rarityIndex <= 1, 'salvaje rareza ≤1'); assert.ok(partsOf(c.appearance) <= 4); assert.ok(partsOf(c.appearance) >= 1); }
+ok('rareza por partes: 9 rarezas (1 parte=índice 0 … 9=8); salvajes ≤4 partes', () => {
+  for (let k = 0; k < 80; k++) { const c = makeCritter('wild' + k); assert.ok(c.rarityIndex <= 1, 'invocada rareza 0-1'); assert.ok(partsOf(c.appearance) <= 2 && partsOf(c.appearance) >= 1); }
   assert.equal(rarityIndexFromParts(1), 0);
-  assert.equal(rarityIndexFromParts(4), 1);
-  assert.equal(rarityIndexFromParts(5), 2);
-  assert.equal(rarityIndexFromParts(9), 4);
+  assert.equal(rarityIndexFromParts(4), 3);
+  assert.equal(rarityIndexFromParts(5), 4);
+  assert.equal(rarityIndexFromParts(9), 8);
 });
 
 ok('genoma-id: makeCritter reconstruye exacto y determinista', () => {
@@ -108,26 +108,33 @@ ok('genoma-id: makeCritter reconstruye exacto y determinista', () => {
   assert.deepEqual(c1, c2);
   assert.equal(c1.element, 'fuego'); assert.equal(c1.role, 'dps');
   assert.equal(partsOf(c1.appearance), 6);   // 1+1+1+3
-  assert.equal(c1.rarityIndex, 2);           // raro
+  assert.equal(c1.rarityIndex, 5);           // 6 partes → índice 5 (Notable)
 });
 
-ok('fusión: difieren en una pieza → hija con +1 parte (sube rareza); subelemento', () => {
+ok('fusión: SOLO 1-2 casillas de diferencia; hija con +1 parte (sube rareza); subelemento', () => {
   const base = { head: 0, thorax: -1, abdomen: -1, legStyle: 0, antennae: false, hue: 0, pattern: 0 };
   const A = makeCritter(genomeId({ seed: 'sa', element: 'fuego', role: 'dps', appearance: { ...base, legs: 2 } }));   // 3 partes
-  const B = makeCritter(genomeId({ seed: 'sb', element: 'agua', role: 'dps', appearance: { ...base, legs: 3 } }));    // 4 partes (A + 1 pata)
+  const B = makeCritter(genomeId({ seed: 'sb', element: 'agua', role: 'dps', appearance: { ...base, legs: 3 } }));    // 4 (diff 1)
   assert.ok(canFuse(A, B));
   const child = fuse(A, B);
   assert.ok(child);
-  assert.equal(partsOf(child.appearance), partsOf(B.appearance) + 1);   // 5
-  assert.ok(child.rarityIndex > A.rarityIndex);                         // sube de rareza
-  assert.equal(child.element, 'agua+fuego');                            // subelemento canónico
-  assert.deepEqual(fuse(A, B), child);                                  // determinista
-  const C = makeCritter(genomeId({ seed: 'sc', element: 'fuego', role: 'dps', appearance: { ...base, legs: 2, hue: 9 } })); // misma estructura
-  assert.ok(!canFuse(A, C));                                            // 0 piezas de diferencia → incompatible
-  const weak = fuse(A, C);                                              // incompatible: igual fusiona pero sin subir parte
-  assert.ok(weak);
-  assert.equal(partsOf(weak.appearance), partsOf(A.appearance));        // no sube de parte
-  assert.equal(weak.element, 'fuego+fuego');                            // acumula ingredientes igual
+  assert.equal(partsOf(child.appearance), 5);                          // max(3,4)+1
+  assert.ok(child.rarityIndex > A.rarityIndex);                        // sube de rareza
+  assert.equal(child.element, 'agua+fuego');                           // subelemento canónico
+  assert.deepEqual(fuse(A, B), child);                                 // determinista
+  const C = makeCritter(genomeId({ seed: 'sc', element: 'fuego', role: 'dps', appearance: { ...base, legs: 2, hue: 9 } })); // igual estructura
+  assert.ok(!canFuse(A, C)); assert.equal(fuse(A, C), null);           // 0 casillas → NO fusiona
+  const D = makeCritter(genomeId({ seed: 'sd2', element: 'planta', role: 'dps', appearance: { ...base, legs: 4 } }));        // 5 (diff 2)
+  assert.ok(canFuse(A, D));                                            // 2 casillas → sí
+  const E = makeCritter(genomeId({ seed: 'se', element: 'agua', role: 'dps', appearance: { ...base, legs: 5 } }));           // 6 (diff 3)
+  assert.ok(!canFuse(A, E)); assert.equal(fuse(A, E), null);           // >2 casillas → NO
+  // Si la rareza NO permite un ingrediente nuevo, los ingredientes se ACUMULAN (no se pierden).
+  const A0 = makeCritter(genomeId({ seed: 'sf0', element: 'fuego', role: 'dps', appearance: { ...base, legs: 0 } }));        // 1 parte
+  const B0 = makeCritter(genomeId({ seed: 'sg0', element: 'agua', role: 'dps', appearance: { ...base, legs: 1 } }));         // 2 (diff 1)
+  const ch0 = fuse(A0, B0);                                            // 3 partes → rareza 2 (cap 1)
+  assert.equal(partsOf(ch0.appearance), 3);
+  assert.equal(new Set(ch0.element.split('+')).size, 1);              // no cabe el subelemento (cap 1)
+  assert.equal(ch0.element.split('+').length, 2);                     // pero ACUMULA (no pierde el ingrediente)
 });
 
 ok('subelemento: ventajas de ambos, sin sumar debilidades', () => {
@@ -139,40 +146,40 @@ ok('subelemento: ventajas de ambos, sin sumar debilidades', () => {
   assert.equal(typeMultiplier('fuego', 'agua+fuego'), 1);       // el dual resiste/neutraliza por sus ingredientes
 });
 
-ok('potencia: puro 1.0, subelemento/triple débiles al nacer y más potentes al madurar', () => {
+ok('potencia: puro 1.0; subelemento/triple débiles al nacer y potentes al madurar (índice 8)', () => {
   assert.equal(elementMult('fuego', 0), 1);                                   // puro siempre 1.0
-  assert.equal(elementMult('fuego', 4), 1);
-  assert.equal(Math.round(elementMult('agua+fuego', 2) * 100), 105);          // subelemento raro
-  assert.equal(Math.round(elementMult('agua+fuego', 4) * 100), 150);          // subelemento legendaria ×1.5
-  assert.equal(Math.round(elementMult('agua+fuego+planta', 4) * 100), 200);   // triple legendaria ×2.0
-  assert.ok(elementMult('agua+fuego+planta', 0) < 0.7);                       // triple "común" muy débil (héroe débil)
+  assert.equal(elementMult('fuego', 8), 1);
+  assert.ok(elementMult('agua+fuego', 0) < 0.7);                              // subelemento "cría" débil
+  assert.equal(Math.round(elementMult('agua+fuego', 8) * 100), 150);          // subelemento legendaria ×1.5
+  assert.equal(Math.round(elementMult('agua+fuego+planta', 8) * 100), 200);   // triple legendaria ×2.0
+  assert.ok(elementMult('agua+fuego+planta', 0) < 0.7);                       // triple cría muy débil (héroe débil)
   // acumulación en gradiente: base convergente fuerte < sub convergente suave; triple lineal
-  const baseAcc = elementMult('fuego+fuego', 4) - elementMult('fuego', 4);
-  const subAcc = elementMult('agua+agua+fuego', 4) - elementMult('agua+fuego', 4);
+  const baseAcc = elementMult('fuego+fuego', 8) - elementMult('fuego', 8);
+  const subAcc = elementMult('agua+agua+fuego', 8) - elementMult('agua+fuego', 8);
   assert.ok(baseAcc > 0 && subAcc > baseAcc);                                 // sub MENOS convergente que base (rinde más)
-  const t0 = elementMult('agua+fuego+planta', 4), t1 = elementMult('agua+agua+fuego+planta', 4), t2 = elementMult('agua+agua+agua+fuego+planta', 4);
+  const t0 = elementMult('agua+fuego+planta', 8), t1 = elementMult('agua+agua+fuego+planta', 8), t2 = elementMult('agua+agua+agua+fuego+planta', 8);
   assert.ok((t1 - t0) > 0 && Math.abs((t1 - t0) - (t2 - t1)) < 1e-9);         // triple LINEAL (vale farmear leyendas)
 });
 
-ok('capacidad por rareza + recorte determinista (degradado)', () => {
-  assert.equal(capacityFor(0), 1); assert.equal(capacityFor(2), 2); assert.equal(capacityFor(4), 3);
-  assert.equal(clampElement('agua+fuego', 2), 'agua+fuego');         // raro cabe el subelemento
-  assert.equal(clampElement('agua+fuego', 0), 'fuego');              // común recorta a 1 base (fuego < agua por orden)
-  assert.equal(clampElement('agua+fuego+planta', 1), 'fuego');       // infrecuente recorta a 1
+ok('capacidad por rareza (de 3 en 3) + recorte determinista (degradado)', () => {
+  assert.equal(capacityFor(0), 1); assert.equal(capacityFor(3), 2); assert.equal(capacityFor(6), 3);
+  assert.equal(clampElement('agua+fuego', 3), 'agua+fuego');         // cap 2 → cabe el subelemento
+  assert.equal(clampElement('agua+fuego', 0), 'fuego');              // cap 1 → recorta a 1 base (fuego < agua por orden)
+  assert.equal(clampElement('agua+fuego+planta', 2), 'fuego');       // cap 1 (rareza 3) → recorta a 1
 });
 
-ok('degradar: baja un tramo, recorta a la capacidad, conserva identidad (semilla)', () => {
+ok('degradar: -1 tramo por vez, recorta a la capacidad, conserva identidad (semilla)', () => {
   const leg = makeCritter(genomeId({ seed: 'sd', element: 'agua+fuego+planta', role: 'dps', appearance: { head: 0, thorax: 0, abdomen: 0, legs: 6, legStyle: 0, antennae: false, hue: 0, pattern: 0 } }));
   assert.equal(partsOf(leg.appearance), 9);
-  assert.equal(leg.rarityIndex, 4);
-  const epic = degrade(leg);
-  assert.equal(epic.rarityIndex, 3);                                  // legend → épico
-  assert.equal(new Set(epic.element.split('+')).size, 3);             // épico aún cabe el triple
-  assert.equal(epic.name, leg.name);                                 // misma semilla → misma raza/identidad
-  const raro = degrade(epic);
-  assert.equal(raro.rarityIndex, 2);
-  assert.equal(new Set(raro.element.split('+')).size, 2);             // raro = subelemento (perdió 1)
-  assert.equal(raro.name, leg.name);                                 // identidad estable al degradar
+  assert.equal(leg.rarityIndex, 8);
+  let c = degrade(leg);
+  assert.equal(partsOf(c.appearance), 8); assert.equal(c.rarityIndex, 7);    // -1 parte = -1 rareza
+  assert.equal(new Set(c.element.split('+')).size, 3);                        // 8 partes (cap 3) aún triple
+  assert.equal(c.name, leg.name);                                            // identidad estable (semilla)
+  while (c && partsOf(c.appearance) > 6) c = degrade(c);                     // bajar a 6 partes
+  assert.equal(partsOf(c.appearance), 6); assert.equal(c.rarityIndex, 5);
+  assert.equal(new Set(c.element.split('+')).size, 2);                        // 6 partes (cap 2) → subelemento
+  assert.equal(c.name, leg.name);
 });
 
 ok('catálogo de 36 nombres: combinación + intensidad por acumulación', () => {

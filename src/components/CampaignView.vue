@@ -15,6 +15,8 @@ const cleared = (id) => game.cleared.includes(id);
 const unlocked = (id) => isUnlocked(id);
 const access = (id) => cleared(id) || unlocked(id);
 const nodeCls = (n) => ({ core: n.id === 'core', boss: n.boss, cleared: cleared(n.id), open: unlocked(n.id) && !cleared(n.id), locked: !unlocked(n.id) && !cleared(n.id) });
+const starsOf = (id) => (game.stars && game.stars[id]) || 0;
+const starStr = (id) => '★'.repeat(starsOf(id)) + '☆'.repeat(3 - starsOf(id));
 
 const NR = 22, BR = 26, CR = 28;     // radios de nodo (unidades de mundo)
 const nodeR = (n) => (n.id === 'core' ? CR : (n.boss ? BR : NR));
@@ -82,6 +84,7 @@ function play (n) { if (movedFlag) { movedFlag = false; return; } if (unlocked(n
         <circle :cx="n.x" :cy="n.y" :r="nodeR(n)" class="dot" :style="terrainShow(n) ? { stroke: terrainShow(n) } : {}" />
         <text v-if="n.id !== 'core'" :x="n.x" :y="n.y + 6" class="lab">{{ access(n.id) ? (n.boss ? '★' : n.diff) : '🔒' }}</text>
         <text v-else :x="n.x" :y="n.y + 7" class="lab">◆</text>
+        <text v-if="cleared(n.id)" :x="n.x" :y="n.y - nodeR(n) - 7" class="nstars">{{ starStr(n.id) }}</text>
       </g>
     </svg>
     <div class="map-ctrl">
@@ -112,6 +115,7 @@ function play (n) { if (movedFlag) { movedFlag = false; return; } if (unlocked(n
 .node.core .dot{fill:#241d44;stroke:var(--cyan)}
 .node.boss .dot{stroke:var(--gold)!important;stroke-width:7}
 .node.boss .lab{fill:var(--gold)}
+.node .nstars{font-size:16px;text-anchor:middle;dominant-baseline:middle;fill:var(--gold);pointer-events:none;letter-spacing:1px}
 .map-ctrl{position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;gap:6px}
 .map-ctrl button{width:38px;height:38px;border-radius:11px;border:1px solid var(--line2);
   background:rgba(20,16,40,.85);color:var(--cyan);font-size:18px;font-weight:800;backdrop-filter:blur(4px)}

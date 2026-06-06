@@ -3,8 +3,9 @@ import { computed, ref, watch, onUnmounted } from 'vue';
 import { instanceByUid, critterById, game } from '../game/state.js';
 import { feed, FEED_COST, setPolicy, setTarget, adjustAlloc, resetAlloc } from '../game/actions.js';
 import { critterSvg } from '../critter/svg.js';
-import { statsAtLevel, STAT_KEYS, pointsFree, xpForNext } from '../critter/forge.js';
+import { statsAtLevel, STAT_KEYS, pointsFree, xpForNext, RARITY_BY_KEY } from '../critter/forge.js';
 import { ACTIVES, PASSIVES } from '../critter/abilities.js';
+import { elementInfo } from '../critter/types.js';
 import { POLICIES, POLICY_INFO, defaultPolicy, TARGET_INFO, normalizeTarget } from '../battle/policies.js';
 import { t, loc } from '../i18n.js';
 
@@ -20,6 +21,8 @@ const stats = computed(() => critter.value ? statsAtLevel(critter.value, inst.va
 const free = computed(() => inst.value ? pointsFree(inst.value.level, inst.value.alloc) : 0);
 const activeInfo = computed(() => critter.value ? ACTIVES[critter.value.active] : null);
 const passiveInfo = computed(() => critter.value ? PASSIVES[critter.value.passive] : null);
+const rar = computed(() => critter.value ? RARITY_BY_KEY[critter.value.rarity] : null);
+const elInfo = computed(() => critter.value ? elementInfo(critter.value.element) : null);
 const curPolicy = computed(() => { const i = inst.value, c = critter.value; return (i && i.policy) || (c ? defaultPolicy(c.role) : 'agresiva'); });
 
 // XP hacia el siguiente nivel.
@@ -58,7 +61,11 @@ onUnmounted(() => { window.removeEventListener('pointermove', tMove); window.rem
     <div class="detail-card" v-if="critter">
       <div v-html="svgBig" style="display:flex;justify-content:center"></div>
       <h2 style="margin-top:6px">{{ critter.name }}</h2>
-      <div class="chips" style="justify-content:center;margin:8px 0"><span class="chip">{{ t('nv') }}{{ inst.level }}</span></div>
+      <div class="chips" style="justify-content:center;margin:8px 0">
+        <span class="chip">{{ t('nv') }}{{ inst.level }}</span>
+        <span v-if="rar" class="chip" :style="{ color: rar.color, borderColor: rar.color }">{{ loc(rar) }}</span>
+        <span v-if="elInfo" class="chip" :style="{ color: elInfo.color }">{{ loc(elInfo) }}</span>
+      </div>
 
       <div class="xpbar"><i :style="{ width: xpPct + '%' }"></i></div>
       <div class="xp-cap">XP {{ xpCur }}/{{ xpNeed }} · {{ Math.max(0, xpNeed - xpCur) }} → {{ t('nv') }}{{ inst.level + 1 }}</div>

@@ -80,6 +80,8 @@ export const nodeById = (seed, id) => graph(seed).byId[id] || null;
 
 export const enemyLevel = (d) => Math.max(1, d);
 export const enemyCount = (d) => Math.min(5, 1 + Math.floor(d / 2));
+// Límite de ciclos para la 2ª estrella ("ganar rápido"): más enemigos → más margen.
+export const starCycleLimit = (node) => 120 + enemyCount(node.diff) * 90;
 // Las zonas con terreno generan enemigos NATIVOS (de ese elemento, que se benefician
 // del terreno) ~70% de las veces; el resto, aleatorios. Determinista.
 export function enemyTeam (node, seed) {

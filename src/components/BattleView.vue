@@ -130,6 +130,16 @@ const summary = computed(() => {
   <div class="result-modal" v-if="finished && !modalHidden">
     <div class="result-card" :class="outcome">
       <div class="rc-title" :class="outcome">{{ outcome === 'win' ? t('victoria') : (outcome === 'lose' ? t('derrota') : t('empate')) }}</div>
+      <div v-if="payload.win" class="rc-stars">
+        <span class="rstar on">★</span>
+        <span class="rstar" :class="{ on: payload.starInfo && payload.starInfo.fast }">★</span>
+        <span class="rstar" :class="{ on: payload.starInfo && payload.starInfo.flawless }">★</span>
+      </div>
+      <div v-if="payload.win" class="rc-objs">
+        <span class="ok">✓ {{ t('star1') }}</span>
+        <span :class="payload.starInfo && payload.starInfo.fast ? 'ok' : 'no'">{{ payload.starInfo && payload.starInfo.fast ? '✓' : '✗' }} {{ t('star2') }}</span>
+        <span :class="payload.starInfo && payload.starInfo.flawless ? 'ok' : 'no'">{{ payload.starInfo && payload.starInfo.flawless ? '✓' : '✗' }} {{ t('star3') }}</span>
+      </div>
       <div class="rc-rewards" v-if="payload.win">
         <span v-if="payload.reward" class="rc-chip coin">+🪙 {{ payload.reward.coins }}</span>
         <span v-if="payload.reward" class="rc-chip frag">+🔹 {{ payload.reward.frags }}</span>
@@ -203,6 +213,12 @@ const summary = computed(() => {
 .rc-title{font-family:var(--fdisplay);font-weight:800;font-size:30px;margin-bottom:8px}
 .rc-title.win{color:var(--good);text-shadow:0 0 26px rgba(74,222,128,.5)}
 .rc-title.lose{color:var(--bad)} .rc-title.draw{color:var(--muted)}
+.rc-stars{display:flex;gap:8px;justify-content:center;margin:2px 0 4px}
+.rstar{font-size:30px;color:rgba(148,163,184,.3);line-height:1}
+.rstar.on{color:var(--gold);text-shadow:0 0 14px rgba(245,158,11,.6);animation:starpop .4s cubic-bezier(.2,1.5,.4,1)}
+@keyframes starpop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
+.rc-objs{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;font-family:var(--fmono);font-size:10.5px;margin-bottom:10px}
+.rc-objs .ok{color:var(--good)} .rc-objs .no{color:var(--muted)}
 .rc-rewards{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:12px}
 .rc-chip{font-family:var(--fmono);font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;border:1px solid var(--line2);background:rgba(167,139,250,.08)}
 .rc-chip.coin{color:var(--gold)} .rc-chip.frag{color:var(--cyan)} .rc-chip.cap{color:#e9d5ff}

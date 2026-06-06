@@ -1,7 +1,7 @@
 // Acciones del juego: invocación (gacha), XP/nivel, gestión del equipo 3×3 y
 // batalla de campaña. Operan sobre el estado reactivo y persisten.
 import { game, persist, newUid, instanceByUid, critterById } from './state.js';
-import { neighbors, nodeById, enemyTeam, reward, captureDrop, nodeBattleSeed } from './campaign.js';
+import { neighbors, nodeById, enemyTeam, reward, captureDrop, nodeBattleSeed, starCycleLimit } from './campaign.js';
 import { simulate } from '../battle/engine.js';
 import { xpForNext, pointsFree, totalXp, levelXpFromTotal } from '../critter/forge.js';
 import { canFuse, fuse, degrade } from './fusion.js';
@@ -174,6 +174,15 @@ export function fightCampaign (nodeId) {
   }
   if (win) {
     const firstClear = !game.cleared.includes(node.id);
+    // ESTRELLAS: 1 ganar · 2 ganar rápido (≤ límite de ciclos) · 3 sin bajas propias.
+    const limit = starCycleLimit(node);
+    const fast = result.cycles <= limit;
+    const flawless = !result.log.some(e => e.t === 'faint' && String(e.target).startsWith('0:'));
+    const stars = 1 + (fast ? 1 : 0) + (flawless ? 1 : 0);
+    if (!game.stars) game.stars = {};
+    game.stars[node.id] = Math.max(game.stars[node.id] || 0, stars);
+    payload.stars = stars;
+    payload.starInfo = { fast, flawless, limit, cycles: result.cycles };
     const rw = reward(node);
     game.wallet.coins += rw.coins; game.wallet.frags += rw.frags;
     payload.reward = rw;
