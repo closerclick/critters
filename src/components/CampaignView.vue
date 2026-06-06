@@ -105,6 +105,14 @@ const terrainCells = computed(() => {
   }
   return out;
 });
+// Agrupa las celdas por elemento (color). La opacidad va en el GRUPO y los polígonos se pintan a
+// opacidad plena → las celdas del MISMO terreno se funden sin costura (sin bordes internos); solo
+// quedan los límites entre terrenos distintos.
+const terrainGroups = computed(() => {
+  const m = new Map();
+  for (const c of terrainCells.value) { if (!m.has(c.color)) m.set(c.color, []); m.get(c.color).push(c.points); }
+  return [...m.entries()].map(([color, polys]) => ({ color, polys }));
+});
 </script>
 
 <template>
@@ -113,8 +121,10 @@ const terrainCells = computed(() => {
   <div class="webwrap">
     <svg ref="svgEl" :viewBox="viewBox" class="web" preserveAspectRatio="xMidYMid meet"
          @wheel.prevent="onWheel" @pointerdown="onDown" @pointermove="onMove" @pointerup="onUp" @pointercancel="onUp">
-      <!-- TERRENO: regiones de fondo (Voronoi) que envuelven áreas de niveles -->
-      <polygon v-for="c in terrainCells" :key="c.key" :points="c.points" :fill="c.color" :stroke="c.color" class="terr-cell" />
+      <!-- TERRENO: regiones de fondo (Voronoi) por elemento; opacidad en el grupo → mismo terreno sin costura -->
+      <g v-for="g in terrainGroups" :key="g.color" class="terr-g">
+        <polygon v-for="(p, i) in g.polys" :key="i" :points="p" :fill="g.color" :stroke="g.color" />
+      </g>
       <line v-for="(e, i) in E" :key="i" :x1="nmap[e[0]].x" :y1="nmap[e[0]].y" :x2="nmap[e[1]].x" :y2="nmap[e[1]].y"
             class="thread" :class="{ on: access(e[0]) && access(e[1]) }" />
       <g v-for="n in nodes" :key="n.id" class="node" :class="nodeCls(n)" @click="play(n)">
@@ -141,7 +151,8 @@ const terrainCells = computed(() => {
 .web{width:100%;height:100%;display:block;touch-action:none;cursor:grab;
   background:radial-gradient(circle at 50% 50%, rgba(167,139,250,.06), transparent 70%);border-radius:16px}
 .web:active{cursor:grabbing}
-.terr-cell{opacity:.17;stroke-width:1.5}   /* regiones de terreno; el stroke del mismo color tapa costuras entre celdas iguales */
+.terr-g{opacity:.17}                       /* opacidad en el grupo: celdas del mismo terreno se funden sin borde interno */
+.terr-g polygon{stroke-width:1.5}          /* relleno+trazo a opacidad plena dentro del grupo (sin doble-alpha) */
 .thread{stroke:rgba(167,139,250,.12);stroke-width:3}
 .thread.on{stroke:rgba(167,139,250,.5);stroke-width:4}
 .node{cursor:default}
