@@ -146,7 +146,12 @@ ok('potencia: puro 1.0, subelemento/triple débiles al nacer y más potentes al 
   assert.equal(Math.round(elementMult('agua+fuego', 4) * 100), 150);          // subelemento legendaria ×1.5
   assert.equal(Math.round(elementMult('agua+fuego+planta', 4) * 100), 200);   // triple legendaria ×2.0
   assert.ok(elementMult('agua+fuego+planta', 0) < 0.7);                       // triple "común" muy débil (héroe débil)
-  assert.equal(elementMult('fuego+fuego', 4), 1);                             // acumular duplicados NO da poder (por rareza, no cantidad)
+  // acumulación en gradiente: base convergente fuerte < sub convergente suave; triple lineal
+  const baseAcc = elementMult('fuego+fuego', 4) - elementMult('fuego', 4);
+  const subAcc = elementMult('agua+agua+fuego', 4) - elementMult('agua+fuego', 4);
+  assert.ok(baseAcc > 0 && subAcc > baseAcc);                                 // sub MENOS convergente que base (rinde más)
+  const t0 = elementMult('agua+fuego+planta', 4), t1 = elementMult('agua+agua+fuego+planta', 4), t2 = elementMult('agua+agua+agua+fuego+planta', 4);
+  assert.ok((t1 - t0) > 0 && Math.abs((t1 - t0) - (t2 - t1)) < 1e-9);         // triple LINEAL (vale farmear leyendas)
 });
 
 ok('capacidad por rareza + recorte determinista (degradado)', () => {
