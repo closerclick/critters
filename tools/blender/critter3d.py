@@ -131,7 +131,7 @@ for i in range(legs_n):
     knee_up = 0.55 if A.get("legStyle") == 1 else 0.35   # el codo dobla HACIA ARRIBA (Z), no al frente
     pa = (*P2(ax, yy), seg_z0 + 0.10); pk = (*P2(kx, yy), seg_z0 + knee_up); pf = (*P2(fx, yy + 4), 0.0)
     add_tube("leg%d" % i, [pa, pk, pf], 0.06, chit)
-    add_diamond("foot%d" % i, (pf[0], pf[1], 0.03), 0.09, glow)
+    add_diamond("foot%d" % i, (pf[0], pf[1], 0.03), 0.108, glow)   # pies 20% más grandes
 
 # antenas
 if A.get("antennae"):
