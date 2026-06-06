@@ -14,7 +14,8 @@ import { ACTIVES, PASSIVES } from '../critter/abilities.js';
 import { BAL, basicDamage } from './balance.js';
 import { defaultPolicy, normalizeTarget } from './policies.js';
 
-export const COLS = 8, ROWS = 3;
+export const COLS = 8, ROWS = 5;
+const ROW_OFFSET = (ROWS - 3) >> 1;   // centra la formación 3×3 verticalmente (filas 1-3 en 5)
 const AOE = new Set(['all', 'self', 'allies', 'backmost']);   // activas que no requieren rango
 
 function buildUnits (team, side, terrain) {
@@ -28,7 +29,7 @@ function buildUnits (team, side, terrain) {
     const ranged = RANGED_ROLES.has(critter.role);
     return {
       uid: side + ':' + slot, side, slot,
-      row: srow, col: side === 0 ? scol : (COLS - 1 - scol),   // jugador a la izq, enemigo a la der
+      row: srow + ROW_OFFSET, col: side === 0 ? scol : (COLS - 1 - scol),   // jugador izq, enemigo der; 3×3 centrado en filas
       id: m.id, level: lvl, critter, name: critter.name, element: critter.element, role: critter.role, rarity: critter.rarity,
       maxHp: s.HP, hp: s.HP, ATK: s.ATK + (b.atk || 0), DEF: s.DEF + (b.def || 0), SPD: s.SPD,
       range: (ranged ? 3 : 1) + (b.range || 0),
@@ -218,7 +219,10 @@ const snap = (u) => ({ uid: u.uid, side: u.side, slot: u.slot, row: u.row, col: 
 export function simulate (teamA, teamB, seed, opts) {
   const terrain = (opts && opts.terrain) || null;
   const A = buildUnits(teamA, 0, terrain), B = buildUnits(teamB, 1, terrain), all = [...A, ...B];
-  const occ = {}; for (const u of all) occ[u.row + ',' + u.col] = u.uid;
+  const occ = {}; const byUid = {}; for (const u of all) { occ[u.row + ',' + u.col] = u.uid; byUid[u.uid] = u; }
+  // Los cadáveres se ven (snapshot conserva su posición) pero NO ocupan casilla: se libera
+  // del mapa de ocupación al morir, así los vivos pueden moverse/empujar sobre ellos.
+  const freeDead = () => { for (const k in occ) { const un = byUid[occ[k]]; if (un && !un.alive) delete occ[k]; } };
   const rng = mulberry32(hash32(String(seed == null ? 'seed' : seed)));
   const log = [];
   const units = all.map(snap);
@@ -238,6 +242,7 @@ export function simulate (teamA, teamB, seed, opts) {
       u.charge -= CH;
       const before = log.length;
       takeTurn(u, u.side === 0 ? B : A, u.side === 0 ? A : B, occ, rng, log, force);
+      freeDead();   // los muertos no ocupan casilla
       const progressed = log.slice(before).some(e => e.t === 'attack' || e.t === 'move');
       sinceProgress = progressed ? 0 : sinceProgress + 1;
       force = sinceProgress >= 6;   // anti-estancamiento: si muchas acciones sin avance, fuerza avanzar

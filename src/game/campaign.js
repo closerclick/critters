@@ -5,7 +5,7 @@
 // que favorece a los critters de ese elemento. Jefes cada ~10 nodos (índice estable).
 import { rngFrom } from '../lib/rng.js';
 import { battleSeed } from '../battle/engine.js';
-import { makeCritter } from '../critter/forge.js';
+import { makeCritter, autoAlloc } from '../critter/forge.js';
 import { ELEMENTS } from '../critter/types.js';
 import { game } from './state.js';
 
@@ -91,7 +91,7 @@ export function enemyTeam (node, seed) {
     if (node.terrain && rngFrom(`nat:${seed}:${node.id}:${i}`)() < 0.7) {
       for (let v = 0; v < 10; v++) { const cand = id + ':' + v; if (makeCritter(cand).element === node.terrain) { id = cand; break; } }
     }
-    out.push({ id, level: enemyLevel(d), slot: SLOTS5[i] });
+    out.push({ id, level: enemyLevel(d), slot: SLOTS5[i], alloc: autoAlloc(makeCritter(id), enemyLevel(d)) });
   }
   return out;
 }

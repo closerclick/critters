@@ -59,7 +59,7 @@ function endBattle () {
   if (ended) return; ended = true;
   clearInterval(timer); timer = null;
   playOutcome();
-  clearTimeout(endTimer); endTimer = setTimeout(() => { if (alive) finished.value = true; }, 3000);
+  clearTimeout(endTimer); endTimer = setTimeout(() => { if (alive) finished.value = true; }, 1500);
 }
 function skip () { if (finished.value || ended) return; const log = res().log; while (i < log.length) applyEv(log[i++], true); endBattle(); }
 function onArena () {
@@ -174,13 +174,13 @@ const summary = computed(() => {
 </template>
 
 <style scoped>
-.arena{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;gap:8px;min-height:0}
-.field{position:relative;width:100%;aspect-ratio:8/3;border-radius:14px;border:1px solid var(--line);overflow:hidden;
+.arena{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;gap:8px;min-height:0;padding:0 12px}
+.field{position:relative;width:100%;max-width:560px;margin:0 auto;aspect-ratio:8/5;border-radius:14px;border:1px solid var(--line);overflow:hidden;
   background:linear-gradient(90deg, rgba(124,58,237,.10) 0 37.5%, transparent 37.5% 62.5%, rgba(56,225,214,.10) 62.5% 100%),
   repeating-linear-gradient(90deg, transparent 0 calc(12.5% - 1px), rgba(167,139,250,.10) calc(12.5% - 1px) 12.5%),
-  repeating-linear-gradient(0deg, transparent 0 calc(33.333% - 1px), rgba(167,139,250,.10) calc(33.333% - 1px) 33.333%)}
+  repeating-linear-gradient(0deg, transparent 0 calc(20% - 1px), rgba(167,139,250,.10) calc(20% - 1px) 20%)}
 .zone{position:absolute;top:0;bottom:0;width:37.5%;pointer-events:none}
-.fu{position:absolute;width:12.5%;height:33.333%;transition:left .28s ease, top .28s ease;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.fu{position:absolute;width:12.5%;height:20%;transition:left .28s ease, top .28s ease;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .fu-svg{width:84%;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 2px 5px rgba(0,0,0,.6))}
 .fu-svg :deep(svg){width:100%;height:auto;transform:rotate(90deg)}      /* jugador mira a la derecha (al enemigo) */
 .fu.foe .fu-svg :deep(svg){transform:rotate(-90deg)}                    /* enemigo mira a la izquierda */
