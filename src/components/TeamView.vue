@@ -82,6 +82,7 @@ function applyDrop (targetLid, targetSlot) {
 <template>
   <p class="hint">{{ t('teamHint') }}</p>
 
+  <div class="team-layout">
   <div class="lineups">
     <div v-for="lu in game.lineups" :key="lu.id" class="lineup" :class="{ act: lu.id === game.activeLineup }">
       <div class="lu-row">
@@ -119,12 +120,21 @@ function applyDrop (targetLid, targetSlot) {
       <p v-if="!bench.length" class="hint" style="margin:6px 0">{{ t('banquilloVacio') }}</p>
     </div>
   </div>
+  </div>
 
   <div v-if="drag.active" class="drag-ghost" :style="{ left: drag.x + 'px', top: drag.y + 'px', '--el': elColor(drag.uid) }" v-html="svgFor(drag.uid, 60)"></div>
 </template>
 
 <style scoped>
-.lineups{display:flex;flex-direction:column;gap:14px;margin-bottom:16px}
+.team-layout{display:flex;flex-direction:column;gap:14px;margin-bottom:16px}
+.lineups{flex:1 1 auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(212px,1fr));gap:12px;align-content:start}
+.lineups .lu-new{grid-column:1 / -1;justify-self:center}
+/* Web: banquillo a la IZQUIERDA + alineaciones en grilla (hasta 3 por fila). */
+@media (min-width:760px){
+  .team-layout{flex-direction:row-reverse;align-items:flex-start}
+  .bench-zone{flex:0 0 172px;border-top:none;border-right:1px solid var(--line);padding-top:0;padding-right:12px;position:sticky;top:8px}
+  .bench-zone .bench{flex-direction:row;flex-wrap:wrap}
+}
 .lineup{border:1px solid var(--line);border-radius:14px;padding:10px;background:linear-gradient(180deg,rgba(167,139,250,.05),transparent)}
 .lineup.act{border-color:color-mix(in srgb,var(--accent) 55%,var(--line2));box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent)}
 .lu-row{display:flex;align-items:center;gap:6px;margin-bottom:8px}
