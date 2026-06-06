@@ -42,6 +42,13 @@ export function autoPlaceInTeam (uid) {
   for (const s of [4, 0, 2, 6, 8, 1, 3, 5, 7]) { if (!game.team[s]) { game.team[s] = uid; return true; } }
   return false;
 }
+// Recompensa por COMPARTIR (referidos): estrellas-bonus + monedas. Invitar premia más que
+// consumir. Dedup por contacto lo maneja referrals.js.
+export function grantShareReward (kind) {
+  if (kind === 'referral') { game.bonusStars = (game.bonusStars || 0) + 3; game.wallet.coins += 80; }
+  else { game.bonusStars = (game.bonusStars || 0) + 1; game.wallet.coins += 40; }
+  persist();
+}
 export function summon () {
   if (game.wallet.coins < SUMMON_COST) return { error: 'coins' };
   game.wallet.coins -= SUMMON_COST;

@@ -33,6 +33,8 @@ async function getBackend () {
 }
 
 export const SAVE_THREAD = 'critters.save';
+export const REFERRALS_THREAD = 'critters.referrals';   // pubkeys que abrieron MI link (invitador)
+export const CONSUMED_THREAD = 'critters.consumed';     // pubkeys de links que YO abrí (consumidor)
 
 export async function loadDoc (thread) {
   const b = await getBackend();

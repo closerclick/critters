@@ -11,6 +11,15 @@ import './nav.js';   // registra <closer-click-back> (instancia compartida)
 
 createApp(App).mount('#app');
 
+// Recompensa de estrellas por COMPARTIR (referidos, best-effort; el juego anda offline igual).
+import { handleInviteHash, startReferrals, inviteLink } from './referrals.js';
+handleInviteHash().catch(() => {});   // si llegué por #i=<pubkey>, cuenta el referido
+startReferrals().catch(() => {});     // escucha acuses de amigos que abren mi link
+inviteLink().then(link => {           // el botón de support comparte MI enlace de invitación
+  if (!link) return;
+  document.querySelectorAll('closer-click-support').forEach(el => el.setAttribute('share-url', link));
+}).catch(() => {});
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
 }
