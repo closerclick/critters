@@ -72,23 +72,32 @@ function attackTarget (u, target, rng, log, mult, ability) {
   dealDamage(u, target, dmg, log, { crit, adv: tm > 1 ? 1 : (tm < 1 ? -1 : 0), ability: ability || null });
 }
 
-// Empuje: mueve al objetivo UNA casilla hacia su retaguardia (lejos del atacante).
-function knockback (target, attacker, occ, log) {
+// Casilla de empuje hacia la retaguardia (columna alejándose del atacante = vector
+// positivo). Prueba recto y luego diagonales (misma columna trasera, fila ±1). null si
+// no hay ninguna (borde o todas ocupadas).
+function knockbackCell (target, attacker, occ) {
   const dir = Math.sign(target.col - attacker.col) || (attacker.side === 0 ? 1 : -1);
   const nc = target.col + dir;
-  if (nc < 0 || nc >= COLS) return;
-  const key = target.row + ',' + nc;
-  if (occ[key]) return;                                  // ocupada → no empuja
-  delete occ[target.row + ',' + target.col];
-  target.col = nc; occ[key] = target.uid;
-  log.push({ t: 'move', by: target.uid, r: target.row, c: nc });
+  if (nc < 0 || nc >= COLS) return null;
+  for (const dr of [0, 1, -1]) {
+    const nr = target.row + dr;
+    if (nr < 0 || nr >= ROWS) continue;
+    if (!occ[nr + ',' + nc]) return { row: nr, col: nc };
+  }
+  return null;
 }
-// Ataque básico: el 2º (o más) golpe SEGUIDO al mismo objetivo lo EMPUJA hacia atrás.
+// Ataque básico: el 2º (o más) golpe SEGUIDO al mismo objetivo lo EMPUJA hacia atrás
+// (recto o diagonal). Si NO hay casilla para empujar → el golpe hace DOBLE daño.
 function basicAttack (u, target, occ, rng, log) {
   const repeat = u.lastTarget === target.uid;
-  attackTarget(u, target, rng, log);
+  const cell = repeat ? knockbackCell(target, u, occ) : null;
+  attackTarget(u, target, rng, log, (repeat && !cell) ? 2 : 1);   // sin lugar para empujar → doble daño
   u.lastTarget = target.uid;
-  if (repeat && target.alive) knockback(target, u, occ, log);
+  if (cell && target.alive) {
+    delete occ[target.row + ',' + target.col];
+    target.row = cell.row; target.col = cell.col; occ[cell.row + ',' + cell.col] = target.uid;
+    log.push({ t: 'move', by: target.uid, r: cell.row, c: cell.col });
+  }
 }
 
 // Candidatos para un criterio: los filtros por rol/tipo pueden quedar VACÍOS (→ se
