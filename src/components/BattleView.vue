@@ -25,7 +25,7 @@ const curMs = () => Math.max(8, Math.round(baseMs / speed.value));
 const res = () => props.payload.result;
 function initUnits () {
   for (const k in U) delete U[k];
-  for (const u of res().units) U[u.uid] = { ...u, hp: u.maxHp, dead: false, flash: false, dmg: null, dmgClass: '' };
+  for (const u of res().units) U[u.uid] = { ...u, hp: u.maxHp, dead: false, flash: false, dmg: null, dmgClass: '', face: u.side === 0 ? 1 : -1 };
   list.value = res().units.map(u => u.uid);
 }
 const svgFor = (u) => critterSvg(critterById(u.id), 40, { frame: false });
@@ -46,8 +46,11 @@ function addTrail (by, tgt, crit) {
 function showDmg (u, val, cls) { u.dmg = val; u.dmgClass = cls; u.flash = true; setTimeout(() => { if (alive) u.flash = false; }, 220); }
 function applyEv (ev, silent) {
   const u = ev.target && U[ev.target], by = ev.by && U[ev.by];
-  if (ev.t === 'move') { if (by) { by.row = ev.r; by.col = ev.c; } }
-  else if (ev.t === 'attack' || ev.t === 'thorns') { if (u) { u.hp = Math.max(0, u.hp - (ev.dmg || 0)); if (!silent) { showDmg(u, ev.dmg, ev.crit ? 'crit' : ''); if (ev.t === 'attack') { sfx.hit(ev.crit); if (by) addTrail(by, u, ev.crit); } } } }
+  if (ev.t === 'move') { if (by) { if (ev.c !== by.col) by.face = ev.c > by.col ? 1 : -1; by.row = ev.r; by.col = ev.c; } }
+  else if (ev.t === 'attack' || ev.t === 'thorns') {
+    if (ev.t === 'attack' && by && u && u.col !== by.col) by.face = u.col > by.col ? 1 : -1;   // mira al objetivo
+    if (u) { u.hp = Math.max(0, u.hp - (ev.dmg || 0)); if (!silent) { showDmg(u, ev.dmg, ev.crit ? 'crit' : ''); if (ev.t === 'attack') { sfx.hit(ev.crit); if (by && !ev.ability) addTrail(by, u, ev.crit); } } }   // estela solo en ataque BÁSICO
+  }
   else if (ev.t === 'heal' || ev.t === 'lifesteal' || ev.t === 'regen') { if (u) { u.hp = Math.min(u.maxHp, u.hp + (ev.heal || 0)); if (!silent) { showDmg(u, '+' + (ev.heal || 0), 'heal'); if (ev.t === 'heal') sfx.heal(); } } }
   else if (ev.t === 'active') { if (!silent) sfx.active(); }
   else if (ev.t === 'faint') { if (u) { u.hp = 0; u.dead = true; if (!silent) sfx.faint(); } }
@@ -110,7 +113,7 @@ const summary = computed(() => {
         <svg class="trails" viewBox="0 0 100 100" preserveAspectRatio="none">
           <line v-for="tr in trails" :key="tr.k" :x1="tr.x1" :y1="tr.y1" :x2="tr.x2" :y2="tr.y2" class="trail" :class="{ crit: tr.crit }" />
         </svg>
-        <div v-for="uid in list" :key="uid" class="fu" :class="{ dead: U[uid].dead, hit: U[uid].flash, foe: U[uid].side === 1, fav: U[uid].terrainFav }"
+        <div v-for="uid in list" :key="uid" class="fu" :class="{ dead: U[uid].dead, hit: U[uid].flash, foe: U[uid].side === 1, fav: U[uid].terrainFav, faceR: U[uid].face > 0, faceL: U[uid].face < 0 }"
              :style="{ left: leftOf(U[uid]), top: topOf(U[uid]) }">
           <span v-if="U[uid].flash && U[uid].dmg != null" class="dmgnum" :class="U[uid].dmgClass">{{ U[uid].dmg }}</span>
           <div class="fu-svg" v-html="svgFor(U[uid])"></div>
@@ -182,8 +185,9 @@ const summary = computed(() => {
 .zone{position:absolute;top:0;bottom:0;width:37.5%;pointer-events:none}
 .fu{position:absolute;width:12.5%;height:20%;transition:left .28s ease, top .28s ease;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .fu-svg{width:84%;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 2px 5px rgba(0,0,0,.6))}
-.fu-svg :deep(svg){width:100%;height:auto;transform:rotate(90deg)}      /* jugador mira a la derecha (al enemigo) */
-.fu.foe .fu-svg :deep(svg){transform:rotate(-90deg)}                    /* enemigo mira a la izquierda */
+.fu-svg :deep(svg){width:100%;height:auto;transition:transform .2s}
+.fu.faceR .fu-svg :deep(svg){transform:rotate(90deg)}                   /* mira a la derecha */
+.fu.faceL .fu-svg :deep(svg){transform:rotate(-90deg)}                  /* mira a la izquierda */
 .fu.dead{opacity:.25;filter:grayscale(1)}
 .fu.hit .fu-svg{transform:scale(1.14)}
 .fu.fav .fu-svg{filter:drop-shadow(0 0 6px var(--terr,transparent)) drop-shadow(0 2px 5px rgba(0,0,0,.6))}

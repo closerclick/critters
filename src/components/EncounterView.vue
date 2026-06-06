@@ -16,7 +16,7 @@ const emit = defineEmits(['close', 'fight']);
 
 const node = computed(() => nodeById(game.seed, props.nodeId));
 const revealed = computed(() => { const n = node.value; return !!n && (!n.boss || game.cleared.includes(n.id)); });
-const enemies = computed(() => node.value ? enemyTeam(node.value, game.seed).map(e => ({ id: e.id, level: e.level })) : []);
+const enemies = computed(() => node.value ? enemyTeam(node.value, game.seed).map(e => ({ id: e.id, level: e.level, alloc: e.alloc })) : []);
 const terrainEl = computed(() => node.value && node.value.terrain ? elementInfo(node.value.terrain) : null);
 const curStars = computed(() => (game.stars && game.stars[props.nodeId]) || 0);
 const cycLimit = computed(() => node.value ? starCycleLimit(node.value) : 0);
