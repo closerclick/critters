@@ -3,7 +3,7 @@
 import { game, persist, newUid, instanceByUid, critterById } from './state.js';
 import { neighbors, nodeById, enemyTeam, reward, captureDrop, nodeBattleSeed } from './campaign.js';
 import { simulate } from '../battle/engine.js';
-import { xpForNext, pointsFree } from '../critter/forge.js';
+import { xpForNext, pointsFree, totalXp, levelXpFromTotal } from '../critter/forge.js';
 import { canFuse, fuse, degrade } from './fusion.js';
 
 export const SUMMON_COST = 100;   // monedas por invocación
@@ -21,7 +21,7 @@ export function addCritter (id, level = 1) {
 export function chooseStarter (id) {
   if (game.collection.length) return null;
   const inst = addCritter(id, 1);
-  game.team = Array(9).fill(null);
+  for (let i = 0; i < game.team.length; i++) game.team[i] = null;   // limpia la alineación activa EN SITIO (no reasignar)
   game.team[4] = inst.uid;   // centro (la posición más protegida)
   game.starterOptions = null;
   persist();
@@ -76,6 +76,14 @@ export function teamInstances () {
 }
 export function teamSnapshot () { return teamInstances().map(x => ({ id: x.instance.id, level: x.instance.level, slot: x.slot, policy: x.instance.policy, target: x.instance.target, alloc: x.instance.alloc })); }
 
+// ---- alineaciones (varias formaciones; una araña puede estar en varias) ----
+export function setActiveLineup (id) { const l = game.lineups.find(x => x.id === id); if (!l) return; game.activeLineup = id; game.team = l.team; persist(); }
+export function createLineup (name) { const lu = { id: newUid(), name: (name || ('Alineación ' + (game.lineups.length + 1))).slice(0, 24), team: Array(9).fill(null) }; game.lineups.push(lu); setActiveLineup(lu.id); return lu; }
+export function renameLineup (id, name) { const l = game.lineups.find(x => x.id === id); if (l) { l.name = (name || l.name).slice(0, 24); persist(); } }
+export function deleteLineup (id) { if (game.lineups.length <= 1) return false; game.lineups = game.lineups.filter(l => l.id !== id); if (game.activeLineup === id) setActiveLineup(game.lineups[0].id); else persist(); return true; }
+// Quita un uid de TODAS las alineaciones (al consumir una araña por fusión/degradado).
+function purgeUid (uid) { for (const l of game.lineups) for (let i = 0; i < l.team.length; i++) if (l.team[i] === uid) l.team[i] = null; }
+
 /** Cambia la política de movimiento de una instancia. */
 export function setPolicy (uid, policy) { const i = instanceByUid(uid); if (i) { i.policy = policy; persist(); } }
 /** Cambia la preferencia de objetivo de una instancia. */
@@ -115,9 +123,11 @@ export function fuseCritters (uidA, uidB) {
   if (!a || !b || uidA === uidB) return { error: 'pick' };
   const child = fuse(critterById(a.id), critterById(b.id));
   if (!child) return { error: 'incompat' };
-  for (let i = 0; i < game.team.length; i++) if (game.team[i] === uidA || game.team[i] === uidB) game.team[i] = null;
+  // La hija HEREDA la XP combinada de las dos (no se pierde lo invertido).
+  const lx = levelXpFromTotal(totalXp(a.level, a.xp) + totalXp(b.level, b.xp));
+  purgeUid(uidA); purgeUid(uidB);
   game.collection = game.collection.filter(x => x.uid !== uidA && x.uid !== uidB);
-  const inst = addCritter(child.id, 1);
+  const inst = addCritter(child.id, lx.level); inst.xp = lx.xp;
   persist();
   return { instance: inst, critter: child };
 }
@@ -131,7 +141,7 @@ export function degradeCritter (uidA, uidB) {
   if (!a || !b || uidA === uidB) return { error: 'pick' };
   const child = degrade(critterById(a.id));
   if (!child) return { error: 'floor' };   // ya en común
-  for (let i = 0; i < game.team.length; i++) if (game.team[i] === uidB) game.team[i] = null;
+  purgeUid(uidB);
   game.collection = game.collection.filter(x => x.uid !== uidB);
   a.id = child.id;   // muta en sitio: nuevo genoma recortado, misma identidad/uid/level/xp
   persist();

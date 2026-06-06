@@ -11,7 +11,9 @@ export const game = reactive({
   ready: false,
   collection: [],            // [{ uid, id, level, xp }]
   wallet: { coins: 0, frags: 0 },
-  team: Array(9).fill(null), // slot 0..8 → uid de instancia (o null)
+  lineups: [],               // [{ id, name, team:[9] }] — varias alineaciones; una araña puede estar en varias
+  activeLineup: null,        // id de la alineación activa
+  team: Array(9).fill(null), // alias REACTIVO al team de la alineación activa (lo usan TeamView/acciones)
   starterOptions: null,      // 3 ids candidatos para elegir la primera criatura
   seed: null,                // semilla de la telaraña de campaña (per-usuario)
   cleared: [],               // ids de nodos despejados
@@ -26,19 +28,33 @@ export function critterOf (uid) { const i = instanceByUid(uid); return i ? critt
 export function newUid () { return 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
 // ---- persistencia ----
-function snapshot () { return { collection: game.collection, wallet: game.wallet, team: game.team, starterOptions: game.starterOptions, seed: game.seed, cleared: game.cleared }; }
+function snapshot () { return { collection: game.collection, wallet: game.wallet, lineups: game.lineups, activeLineup: game.activeLineup, starterOptions: game.starterOptions, seed: game.seed, cleared: game.cleared }; }
 let _t = null;
 export function persist () {
   try { localStorage.setItem(LS_KEY, JSON.stringify(snapshot())); } catch {}
   clearTimeout(_t); _t = setTimeout(() => { saveDoc(SAVE_THREAD, snapshot()).catch(() => {}); }, 300);
 }
+const normTeam = (t) => { const a = Array(9).fill(null); (t || []).slice(0, 9).forEach((v, i) => a[i] = v || null); return a; };
 function apply (d) {
   if (Array.isArray(d.collection)) game.collection = d.collection;
   if (d.wallet) game.wallet = { coins: d.wallet.coins || 0, frags: d.wallet.frags || 0 };
-  if (Array.isArray(d.team)) { const t = Array(9).fill(null); d.team.slice(0, 9).forEach((v, i) => t[i] = v || null); game.team = t; }
+  if (Array.isArray(d.lineups) && d.lineups.length) {
+    game.lineups = d.lineups.map(l => ({ id: l.id || newUid(), name: l.name || 'Alineación', team: normTeam(l.team) }));
+    game.activeLineup = d.activeLineup || game.lineups[0].id;
+  } else if (Array.isArray(d.team)) {   // formato viejo: una sola alineación → migrar
+    game.lineups = [{ id: newUid(), name: 'Alineación 1', team: normTeam(d.team) }];
+    game.activeLineup = game.lineups[0].id;
+  }
   if (Array.isArray(d.starterOptions)) game.starterOptions = d.starterOptions;
   if (d.seed) game.seed = d.seed;
   if (Array.isArray(d.cleared)) game.cleared = d.cleared;
+}
+
+/** Garantiza al menos una alineación y deja game.team apuntando a la activa. */
+export function ensureLineups () {
+  if (!Array.isArray(game.lineups) || !game.lineups.length) { game.lineups = [{ id: newUid(), name: 'Alineación 1', team: Array(9).fill(null) }]; }
+  if (!game.lineups.find(l => l.id === game.activeLineup)) game.activeLineup = game.lineups[0].id;
+  game.team = game.lineups.find(l => l.id === game.activeLineup).team;
 }
 
 export async function loadGame () {
@@ -47,11 +63,12 @@ export async function loadGame () {
   if (!game.collection.length) ensureStarterOptions();   // primer arranque → elegir 1 de 3
   if (!game.seed) game.seed = 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);  // telaraña per-usuario
   if (!Array.isArray(game.cleared)) game.cleared = [];
+  ensureLineups();
   game.ready = true;
   persist();
   // 2) Store en segundo plano: fusiona si trae más progreso.
   loadDoc(SAVE_THREAD).then(remote => {
-    if (remote && Array.isArray(remote.collection) && remote.collection.length > game.collection.length) { apply(remote); persist(); }
+    if (remote && Array.isArray(remote.collection) && remote.collection.length > game.collection.length) { apply(remote); ensureLineups(); persist(); }
   }).catch(() => {});
 }
 

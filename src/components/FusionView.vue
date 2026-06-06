@@ -1,12 +1,16 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { game, instanceByUid } from '../game/state.js';
+import { game, instanceByUid, critterById } from '../game/state.js';
 import { fusePreview, fuseCritters, isCompatibleFuse, degradePreview, degradeCritter } from '../game/actions.js';
 import { openCritter } from '../ui.js';
 import { elementInfo } from '../critter/types.js';
-import { RARITY_BY_KEY } from '../critter/forge.js';
+import { RARITY_BY_KEY, statsAtLevel } from '../critter/forge.js';
+import { critterSvg } from '../critter/svg.js';
 import { t, loc } from '../i18n.js';
 import CritterCard from './CritterCard.vue';
+
+const svgFor = (inst) => inst ? critterSvg(critterById(inst.id), 58) : '';
+const nameOf = (inst) => inst ? critterById(inst.id).name : '';
 
 const selA = ref(null);
 const selB = ref(null);
@@ -17,9 +21,10 @@ const others = computed(() => game.collection.filter(i => i.uid !== selA.value))
 const compatOf = (uid) => isCompatibleFuse(selA.value, uid);
 const previewCompatible = computed(() => (selA.value && selB.value) ? isCompatibleFuse(selA.value, selB.value) : false);
 const preview = computed(() => (selA.value && selB.value) ? fusePreview(selA.value, selB.value) : null);
-const prevInst = computed(() => preview.value ? { uid: '__prev', id: preview.value.id, level: 1 } : null);
+const svgPrev = computed(() => preview.value ? critterSvg(preview.value, 58) : '');
 const prevEl = computed(() => preview.value ? elementInfo(preview.value.element) : null);
 const prevRar = computed(() => preview.value ? RARITY_BY_KEY[preview.value.rarity] : null);
+const prevStats = computed(() => preview.value ? statsAtLevel(preview.value, 1) : null);
 
 const gridList = computed(() => {
   if (!selA.value) return game.collection;
@@ -59,17 +64,17 @@ function doDegrade () {
   <template v-if="game.collection.length >= 2">
     <div class="fuse-bar">
       <div class="fslot" :class="{ on: selA }" @click="clearA">
-        <CritterCard v-if="instA" :instance="instA" :size="66" :stats="false" />
+        <template v-if="instA"><div class="fp" v-html="svgFor(instA)"></div><span class="fn">{{ nameOf(instA) }}</span></template>
         <span v-else class="q">A</span>
       </div>
       <span class="op">+</span>
       <div class="fslot" :class="{ on: selB }" @click="selB = null">
-        <CritterCard v-if="instB" :instance="instB" :size="66" :stats="false" />
+        <template v-if="instB"><div class="fp" v-html="svgFor(instB)"></div><span class="fn">{{ nameOf(instB) }}</span></template>
         <span v-else class="q">B</span>
       </div>
       <span class="op">=</span>
       <div class="fslot res">
-        <CritterCard v-if="prevInst" :instance="prevInst" :size="66" :stats="false" />
+        <template v-if="preview"><div class="fp" v-html="svgPrev"></div><span class="fn">{{ preview.name }}</span></template>
         <span v-else class="q">?</span>
       </div>
     </div>
@@ -78,6 +83,7 @@ function doDegrade () {
       <div><b :style="{ color: prevEl.color }">{{ preview.name }}</b>
         <span class="dot">·</span> {{ loc(prevEl) }}
         <span class="dot">·</span> <span :style="{ color: prevRar.color }">{{ loc(prevRar) }}</span></div>
+      <div class="prev-stats" v-if="prevStats">❤{{ prevStats.HP }} · ⚔{{ prevStats.ATK }} · 🛡{{ prevStats.DEF }} · ⚡{{ prevStats.SPD }}</div>
       <div class="fnote" :class="previewCompatible ? 'ok' : 'weak'">{{ previewCompatible ? '✓ ' + t('fusionSube') : '⚠ ' + t('fusionDebil') }}</div>
     </div>
 
@@ -99,15 +105,18 @@ function doDegrade () {
 
 <style scoped>
 .fuse-bar{display:flex;align-items:center;justify-content:center;gap:8px;margin:10px 0}
-.fslot{width:84px;height:104px;border-radius:14px;border:1px dashed var(--line2);background:rgba(167,139,250,.05);
-  display:flex;align-items:center;justify-content:center;position:relative}
+.fslot{flex:1 1 0;min-width:0;max-width:110px;aspect-ratio:3/4;border-radius:14px;border:1px dashed var(--line2);background:rgba(167,139,250,.05);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:6px;position:relative}
 .fslot.on{border-style:solid;border-color:var(--accent)}
 .fslot.res{border-color:color-mix(in srgb,var(--cyan) 50%,var(--line2));background:rgba(56,225,214,.06)}
 .fslot .q{font-family:var(--fdisplay);font-size:24px;color:var(--muted);opacity:.6}
-.fslot :deep(.card){transform:scale(.92)}
-.op{font-family:var(--fdisplay);font-size:22px;color:var(--muted)}
-.prev-info{text-align:center;font-size:13px;margin:2px 0 8px}
+.fslot .fp{width:100%;display:flex;align-items:center;justify-content:center}
+.fslot .fp :deep(svg){width:72%;height:auto;filter:drop-shadow(0 2px 5px rgba(0,0,0,.5))}
+.fslot .fn{font-size:10.5px;font-weight:700;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.op{font-family:var(--fdisplay);font-size:22px;color:var(--muted);flex:0 0 auto}
+.prev-info{text-align:center;font-size:13px;margin:6px 0 8px}
 .prev-info .dot{color:var(--muted);margin:0 4px}
+.prev-stats{font-family:var(--fmono);font-size:11.5px;color:var(--muted);margin-top:3px}
 .fnote{font-family:var(--fmono);font-size:11px;margin-top:3px}
 .fnote.ok{color:var(--good)} .fnote.weak{color:var(--gold)}
 .fsub{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;text-align:center;margin:10px 0 6px}

@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { game } from '../game/state.js';
 import { nodeById, enemyTeam } from '../game/campaign.js';
+import { setActiveLineup } from '../game/actions.js';
 import { elementInfo } from '../critter/types.js';
 import { SPEEDS, speed, setSpeed } from '../speed.js';
 import { t, loc } from '../i18n.js';
@@ -37,6 +38,13 @@ const terrainEl = computed(() => node.value && node.value.terrain ? elementInfo(
         <p class="hint">{{ t('bossOculto') }}</p>
       </div>
 
+      <div class="enc-lineup">
+        <span class="enc-sub2">{{ t('tuAlineacion') }}</span>
+        <select class="lu-select" :value="game.activeLineup" @change="e => setActiveLineup(e.target.value)">
+          <option v-for="l in game.lineups" :key="l.id" :value="l.id">{{ l.name }} ({{ l.team.filter(Boolean).length }}/5)</option>
+        </select>
+      </div>
+
       <div class="enc-speed">
         <span class="enc-sub2">{{ t('velocidad') }}</span>
         <span class="speedbar">
@@ -68,7 +76,9 @@ const terrainEl = computed(() => node.value && node.value.terrain ? elementInfo(
 .enc-hidden{padding:6px 0 2px}
 .enc-q{width:90px;height:90px;margin:0 auto;border-radius:16px;border:1px dashed var(--gold);background:rgba(245,158,11,.06);
   display:flex;align-items:center;justify-content:center;font-family:var(--fdisplay);font-size:46px;color:var(--gold)}
-.enc-speed{display:flex;align-items:center;justify-content:center;gap:10px;margin:14px 0 12px}
+.enc-lineup{display:flex;align-items:center;justify-content:center;gap:10px;margin:12px 0 4px}
+.enc-lineup .lu-select{flex:1 1 auto;max-width:240px;background:var(--panel);color:var(--text);border:1px solid var(--line2);border-radius:9px;padding:7px 9px;font-size:13px}
+.enc-speed{display:flex;align-items:center;justify-content:center;gap:10px;margin:10px 0 12px}
 .enc-sub2{font-family:var(--fdisplay);font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
 .speedbar{display:inline-flex;gap:6px}
 .spd-btn{font-family:var(--fmono);font-weight:800;font-size:12px;padding:5px 11px;border-radius:9px;border:1px solid var(--line2);

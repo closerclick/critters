@@ -36,7 +36,7 @@ function buildUnits (team, side, terrain) {
       target: normalizeTarget(m.target, critter.role),   // prioridad ordenada de objetivos
       flanks: !!critter.flanks,
       terrainFav: !!terrain && String(critter.element).split('+').includes(terrain),   // el terreno favorece su(s) elemento(s)
-      energy: 0, charge: 0, stunTurns: 0, buffs: [], alive: true, passive: critter.passive, active: critter.active,
+      energy: 0, charge: 0, stunTurns: 0, buffs: [], alive: true, passive: critter.passive, active: critter.active, lastTarget: null,
     };
   });
 }
@@ -70,6 +70,25 @@ function attackTarget (u, target, rng, log, mult, ability) {
   const tm = typeMultiplier(u.element, target.element);
   const dmg = basicDamage(eff(u, 'ATK') * (mult || 1), eff(target, 'DEF'), tm, crit);
   dealDamage(u, target, dmg, log, { crit, adv: tm > 1 ? 1 : (tm < 1 ? -1 : 0), ability: ability || null });
+}
+
+// Empuje: mueve al objetivo UNA casilla hacia su retaguardia (lejos del atacante).
+function knockback (target, attacker, occ, log) {
+  const dir = Math.sign(target.col - attacker.col) || (attacker.side === 0 ? 1 : -1);
+  const nc = target.col + dir;
+  if (nc < 0 || nc >= COLS) return;
+  const key = target.row + ',' + nc;
+  if (occ[key]) return;                                  // ocupada → no empuja
+  delete occ[target.row + ',' + target.col];
+  target.col = nc; occ[key] = target.uid;
+  log.push({ t: 'move', by: target.uid, r: target.row, c: nc });
+}
+// Ataque básico: el 2º (o más) golpe SEGUIDO al mismo objetivo lo EMPUJA hacia atrás.
+function basicAttack (u, target, occ, rng, log) {
+  const repeat = u.lastTarget === target.uid;
+  attackTarget(u, target, rng, log);
+  u.lastTarget = target.uid;
+  if (repeat && target.alive) knockback(target, u, occ, log);
 }
 
 // Candidatos para un criterio: los filtros por rol/tipo pueden quedar VACÍOS (→ se
@@ -175,16 +194,12 @@ function takeTurn (u, enemies, allies, occ, rng, log, force) {
   const ab = ACTIVES[u.active];
   const inRange = cheb(u, target) <= u.range;
   if (u.energy >= ab.cost && (AOE.has(ab.scope) || inRange)) { castActive(u, ab, enemies, allies, rng, log); u.energy = 0; return; }
-  if (inRange) { attackTarget(u, target, rng, log); u.energy = Math.min(ab.cost, u.energy + BAL.energyPerAction); return; }
-  // Aguantar (defensiva / guardián), SALVO que `force` rompa el estancamiento: si
-  // la ronda anterior no hubo ataques ni movimientos, todos avanzan (evita empates
-  // por bloqueo mutuo cuando ambos bandos son defensivos).
+  if (inRange) { basicAttack(u, target, occ, rng, log); u.energy = Math.min(ab.cost, u.energy + BAL.energyPerAction); return; }
+  // Aguantar (defensiva), SALVO que `force` rompa el estancamiento (ambos defensivos).
   if (!force && u.policy === 'defensiva') { u.energy = Math.min(ab.cost, u.energy + 8); return; }
+  // Moverse UN casillero consume TODO el ciclo (no ataca tras moverse).
   const goal = approachCell(u, target, u.range, occ);
-  if (stepToward(u, goal, occ, log)) {
-    if (cheb(u, target) <= u.range) attackTarget(u, target, rng, log);
-    else u.energy = Math.min(ab.cost, u.energy + 6);
-  }
+  if (stepToward(u, goal, occ, log)) u.energy = Math.min(ab.cost, u.energy + 6);
 }
 
 const aliveN = (t) => t.reduce((n, u) => n + (u.alive ? 1 : 0), 0);

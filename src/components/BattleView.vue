@@ -131,8 +131,7 @@ const summary = computed(() => {
 
       <div class="rc-btns">
         <button class="btn sec" @click="start">↻ {{ t('repetir') }}</button>
-        <button v-if="payload.win && payload.nextNode" class="btn" @click="next">{{ t('siguiente') }} →</button>
-        <button class="btn sec" @click="emit('close')">{{ t('cerrar') }}</button>
+        <button class="btn" @click="emit('close')">{{ t('alMapa') }}</button>
       </div>
     </div>
   </div>

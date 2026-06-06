@@ -180,5 +180,9 @@ export function power (critter, level = 1) {
 
 /** XP necesaria para pasar del nivel L a L+1. */
 export function xpForNext (level) { return 50 + (level - 1) * 35; }
+/** XP TOTAL acumulada de una instancia (suma de los tramos previos + xp del nivel actual). */
+export function totalXp (level, xp) { let t = xp || 0; for (let l = 1; l < (level || 1); l++) t += xpForNext(l); return t; }
+/** Nivel + xp resultantes de una XP total (inverso de totalXp). */
+export function levelXpFromTotal (total) { let l = 1, t = Math.max(0, total || 0); while (t >= xpForNext(l)) { t -= xpForNext(l); l++; } return { level: l, xp: t }; }
 
 export const FORGE_CONST = { BASE_BUDGET, HP_FACTOR };

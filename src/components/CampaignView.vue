@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { game } from '../game/state.js';
 import { teamCount, isUnlocked } from '../game/actions.js';
 import { allNodes, edges, RING_GAP } from '../game/campaign.js';
@@ -21,10 +21,15 @@ const nodeR = (n) => (n.id === 'core' ? CR : (n.boss ? BR : NR));
 const terrainColor = (n) => (n.terrain ? elementInfo(n.terrain).color : null);
 const terrainShow = (n) => (n.terrain && access(n.id)) ? elementInfo(n.terrain).color : null;
 
-// Vista paneable: ventana viewBox centrada en (panX, panY).
-const VIEW = 3.4 * RING_GAP;         // ~3 anillos visibles
+// Vista paneable que LLENA todo el área: el viewBox toma el aspecto del contenedor
+// (la dimensión menor muestra ~3.4 anillos; la mayor muestra más) → sin recorte ni
+// franjas vacías. Se mide el SVG y se recalcula al redimensionar.
+const BASE = 3.4 * RING_GAP;         // mundo visible en la dimensión MENOR
+const svgEl = ref(null);
+const vw = ref(BASE), vh = ref(BASE);
 const panX = ref(0), panY = ref(0);
-const viewBox = computed(() => `${(panX.value - VIEW / 2).toFixed(1)} ${(panY.value - VIEW / 2).toFixed(1)} ${VIEW} ${VIEW}`);
+const viewBox = computed(() => `${(panX.value - vw.value / 2).toFixed(1)} ${(panY.value - vh.value / 2).toFixed(1)} ${vw.value.toFixed(1)} ${vh.value.toFixed(1)}`);
+function measure () { const el = svgEl.value; if (!el) return; const r = el.getBoundingClientRect(); const m = Math.min(r.width, r.height) || 1; vw.value = BASE * ((r.width || m) / m); vh.value = BASE * ((r.height || m) / m); }
 
 function recenter () {
   const open = nodes.value.filter(n => unlocked(n.id) && !cleared(n.id));
@@ -32,15 +37,16 @@ function recenter () {
   if (pts.length) { panX.value = pts.reduce((s, n) => s + n.x, 0) / pts.length; panY.value = pts.reduce((s, n) => s + n.y, 0) / pts.length; }
   else { panX.value = 0; panY.value = 0; }
 }
-onMounted(recenter);
+function onResize () { measure(); }
+onMounted(() => { measure(); recenter(); window.addEventListener('resize', onResize); });
+onUnmounted(() => window.removeEventListener('resize', onResize));
 
 // Pan por puntero; tap (sin arrastrar) sobre un nodo = pelear.
-const svgEl = ref(null);
 let drag = null, movedFlag = false;
 function onDown (e) { drag = { sx: e.clientX, sy: e.clientY, px: panX.value, py: panY.value }; movedFlag = false; }
 function onMove (e) {
   if (!drag) return;
-  const w = svgEl.value.clientWidth || 1, k = VIEW / w;
+  const w = svgEl.value.clientWidth || 1, k = vw.value / w;
   const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
   if (Math.hypot(dx, dy) > 4) movedFlag = true;
   panX.value = drag.px - dx * k; panY.value = drag.py - dy * k;
@@ -71,8 +77,8 @@ function play (n) { if (movedFlag) { movedFlag = false; return; } if (unlocked(n
 </template>
 
 <style scoped>
-.webwrap{position:relative;width:100%;max-width:560px;margin:0 auto}
-.web{width:100%;height:auto;aspect-ratio:1;display:block;touch-action:none;cursor:grab;
+.webwrap{position:relative;width:100%;height:calc(100dvh - 210px);min-height:300px;margin:0 auto}
+.web{width:100%;height:100%;display:block;touch-action:none;cursor:grab;
   background:radial-gradient(circle at 50% 50%, rgba(167,139,250,.06), transparent 70%);border-radius:16px}
 .web:active{cursor:grabbing}
 .thread{stroke:rgba(167,139,250,.12);stroke-width:3}

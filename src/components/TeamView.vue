@@ -1,7 +1,7 @@
 <script setup>
 import { ref, reactive, computed, onUnmounted } from 'vue';
 import { game, instanceByUid, critterById, persist } from '../game/state.js';
-import { placeInSlot, clearSlot, teamCount } from '../game/actions.js';
+import { placeInSlot, clearSlot, teamCount, setActiveLineup, createLineup, renameLineup, deleteLineup } from '../game/actions.js';
 import { openCritter } from '../ui.js';
 import { critterSvg } from '../critter/svg.js';
 import { elementInfo } from '../critter/types.js';
@@ -16,6 +16,14 @@ function svgFor (uid, size) { const c = critterFor(uid); return c ? critterSvg(c
 function elColor (uid) { const c = critterFor(uid); return c ? elementInfo(c.element).color : 'var(--line)'; }
 function levelOf (uid) { const i = instanceByUid(uid); return i ? i.level : null; }
 const bench = computed(() => { const on = new Set(game.team.filter(Boolean)); return game.collection.filter(i => !on.has(i.uid)); });
+
+// Alineaciones: cambiar / crear / renombrar / borrar (una araña puede estar en varias).
+const activeName = computed(() => { const l = game.lineups.find(x => x.id === game.activeLineup); return l ? l.name : ''; });
+const countOf = (l) => l.team.filter(Boolean).length;
+function onPickLineup (e) { setActiveLineup(e.target.value); }
+function onRenameLineup (e) { renameLineup(game.activeLineup, e.target.value); }
+function onNewLineup () { createLineup(); }
+function onDeleteLineup () { deleteLineup(game.activeLineup); }
 
 function onDown (e, uid, from, fromSlot) {
   if (!uid) return;
@@ -61,6 +69,14 @@ function drop (targetSlot) {
 </script>
 
 <template>
+  <div class="lu-bar">
+    <select class="lu-select" :value="game.activeLineup" @change="onPickLineup">
+      <option v-for="l in game.lineups" :key="l.id" :value="l.id">{{ l.name }} ({{ countOf(l) }}/5)</option>
+    </select>
+    <input class="lu-name" :value="activeName" @change="onRenameLineup" maxlength="24" :placeholder="t('alineacion')" />
+    <button class="lu-btn" @click="onNewLineup" :title="t('nueva')">＋</button>
+    <button class="lu-btn" @click="onDeleteLineup" :disabled="game.lineups.length <= 1" title="🗑">🗑</button>
+  </div>
   <p class="hint">{{ t('elegiSlot') }}</p>
 
   <div class="tg-wrap">
@@ -94,6 +110,11 @@ function drop (targetSlot) {
 </template>
 
 <style scoped>
+.lu-bar{display:flex;gap:6px;align-items:center;margin:0 0 10px}
+.lu-select{flex:1 1 auto;min-width:0;background:var(--panel2);color:var(--text);border:1px solid var(--line2);border-radius:9px;padding:7px 9px;font-size:13px}
+.lu-name{width:96px;background:var(--panel);color:var(--text);border:1px solid var(--line2);border-radius:9px;padding:7px 9px;font-size:13px}
+.lu-btn{flex:0 0 auto;width:34px;height:34px;border-radius:9px;border:1px solid var(--line2);background:rgba(167,139,250,.08);color:var(--text);font-size:15px}
+.lu-btn:disabled{opacity:.35}
 .tg-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;margin:6px 0 16px}
 .tg{display:grid;grid-template-columns:repeat(3,76px);grid-template-rows:repeat(3,76px);gap:8px;
   padding:10px;border-radius:18px;background:linear-gradient(180deg,rgba(167,139,250,.06),transparent);border:1px solid var(--line)}
