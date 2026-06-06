@@ -13,7 +13,8 @@ export const SLOTS5 = [4, 0, 2, 6, 8];
 const BASE = 5, GROWTH = 2;            // anillo r tiene BASE+(r-1)*GROWTH nodos
 export const RING_GAP = 100;           // separación radial por anillo (unidades de mundo)
 const INITIAL_RINGS = 3, LOOKAHEAD = 2;
-const SECTORS = 6;                     // sectores angulares para el terreno
+const TERR_BANDS = 3;                  // anillos por banda de terreno
+const TERR_ZONE = 13;                  // nodos objetivo por ZONA de terreno (rango 10-16)
 
 const _cache = new Map();              // 'seed#rings' → grafo
 const angOf = (n) => Math.atan2(n.y, n.x);
@@ -24,12 +25,21 @@ function ringsNeeded (cleared) { let mx = 0; for (const id of (cleared || [])) m
 
 // Terreno determinista por (sector angular, banda radial): zonas contiguas que
 // cambian entre ramas y hacia afuera; ~40% son neutrales (sin terreno).
+const nodesInRing = (r) => BASE + (r - 1) * GROWTH;
+// Sectores angulares por banda: proporcionales a los nodos de la banda para que cada ZONA
+// (banda × sector) tenga ~TERR_ZONE nodos (entre 10 y 16), sin importar que el anillo crezca.
+function sectorsForBand (band) {
+  let total = 0;
+  for (let r = band * TERR_BANDS + 1; r <= band * TERR_BANDS + TERR_BANDS; r++) total += nodesInRing(r);
+  return Math.max(1, Math.round(total / TERR_ZONE));
+}
 function terrainFor (seed, n) {
+  const band = Math.floor((n.ring - 1) / TERR_BANDS);
+  const sectors = sectorsForBand(band);
   const ang = (Math.atan2(n.y, n.x) / (Math.PI * 2) + 1) % 1;
-  const sector = Math.floor(ang * SECTORS);
-  const band = Math.floor((n.ring - 1) / 2);
-  const rng = rngFrom(seed + ':terr:' + sector + ':' + band);
-  if (rng() < 0.4) return null;
+  const sector = Math.floor(ang * sectors) % sectors;
+  const rng = rngFrom(seed + ':terr:' + band + ':' + sector);
+  if (rng() < 0.25) return null;   // mayormente con terreno; algún bolsón neutral
   return ELEMENTS[Math.floor(rng() * ELEMENTS.length)];
 }
 
