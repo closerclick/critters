@@ -2,7 +2,7 @@
 import assert from 'node:assert';
 import { makeCritter, statsAtLevel, power, pointsTotal, pointsFree, partsOf, rarityIndexFromParts, genomeId } from '../src/critter/forge.js';
 import { critterSvg } from '../src/critter/svg.js';
-import { typeMultiplier, mixElements } from '../src/critter/types.js';
+import { typeMultiplier, mixElements, elementInfo } from '../src/critter/types.js';
 import { simulate, battleSeed } from '../src/battle/engine.js';
 import { normalizeTarget } from '../src/battle/policies.js';
 import { canFuse, fuse } from '../src/game/fusion.js';
@@ -128,11 +128,20 @@ ok('fusión: difieren en una pieza → hija con +1 parte (sube rareza); subeleme
 
 ok('subelemento: ventajas de ambos, sin sumar debilidades', () => {
   assert.equal(mixElements('fuego', 'agua'), 'agua+fuego');
-  assert.equal(mixElements('fuego', 'fuego'), 'fuego');
-  assert.equal(mixElements('agua+fuego', 'planta'), 'agua+fuego+planta');        // dual + base → avanzado (Prisma)
-  assert.equal(mixElements('agua+fuego+planta', 'agua'), 'agua+fuego+planta');   // avanzado + base → igual (solo aporta ingredientes)
+  assert.equal(mixElements('fuego', 'fuego'), 'fuego+fuego');                          // acumula con multiplicidad
+  assert.equal(mixElements('agua+fuego', 'planta'), 'agua+fuego+planta');              // dual + base → triple
+  assert.equal(mixElements('agua+fuego+planta', 'agua'), 'agua+agua+fuego+planta');    // en profundidad SIGUE acumulando
   assert.equal(typeMultiplier('agua+fuego', 'planta'), 1.25);   // atacando: toma la ventaja (agua)
   assert.equal(typeMultiplier('fuego', 'agua+fuego'), 1);       // defendiendo: el dual resiste (sin extra debilidad)
+});
+
+ok('catálogo de nombres: arquetipo + grado por acumulación', () => {
+  assert.equal(elementInfo('fuego').es, 'Fuego');                    // base, grado 1 → sin sufijo
+  assert.equal(elementInfo('fuego+fuego').es, 'Fuego II');           // acumulado
+  assert.equal(elementInfo('agua+fuego').es, 'Vapor');              // subelemento nombrado
+  assert.equal(elementInfo('agua+fuego+planta').es, 'Prisma');      // avanzado
+  assert.equal(elementInfo('agua+agua+fuego+planta').es, 'Prisma II'); // prisma acumulado
+  assert.equal(typeMultiplier('agua+agua+fuego+planta', 'planta'), 1.25); // combate por ingredientes (no por grado)
 });
 
 // Muestra: imprime un resumen de una batalla para inspección manual.

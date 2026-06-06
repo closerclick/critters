@@ -20,15 +20,14 @@ export const DIS = 0.8;    // multiplicador con desventaja
 // Un SUBELEMENTO (fruto de fusionar dos elementos distintos) se escribe "a+b".
 export const comps = (el) => String(el).split('+');
 export const isSub = (el) => String(el).includes('+');
-// El elemento de una araña = CONJUNTO de ingredientes base (subconjunto de los 3).
-// Fusionar = UNIÓN de ingredientes, con tope natural en los 3 base → solo hay 7
-// elementos posibles: 3 base · 3 subelementos (pares) · 1 avanzado (los 3 = "Prisma").
-// Mezclar avanzados no crea nada nuevo: solo aportan ingredientes (la unión ya está llena).
+// El elemento es la ACUMULACIÓN de ingredientes base de los ancestros (multiset, con
+// multiplicidad). Fusionar = unir TODOS los ingredientes (en profundidad se acumulan).
+// El NOMBRE se resume en un catálogo finito (arquetipo por ingredientes distintos +
+// GRADO por acumulación); el COMBATE usa los ingredientes base con la fórmula.
 export function mixElements (a, b) {
-  const cs = [...new Set([...comps(a), ...comps(b)])].filter(c => ELEMENTS.includes(c)).sort();
+  const cs = [...comps(a), ...comps(b)].filter(c => ELEMENTS.includes(c)).sort();
   return (cs.length ? cs : ['fuego']).join('+');
 }
-export const ADVANCED_INFO = { es: 'Prisma', en: 'Prism', color: '#f0abfc', color2: '#6d28d9' };
 
 function baseMult (att, def) {
   const n = ELEMENTS.length;
@@ -50,12 +49,32 @@ export function typeMultiplier (att, def) {
 }
 
 const hx = (h) => { h = String(h).replace('#', ''); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16) || 0); };
-const mixHex = (a, b) => { const x = hx(a), y = hx(b); return '#' + [0, 1, 2].map(i => Math.round((x[i] + y[i]) / 2).toString(16).padStart(2, '0')).join(''); };
-/** Info visual/label de un elemento (base, subelemento o avanzado). */
+const rgbHex = (r, g, b) => '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+
+// Catálogo de nombres: arquetipo por conjunto de ingredientes DISTINTOS + GRADO romano.
+const DUAL_NAMES = {
+  'agua+fuego': { es: 'Vapor', en: 'Steam' },
+  'fuego+planta': { es: 'Ceniza', en: 'Ash' },
+  'agua+planta': { es: 'Pantano', en: 'Marsh' },
+};
+const TRIPLE_NAME = { es: 'Prisma', en: 'Prism' };
+const ROMAN = ['', '', 'II', 'III', 'IV', 'V', 'VI'];
+
+/** Etiqueta/colores de un elemento: arquetipo (por sus ingredientes base distintos) +
+ *  GRADO según cuántos ingredientes acumuló; color promediado por proporción. */
 export function elementInfo (el) {
-  const cs = comps(el).filter(c => ELEMENT_INFO[c]);
-  if (cs.length <= 1) return ELEMENT_INFO[cs[0]] || ELEMENT_INFO[el] || ELEMENT_INFO.fuego;
-  if (ELEMENTS.every(e => cs.includes(e))) return { es: ADVANCED_INFO.es, en: ADVANCED_INFO.en, color: ADVANCED_INFO.color, color2: ADVANCED_INFO.color2, sub: true, tier: 2 };
-  const a = ELEMENT_INFO[cs[0]], b = ELEMENT_INFO[cs[1]];
-  return { es: a.es + '/' + b.es, en: a.en + '/' + b.en, color: mixHex(a.color, b.color), color2: mixHex(a.color2, b.color2), sub: true, tier: 1 };
+  const all = comps(el).filter(c => ELEMENT_INFO[c]);
+  if (!all.length) return ELEMENT_INFO.fuego;
+  const distinct = [...new Set(all)].sort();
+  let r = 0, g = 0, b = 0, r2 = 0, g2 = 0, b2 = 0;
+  for (const c of all) { const i = ELEMENT_INFO[c]; const [x, y, z] = hx(i.color); const [x2, y2, z2] = hx(i.color2); r += x; g += y; b += z; r2 += x2; g2 += y2; b2 += z2; }
+  const color = rgbHex(r / all.length, g / all.length, b / all.length);
+  const color2 = rgbHex(r2 / all.length, g2 / all.length, b2 / all.length);
+  let base;
+  if (distinct.length === 1) base = ELEMENT_INFO[distinct[0]];
+  else if (distinct.length >= 3) base = TRIPLE_NAME;
+  else base = DUAL_NAMES[distinct.join('+')] || { es: distinct.map(d => ELEMENT_INFO[d].es).join('/'), en: distinct.map(d => ELEMENT_INFO[d].en).join('/') };
+  const grade = all.length - distinct.length + 1;   // 1 = forma mínima; sube al acumular
+  const suf = grade > 1 ? ' ' + (grade <= 6 ? ROMAN[grade] : grade) : '';
+  return { es: base.es + suf, en: base.en + suf, color, color2, sub: distinct.length > 1, grade, distinct };
 }
