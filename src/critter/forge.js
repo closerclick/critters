@@ -181,17 +181,22 @@ export const POINT_VALUE = { HP: 12, ATK: 3, DEF: 3, SPD: 2 };
 export function pointsTotal (level) { return Math.max(0, (Math.max(1, level) - 1) * POINTS_PER_LEVEL); }
 export function pointsSpent (alloc) { return alloc ? ((alloc.HP || 0) + (alloc.ATK || 0) + (alloc.DEF || 0) + (alloc.SPD || 0)) : 0; }
 export function pointsFree (level, alloc) { return pointsTotal(level) - pointsSpent(alloc); }
-/** Reparto AUTOMÁTICO de los puntos de nivel por pesos de rol (para enemigos: usan sus
- *  puntos como lo haría un jugador optimizado). Determinista. */
+/** Reparto AUTOMÁTICO de los puntos de nivel (para enemigos: gastan sus puntos como un
+ *  jugador). Ruleta ponderada por rol SEMBRADA por el id del critter → varía por enemigo
+ *  pero es 100% determinista y reproducible con el seed. */
 export function autoAlloc (critter, level) {
   const total = pointsTotal(level);
   if (total <= 0) return {};
   const w = ROLE_WEIGHTS[critter.role] || ROLE_WEIGHTS[ROLES[0]];
-  const sumW = STAT_KEYS.reduce((a, k) => a + (w[k] || 0), 0) || 1;
-  const alloc = {}; let used = 0;
-  for (const k of STAT_KEYS) { const n = Math.floor(total * (w[k] || 0) / sumW); alloc[k] = n; used += n; }
-  const order = [...STAT_KEYS].sort((a, b) => (w[b] || 0) - (w[a] || 0) || STAT_KEYS.indexOf(a) - STAT_KEYS.indexOf(b));
-  for (let rem = total - used, i = 0; rem > 0; rem--, i = (i + 1) % order.length) alloc[order[i]] += 1;
+  const weights = STAT_KEYS.map(k => Math.max(0.0001, w[k] || 0));
+  const sum = weights.reduce((a, b) => a + b, 0);
+  const rng = rngFrom('alloc:' + critter.id);
+  const alloc = { HP: 0, ATK: 0, DEF: 0, SPD: 0 };
+  for (let i = 0; i < total; i++) {
+    let r = rng() * sum, pick = STAT_KEYS[0];
+    for (let j = 0; j < STAT_KEYS.length; j++) { r -= weights[j]; if (r <= 0) { pick = STAT_KEYS[j]; break; } }
+    alloc[pick]++;
+  }
   return alloc;
 }
 

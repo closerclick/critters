@@ -37,7 +37,7 @@ function buildUnits (team, side, terrain) {
       targets: normalizeTargets(m.target),   // 3 listas de prioridad de objetivo (una por rol)
       flanks: !!critter.flanks,
       terrainFav: !!terrain && String(critter.element).split('+').includes(terrain),   // el terreno favorece su(s) elemento(s)
-      energy: 0, charge: 0, stunTurns: 0, buffs: [], alive: true, passive: critter.passive, active: critter.active, lastTarget: null,
+      energy: 0, charge: 0, stunTurns: 0, buffs: [], alive: true, healFactor: 1, passive: critter.passive, active: critter.active, lastTarget: null,
     };
   });
 }
@@ -56,12 +56,13 @@ function gainHit (u) { u.energy = Math.min(ACTIVES[u.active].cost, u.energy + BA
 function dealDamage (att, tgt, amount, log, extra) {
   amount = Math.max(1, Math.round(amount));
   tgt.hp -= amount; gainHit(tgt);
+  tgt.healFactor = Math.max(0, tgt.healFactor - amount / tgt.maxHp);   // recibir daño REDUCE su poder de cura (gradual, irrecuperable)
   log.push({ t: 'attack', by: att ? att.uid : null, target: tgt.uid, dmg: amount, ...(extra || {}) });
   if (att && att.alive) {
     const tp = PASSIVES[tgt.passive];
-    if (tp && tp.thorns && tgt.hp > 0) { const r = Math.max(1, Math.round(amount * tp.thorns)); att.hp -= r; log.push({ t: 'thorns', by: tgt.uid, target: att.uid, dmg: r }); if (att.hp <= 0) faint(att, log); }
+    if (tp && tp.thorns && tgt.hp > 0) { const r = Math.max(1, Math.round(amount * tp.thorns)); att.hp -= r; att.healFactor = Math.max(0, att.healFactor - r / att.maxHp); log.push({ t: 'thorns', by: tgt.uid, target: att.uid, dmg: r }); if (att.hp <= 0) faint(att, log); }
     const ap = PASSIVES[att.passive];
-    if (ap && ap.lifesteal) { const h = Math.max(1, Math.round(amount * ap.lifesteal)); att.hp = Math.min(att.maxHp, att.hp + h); log.push({ t: 'lifesteal', target: att.uid, heal: h }); }
+    if (ap && ap.lifesteal) { const h = Math.round(amount * ap.lifesteal * att.healFactor); if (h > 0) { att.hp = Math.min(att.maxHp, att.hp + h); log.push({ t: 'lifesteal', target: att.uid, heal: h }); } }
   }
   if (tgt.hp <= 0) faint(tgt, log);
 }
@@ -185,7 +186,7 @@ function castActive (u, ab, enemies, allies, rng, log) {
   } else if (ab.type === 'heal') {
     let tt = ab.scope === 'self' ? u : null;
     if (!tt) for (const al of allies) { if (!al.alive) continue; if (!tt || al.hp / al.maxHp < tt.hp / tt.maxHp) tt = al; }
-    if (tt) { const h = Math.max(1, Math.round(eff(u, 'ATK') * ab.mult)); tt.hp = Math.min(tt.maxHp, tt.hp + h); log.push({ t: 'heal', by: u.uid, target: tt.uid, heal: h }); }
+    if (tt) { const h = Math.round(eff(u, 'ATK') * ab.mult * u.healFactor); if (h > 0) { tt.hp = Math.min(tt.maxHp, tt.hp + h); log.push({ t: 'heal', by: u.uid, target: tt.uid, heal: h }); } }
   } else if (ab.type === 'buff') {
     const ts = ab.scope === 'allies' ? allies.filter(a => a.alive) : [u];
     for (const al of ts) al.buffs.push({ stat: ab.stat, mult: ab.mult, turns: ab.dur });
@@ -215,7 +216,7 @@ function activeRole (u, enemies, allies) {
 function takeTurn (u, enemies, allies, occ, rng, log, force) {
   u.buffs = u.buffs.filter(b => (--b.turns) > 0);
   const p = PASSIVES[u.passive];
-  if (p && p.regen && u.hp < u.maxHp) { const h = Math.max(1, Math.round(u.maxHp * p.regen)); u.hp = Math.min(u.maxHp, u.hp + h); log.push({ t: 'regen', target: u.uid, heal: h }); }
+  if (p && p.regen && u.hp < u.maxHp) { const h = Math.round(u.maxHp * p.regen * u.healFactor); if (h > 0) { u.hp = Math.min(u.maxHp, u.hp + h); log.push({ t: 'regen', target: u.uid, heal: h }); } }
   if (u.stunTurns > 0) { u.stunTurns--; log.push({ t: 'stun-skip', target: u.uid }); return; }
 
   const ab = ACTIVES[u.active];
