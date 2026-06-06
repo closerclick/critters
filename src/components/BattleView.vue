@@ -4,7 +4,9 @@ import { critterById } from '../game/state.js';
 import { critterSvg } from '../critter/svg.js';
 import { COLS, ROWS } from '../battle/engine.js';
 import * as sfx from '../sfx.js';
-import { t } from '../i18n.js';
+import { SPEEDS, speed, setSpeed } from '../speed.js';
+import { elementInfo } from '../critter/types.js';
+import { t, loc } from '../i18n.js';
 
 const props = defineProps({ payload: Object });
 const emit = defineEmits(['close', 'next']);
@@ -14,13 +16,10 @@ const list = ref([]);             // uids para render
 const finished = ref(false);
 let timer = null, i = 0, alive = true;
 
-// Velocidad de reproducción (persistida). El replay apunta a ~8 s a 1×; los botones
-// 2×/5×/10× dividen el intervalo por evento.
-const SPEEDS = [1, 2, 5, 10];
-const speed = ref((() => { const v = Number(localStorage.getItem('critters_speed')); return SPEEDS.includes(v) ? v : 1; })());
+// Velocidad de reproducción (compartida/persistida; se elige en el modal de encuentro).
+// El replay apunta a ~8 s a 1×; 2×/5×/10× dividen el intervalo por evento.
 let baseMs = 120;
 const curMs = () => Math.max(8, Math.round(baseMs / speed.value));
-function setSpeed (s) { speed.value = s; try { localStorage.setItem('critters_speed', String(s)); } catch {} if (timer) { clearInterval(timer); timer = setInterval(step, curMs()); } }
 
 const res = () => props.payload.result;
 function initUnits () {
@@ -53,7 +52,9 @@ function start () { initUnits(); finished.value = false; i = 0; clearInterval(ti
 onMounted(start);
 onUnmounted(() => { alive = false; clearInterval(timer); });
 watch(() => props.payload, start);
+watch(speed, () => { if (timer) { clearInterval(timer); timer = setInterval(step, curMs()); } });   // aplica el cambio de velocidad en vivo
 
+const terrainInfo = computed(() => props.payload.terrain ? elementInfo(props.payload.terrain) : null);
 const outcome = computed(() => props.payload.win ? 'win' : (res().winner === 'draw' ? 'draw' : 'lose'));
 function next () { if (props.payload.nextNode) emit('next', props.payload.nextNode); }
 
@@ -82,10 +83,11 @@ const summary = computed(() => {
   <div class="battle">
     <closer-click-back class="battle-back" style="--cc-back-size:32px;color:var(--text)"></closer-click-back>
     <h2>{{ t('campana') }} · {{ payload.boss ? 'BOSS ★' : (t('nivel') + ' ' + payload.level) }}</h2>
+    <div v-if="terrainInfo" class="bterrain" :style="{ color: terrainInfo.color }">🌍 {{ loc(terrainInfo) }} · {{ t('favorece') }}</div>
     <div class="arena" @click="skip">
-      <div class="field">
+      <div class="field" :style="terrainInfo ? { '--terr': terrainInfo.color } : {}">
         <div class="zone you"></div><div class="zone foe"></div>
-        <div v-for="uid in list" :key="uid" class="fu" :class="{ dead: U[uid].dead, hit: U[uid].flash, foe: U[uid].side === 1 }"
+        <div v-for="uid in list" :key="uid" class="fu" :class="{ dead: U[uid].dead, hit: U[uid].flash, foe: U[uid].side === 1, fav: U[uid].terrainFav }"
              :style="{ left: leftOf(U[uid]), top: topOf(U[uid]) }">
           <span v-if="U[uid].flash && U[uid].dmg != null" class="dmgnum" :class="U[uid].dmgClass">{{ U[uid].dmg }}</span>
           <div class="fu-svg" v-html="svgFor(U[uid])"></div>
@@ -149,6 +151,8 @@ const summary = computed(() => {
 .fu.foe .fu-svg :deep(svg){transform:rotate(-90deg)}                    /* enemigo mira a la izquierda */
 .fu.dead{opacity:.25;filter:grayscale(1)}
 .fu.hit .fu-svg{transform:scale(1.14)}
+.fu.fav .fu-svg{filter:drop-shadow(0 0 6px var(--terr,transparent)) drop-shadow(0 2px 5px rgba(0,0,0,.6))}
+.bterrain{font-family:var(--fmono);font-size:11.5px;text-align:center;margin:-2px 0 4px}
 .hpbar{width:80%;height:4px;background:rgba(7,6,17,.85);border-radius:3px;overflow:hidden;margin-top:1px}
 .hpbar i{display:block;height:100%;background:linear-gradient(90deg,#4ade80,#a3e635);transition:width .22s}
 .hpbar.low i{background:linear-gradient(90deg,#ff5d6c,#fb923c)}

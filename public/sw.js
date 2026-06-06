@@ -1,7 +1,7 @@
 // Service worker estándar del ecosistema (§3): navegación network-first (deploys
 // instantáneos; offline cae a caché), resto cache-first con refresco en segundo
 // plano. Subir N de CACHE en cada cambio de assets cacheados.
-const CACHE = 'critters-v26';
+const CACHE = 'critters-v27';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
 
 self.addEventListener('install', e => {

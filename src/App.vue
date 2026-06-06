@@ -12,6 +12,7 @@ import TeamView from './components/TeamView.vue';
 import SummonView from './components/SummonView.vue';
 import FusionView from './components/FusionView.vue';
 import BattleView from './components/BattleView.vue';
+import EncounterView from './components/EncounterView.vue';
 import CritterDetail from './components/CritterDetail.vue';
 import StarterView from './components/StarterView.vue';
 
@@ -57,6 +58,14 @@ function onNext (n) { fight(n); }
 function onCloseRequest () { if (battleNav) nav.back(); else closeBattleUI(); }
 watch(battle, (b) => { if (b && !battleNav) battleNav = nav.open(() => closeBattleUI()); });
 
+// Modal de ENCUENTRO (previo a pelear): clic en un nivel lo abre; "Pelear" lanza la
+// batalla. Modal simple (cierra con Cancelar/afuera) para no chocar con la navegación
+// asíncrona del back al abrir la batalla.
+const encounter = ref(null);
+function onFightRequest (n) { encounter.value = n; }
+function onEncounterClose () { encounter.value = null; }
+function startEncounter () { const id = encounter.value; encounter.value = null; fight(id); }
+
 // Perfil/config de criatura: también es una capa de nav (el back lo cierra). Se abre
 // tocando un avatar en colección o equipo (nunca en pelea).
 let detailNav = null;
@@ -91,13 +100,15 @@ watch(() => ui.detailUid, (v) => { if (v && !detailNav) detailNav = nav.open(() 
   </nav>
 
   <main class="view" v-if="game.ready">
-    <CampaignView v-if="tab === 'campana'" @fight="fight" />
+    <CampaignView v-if="tab === 'campana'" @fight="onFightRequest" />
     <TeamView v-else-if="tab === 'equipo'" />
     <CollectionView v-else-if="tab === 'coleccion'" />
     <FusionView v-else-if="tab === 'fusion'" />
     <SummonView v-else-if="tab === 'invocar'" />
   </main>
   <main class="view center" v-else><p class="hint">…</p></main>
+
+  <EncounterView v-if="encounter && !battle" :node-id="encounter" @close="onEncounterClose" @fight="startEncounter" />
 
   <BattleView v-if="battle" :payload="battle" @close="onCloseRequest" @next="onNext" />
 

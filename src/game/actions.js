@@ -139,7 +139,7 @@ export function fightCampaign (nodeId) {
   const winXp = 18 + node.diff * 4;
   // XP: ganar da winXp; perder da un CUARTO (entrena igual → anti-softlock).
   const gain = win ? winXp : Math.max(1, Math.round(winXp / 4));
-  const payload = { result, win, node: node.id, level: node.diff, boss: node.boss, xp: {} };
+  const payload = { result, win, node: node.id, level: node.diff, boss: node.boss, terrain: node.terrain || null, xp: {} };
   // Aplica XP a cada miembro y registra lo ganado por SLOT (para el resumen).
   for (const x of ti) {
     const before = x.instance.level;

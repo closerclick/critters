@@ -14,6 +14,8 @@ test('elegir criatura inicial (1 de 3) y pelear nivel 1', async ({ page }) => {
   const n = await page.evaluate(async () => (await import('/src/game/state.js')).game.collection.length)
   expect(n).toBe(1)
   await page.locator('.web .node.core').click({ force: true })   // nodo central de la telaraña
+  await expect(page.locator('.enc-modal')).toBeVisible()         // modal de encuentro
+  await page.locator('.enc-modal .btn:not(.sec)').click()        // Pelear
   await expect(page.locator('.battle')).toBeVisible()
   await page.locator('.arena').click()
   await expect(page.locator('.result-modal .rc-title')).toBeVisible()
