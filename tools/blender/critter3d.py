@@ -41,6 +41,16 @@ def mat_glow(strength=9.0):
     out = nt.nodes.new("ShaderNodeOutputMaterial"); nt.links.new(em.outputs[0], out.inputs[0])
     return m
 
+def mat_eye():   # ojos NEGROS glossy (como los de una hormiga), no emisivos
+    m = bpy.data.materials.get("eye")
+    if m: return m
+    m = bpy.data.materials.new("eye"); m.use_nodes = True
+    b = m.node_tree.nodes["Principled BSDF"]
+    b.inputs["Base Color"].default_value = (0.01, 0.01, 0.01, 1)
+    for k, v in (("Metallic", 0.0), ("Roughness", 0.12)):
+        if k in b.inputs: b.inputs[k].default_value = v
+    return m
+
 def shade_smooth(me):
     for p in me.polygons: p.use_smooth = True
     if hasattr(me, "use_auto_smooth"):
@@ -92,7 +102,7 @@ def add_diamond(name, loc, size, mat):
     ob.location = loc; ob.data.materials.append(mat); shade_smooth(me); return ob
 
 # ---------- construir el critter ----------
-chit = mat_chitin(); glow = mat_glow(9); glow_eye = mat_glow(13)
+chit = mat_chitin(); glow = mat_glow(9); eye_mat = mat_eye()
 xC, y0, y1, y2 = 50, 24, 50, 76
 rowY = [y0, y1, y2]
 hasTh = A.get("thorax", -1) >= 0
@@ -144,7 +154,7 @@ if A.get("antennae"):
 eyeY = y0 - 7 if A.get("head") == 3 else y0 - 8
 eyexs = [xC-4.5, xC+4.5] + ([xC] if A.get("head") == 3 else [])
 for j, ex in enumerate(eyexs):
-    e = P2(ex, eyeY); add_diamond("eye%d" % j, (e[0], e[1], topz*0.98), 0.09, glow_eye)
+    e = P2(ex, eyeY); add_diamond("eye%d" % j, (e[0], e[1], topz*0.98), 0.18, eye_mat)   # doble de grandes y negros
 
 # ---------- escena ----------
 def add_area(name, loc, energy, size, color=(1, 1, 1)):
