@@ -94,11 +94,15 @@ export function adjustAlloc (uid, stat, delta) {
 export function resetAlloc (uid) { const i = instanceByUid(uid); if (i) { i.alloc = {}; persist(); } }
 
 // ---- fusión ----
-/** uids de la colección que se pueden fusionar con `uid` (difieren en una pieza). */
+/** uids de la colección que se pueden fusionar con `uid` (cualquiera; los incompatibles
+ *  salen débiles). */
 export function fusablePartners (uid) {
-  const a = instanceByUid(uid); if (!a) return [];
-  const ca = critterById(a.id);
-  return game.collection.filter(b => b.uid !== uid && canFuse(ca, critterById(b.id))).map(b => b.uid);
+  return game.collection.filter(b => b.uid !== uid).map(b => b.uid);
+}
+/** ¿La fusión A+B es COMPATIBLE (sube rareza) o incompatible (débil)? */
+export function isCompatibleFuse (uidA, uidB) {
+  const a = instanceByUid(uidA), b = instanceByUid(uidB);
+  return !!(a && b) && canFuse(critterById(a.id), critterById(b.id));
 }
 /** Vista previa del descriptor resultante (no consume nada). */
 export function fusePreview (uidA, uidB) {

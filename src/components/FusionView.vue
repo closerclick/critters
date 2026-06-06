@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { game, instanceByUid, critterById } from '../game/state.js';
-import { fusablePartners, fusePreview, fuseCritters } from '../game/actions.js';
+import { game, instanceByUid } from '../game/state.js';
+import { fusePreview, fuseCritters, isCompatibleFuse } from '../game/actions.js';
 import { openCritter } from '../ui.js';
 import { elementInfo } from '../critter/types.js';
 import { RARITY_BY_KEY } from '../critter/forge.js';
@@ -13,8 +13,9 @@ const selB = ref(null);
 
 const instA = computed(() => selA.value ? instanceByUid(selA.value) : null);
 const instB = computed(() => selB.value ? instanceByUid(selB.value) : null);
-const partners = computed(() => selA.value && !selB.value ? fusablePartners(selA.value) : []);
-const partnerInsts = computed(() => partners.value.map(uid => instanceByUid(uid)).filter(Boolean));
+const others = computed(() => game.collection.filter(i => i.uid !== selA.value));
+const compatOf = (uid) => isCompatibleFuse(selA.value, uid);
+const previewCompatible = computed(() => (selA.value && selB.value) ? isCompatibleFuse(selA.value, selB.value) : false);
 const preview = computed(() => (selA.value && selB.value) ? fusePreview(selA.value, selB.value) : null);
 const prevInst = computed(() => preview.value ? { uid: '__prev', id: preview.value.id, level: 1 } : null);
 const prevEl = computed(() => preview.value ? elementInfo(preview.value.element) : null);
@@ -22,19 +23,19 @@ const prevRar = computed(() => preview.value ? RARITY_BY_KEY[preview.value.rarit
 
 const gridList = computed(() => {
   if (!selA.value) return game.collection;
-  if (!selB.value) return partnerInsts.value;
+  if (!selB.value) return others.value;
   return [];
 });
 const subLabel = computed(() => {
   if (!selA.value) return t('fusionPick');
-  if (!selB.value) return partners.value.length ? t('fusionPartners') : t('fusionNone');
+  if (!selB.value) return t('fusionPick2');
   return '';
 });
 
 function choose (uid) {
   if (!selA.value) { selA.value = uid; selB.value = null; return; }
   if (uid === selA.value) return;
-  if (!selB.value && partners.value.includes(uid)) selB.value = uid;
+  if (!selB.value) selB.value = uid;   // cualquiera: compatible (sube) o incompatible (débil)
 }
 function clearA () { selA.value = null; selB.value = null; }
 function reset () { selA.value = null; selB.value = null; }
@@ -67,9 +68,10 @@ function doFuse () {
     </div>
 
     <div v-if="preview" class="prev-info">
-      <b :style="{ color: prevEl.color }">{{ preview.name }}</b>
-      <span class="dot">·</span> {{ loc(prevEl) }}
-      <span class="dot">·</span> <span :style="{ color: prevRar.color }">{{ loc(prevRar) }}</span>
+      <div><b :style="{ color: prevEl.color }">{{ preview.name }}</b>
+        <span class="dot">·</span> {{ loc(prevEl) }}
+        <span class="dot">·</span> <span :style="{ color: prevRar.color }">{{ loc(prevRar) }}</span></div>
+      <div class="fnote" :class="previewCompatible ? 'ok' : 'weak'">{{ previewCompatible ? '✓ ' + t('fusionSube') : '⚠ ' + t('fusionDebil') }}</div>
     </div>
 
     <div class="row-btns" v-if="selA || selB">
@@ -79,7 +81,10 @@ function doFuse () {
 
     <div class="fsub" v-if="subLabel">{{ subLabel }}</div>
     <div class="grid-cards" v-if="gridList.length">
-      <div v-for="i in gridList" :key="i.uid" @click="choose(i.uid)" style="cursor:pointer"><CritterCard :instance="i" :size="78" /></div>
+      <div v-for="i in gridList" :key="i.uid" @click="choose(i.uid)" class="fcell">
+        <span v-if="selA && !selB" class="ftag" :class="compatOf(i.uid) ? 'ok' : 'weak'">{{ compatOf(i.uid) ? '✓' : t('fusionDebil') }}</span>
+        <CritterCard :instance="i" :size="78" />
+      </div>
     </div>
   </template>
 </template>
@@ -95,5 +100,12 @@ function doFuse () {
 .op{font-family:var(--fdisplay);font-size:22px;color:var(--muted)}
 .prev-info{text-align:center;font-size:13px;margin:2px 0 8px}
 .prev-info .dot{color:var(--muted);margin:0 4px}
+.fnote{font-family:var(--fmono);font-size:11px;margin-top:3px}
+.fnote.ok{color:var(--good)} .fnote.weak{color:var(--gold)}
 .fsub{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;text-align:center;margin:10px 0 6px}
+.fcell{position:relative;cursor:pointer}
+.ftag{position:absolute;top:4px;left:50%;transform:translateX(-50%);z-index:3;font-family:var(--fmono);font-size:9px;font-weight:800;
+  padding:1px 6px;border-radius:7px}
+.ftag.ok{background:var(--good);color:#062b12}
+.ftag.weak{background:rgba(120,113,108,.85);color:#e7e5e4}
 </style>

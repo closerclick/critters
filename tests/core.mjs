@@ -123,7 +123,11 @@ ok('fusión: difieren en una pieza → hija con +1 parte (sube rareza); subeleme
   assert.equal(child.element, 'agua+fuego');                            // subelemento canónico
   assert.deepEqual(fuse(A, B), child);                                  // determinista
   const C = makeCritter(genomeId({ element: 'fuego', role: 'dps', appearance: { ...base, legs: 2, hue: 9 } })); // misma estructura
-  assert.ok(!canFuse(A, C));                                            // 0 piezas de diferencia → no
+  assert.ok(!canFuse(A, C));                                            // 0 piezas de diferencia → incompatible
+  const weak = fuse(A, C);                                              // incompatible: igual fusiona pero sin subir parte
+  assert.ok(weak);
+  assert.equal(partsOf(weak.appearance), partsOf(A.appearance));        // no sube de parte
+  assert.equal(weak.element, 'fuego+fuego');                            // acumula ingredientes igual
 });
 
 ok('subelemento: ventajas de ambos, sin sumar debilidades', () => {

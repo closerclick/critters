@@ -36,12 +36,15 @@ function addPiece (a) {
   return r;
 }
 
-/** Fusiona dos criaturas → NUEVO descriptor determinista (una parte más que la mayor;
- *  elemento mezclado → subelemento si difieren). Devuelve null si no son fusionables. */
+/** Fusiona CUALQUIER par distinto → NUEVO descriptor determinista. Compatible (difieren
+ *  en una pieza) → la hija sube una parte (sube rareza). Incompatible → NO sube parte
+ *  (queda como la mayor), pero igual acumula los ingredientes → más impuesto de mezcla
+ *  = nace más débil. En ambos casos el elemento es la unión. Null solo si par inválido. */
 export function fuse (cA, cB) {
-  if (!canFuse(cA, cB)) return null;
+  if (!cA || !cB || cA.id === cB.id) return null;
   const big = bigger(cA, cB);
-  const appearance = addPiece(big.appearance);
+  const climbs = canFuse(cA, cB);   // compatible → sube de parte/rareza
+  const appearance = climbs ? addPiece(big.appearance) : { ...big.appearance };
   const element = mixElements(cA.element, cB.element);
   return makeCritter(genomeId({ element, role: big.role, appearance }));
 }
