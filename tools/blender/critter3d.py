@@ -127,8 +127,9 @@ if hasTh and hasAb: add_tube("waist", [(*P2(xC, y1+9), midz), (*P2(xC, y2-13), m
 LEG_CELLS = [(0, -1), (0, 1), (1, -1), (1, 1), (2, -1), (2, 1)]
 for i in range(legs_n):
     r, side = LEG_CELLS[i]; yy = rowY[r]
-    ax = xC + side*8;  kx = xC + side*20; ky = yy - (6 if A.get("legStyle") == 1 else 0); fx = xC + side*31; fy = yy + 6
-    pa = (*P2(ax, yy), seg_z0 + 0.10); pk = (*P2(kx, ky), seg_z0*0.55); pf = (*P2(fx, fy), 0.0)
+    ax = xC + side*8; kx = xC + side*20; fx = xC + side*31
+    knee_up = 0.55 if A.get("legStyle") == 1 else 0.35   # el codo dobla HACIA ARRIBA (Z), no al frente
+    pa = (*P2(ax, yy), seg_z0 + 0.10); pk = (*P2(kx, yy), seg_z0 + knee_up); pf = (*P2(fx, yy + 4), 0.0)
     add_tube("leg%d" % i, [pa, pk, pf], 0.06, chit)
     add_diamond("foot%d" % i, (pf[0], pf[1], 0.03), 0.09, glow)
 
