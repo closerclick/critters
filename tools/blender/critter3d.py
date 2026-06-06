@@ -101,6 +101,14 @@ def add_diamond(name, loc, size, mat):
     bm.to_mesh(me); bm.free()
     ob.location = loc; ob.data.materials.append(mat); shade_smooth(me); return ob
 
+def add_sphere(name, loc, radius, mat):
+    me = bpy.data.meshes.new(name); ob = bpy.data.objects.new(name, me); bpy.context.collection.objects.link(ob)
+    bm = bmesh.new()
+    try: bmesh.ops.create_icosphere(bm, subdivisions=2, radius=radius)
+    except TypeError: bmesh.ops.create_icosphere(bm, subdivisions=2, diameter=radius * 2)
+    bm.to_mesh(me); bm.free()
+    ob.location = loc; ob.data.materials.append(mat); shade_smooth(me); return ob
+
 # ---------- construir el critter ----------
 chit = mat_chitin(); glow = mat_glow(9); eye_mat = mat_eye()
 xC, y0, y1, y2 = 50, 24, 50, 76
@@ -154,7 +162,7 @@ if A.get("antennae"):
 eyeY = y0 - 7 if A.get("head") == 3 else y0 - 8
 eyexs = [xC-4.5, xC+4.5] + ([xC] if A.get("head") == 3 else [])
 for j, ex in enumerate(eyexs):
-    e = P2(ex, eyeY); add_diamond("eye%d" % j, (e[0], e[1], topz*0.98), 0.18, eye_mat)   # doble de grandes y negros
+    e = P2(ex, eyeY); add_sphere("eye%d" % j, (e[0], e[1], topz*0.98), 0.18, eye_mat)   # ojos ESFÉRICOS negros
 
 # ---------- escena ----------
 def add_area(name, loc, energy, size, color=(1, 1, 1)):
