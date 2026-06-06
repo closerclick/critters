@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { game, instanceByUid } from '../game/state.js';
-import { fusePreview, fuseCritters, isCompatibleFuse } from '../game/actions.js';
+import { fusePreview, fuseCritters, isCompatibleFuse, degradePreview, degradeCritter } from '../game/actions.js';
 import { openCritter } from '../ui.js';
 import { elementInfo } from '../critter/types.js';
 import { RARITY_BY_KEY } from '../critter/forge.js';
@@ -44,6 +44,13 @@ function doFuse () {
   reset();
   if (r && r.instance) openCritter(r.instance.uid);   // muestra la nueva criatura
 }
+// Degradar A consumiendo B: baja un tramo de rareza (piso común), recorta el elemento.
+const degradable = computed(() => !!(selA.value && selB.value && degradePreview(selA.value)));
+function doDegrade () {
+  const r = degradeCritter(selA.value, selB.value);
+  reset();
+  if (r && r.instance) openCritter(r.instance.uid);
+}
 </script>
 
 <template>
@@ -76,6 +83,7 @@ function doFuse () {
 
     <div class="row-btns" v-if="selA || selB">
       <button class="btn sec" @click="reset">{{ t('cancelar') }}</button>
+      <button v-if="degradable" class="btn sec" @click="doDegrade" :title="t('degradar') + ' A'">⬇ {{ t('degradar') }} A</button>
       <button class="btn" :disabled="!preview" @click="doFuse">✦ {{ t('fusionar') }}</button>
     </div>
 

@@ -4,7 +4,7 @@ import { game, persist, newUid, instanceByUid, critterById } from './state.js';
 import { neighbors, nodeById, enemyTeam, reward, captureDrop, nodeBattleSeed } from './campaign.js';
 import { simulate } from '../battle/engine.js';
 import { xpForNext, pointsFree } from '../critter/forge.js';
-import { canFuse, fuse } from './fusion.js';
+import { canFuse, fuse, degrade } from './fusion.js';
 
 export const SUMMON_COST = 100;   // monedas por invocación
 export const FEED_XP = 60;        // XP por alimentar
@@ -120,6 +120,22 @@ export function fuseCritters (uidA, uidB) {
   const inst = addCritter(child.id, 1);
   persist();
   return { instance: inst, critter: child };
+}
+
+/** Vista previa del resultado de degradar `uid`. */
+export function degradePreview (uid) { const a = instanceByUid(uid); return a ? degrade(critterById(a.id)) : null; }
+/** Degrada la araña `uidA` un tramo de rareza CONSUMIENDO a `uidB`. Muta A en sitio
+ *  (conserva uid/level/xp/alloc); B se descarta. Piso = común. */
+export function degradeCritter (uidA, uidB) {
+  const a = instanceByUid(uidA), b = instanceByUid(uidB);
+  if (!a || !b || uidA === uidB) return { error: 'pick' };
+  const child = degrade(critterById(a.id));
+  if (!child) return { error: 'floor' };   // ya en común
+  for (let i = 0; i < game.team.length; i++) if (game.team[i] === uidB) game.team[i] = null;
+  game.collection = game.collection.filter(x => x.uid !== uidB);
+  a.id = child.id;   // muta en sitio: nuevo genoma recortado, misma identidad/uid/level/xp
+  persist();
+  return { instance: a, critter: child };
 }
 
 // ---- telaraña de campaña ----

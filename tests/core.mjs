@@ -1,11 +1,11 @@
 // Test Node (sin navegador) del núcleo determinista: forge, svg y motor de batalla.
 import assert from 'node:assert';
-import { makeCritter, statsAtLevel, power, pointsTotal, pointsFree, partsOf, rarityIndexFromParts, genomeId, mixFactor } from '../src/critter/forge.js';
+import { makeCritter, statsAtLevel, power, pointsTotal, pointsFree, partsOf, rarityIndexFromParts, genomeId, elementMult, clampElement, capacityFor } from '../src/critter/forge.js';
 import { critterSvg } from '../src/critter/svg.js';
 import { typeMultiplier, mixElements, elementInfo } from '../src/critter/types.js';
 import { simulate, battleSeed } from '../src/battle/engine.js';
 import { normalizeTarget } from '../src/battle/policies.js';
-import { canFuse, fuse } from '../src/game/fusion.js';
+import { canFuse, fuse, degrade } from '../src/game/fusion.js';
 
 let failed = 0;
 const ok = (name, fn) => { try { fn(); console.log('  ✓', name); } catch (e) { failed++; console.error('  ✗', name, '\n   ', e.message); } };
@@ -103,7 +103,7 @@ ok('rareza por partes: salvajes 0/1 (≤4 partes); 9 = legendaria', () => {
 });
 
 ok('genoma-id: makeCritter reconstruye exacto y determinista', () => {
-  const id = genomeId({ element: 'fuego', role: 'dps', appearance: { head: 1, thorax: 0, abdomen: 2, legs: 3, legStyle: 1, antennae: true, hue: 5, pattern: 1 } });
+  const id = genomeId({ seed: 'sx', element: 'fuego', role: 'dps', appearance: { head: 1, thorax: 0, abdomen: 2, legs: 3, legStyle: 1, antennae: true, hue: 5, pattern: 1 } });
   const c1 = makeCritter(id), c2 = makeCritter(id);
   assert.deepEqual(c1, c2);
   assert.equal(c1.element, 'fuego'); assert.equal(c1.role, 'dps');
@@ -113,8 +113,8 @@ ok('genoma-id: makeCritter reconstruye exacto y determinista', () => {
 
 ok('fusión: difieren en una pieza → hija con +1 parte (sube rareza); subelemento', () => {
   const base = { head: 0, thorax: -1, abdomen: -1, legStyle: 0, antennae: false, hue: 0, pattern: 0 };
-  const A = makeCritter(genomeId({ element: 'fuego', role: 'dps', appearance: { ...base, legs: 2 } }));   // 3 partes
-  const B = makeCritter(genomeId({ element: 'agua', role: 'dps', appearance: { ...base, legs: 3 } }));    // 4 partes (A + 1 pata)
+  const A = makeCritter(genomeId({ seed: 'sa', element: 'fuego', role: 'dps', appearance: { ...base, legs: 2 } }));   // 3 partes
+  const B = makeCritter(genomeId({ seed: 'sb', element: 'agua', role: 'dps', appearance: { ...base, legs: 3 } }));    // 4 partes (A + 1 pata)
   assert.ok(canFuse(A, B));
   const child = fuse(A, B);
   assert.ok(child);
@@ -122,7 +122,7 @@ ok('fusión: difieren en una pieza → hija con +1 parte (sube rareza); subeleme
   assert.ok(child.rarityIndex > A.rarityIndex);                         // sube de rareza
   assert.equal(child.element, 'agua+fuego');                            // subelemento canónico
   assert.deepEqual(fuse(A, B), child);                                  // determinista
-  const C = makeCritter(genomeId({ element: 'fuego', role: 'dps', appearance: { ...base, legs: 2, hue: 9 } })); // misma estructura
+  const C = makeCritter(genomeId({ seed: 'sc', element: 'fuego', role: 'dps', appearance: { ...base, legs: 2, hue: 9 } })); // misma estructura
   assert.ok(!canFuse(A, C));                                            // 0 piezas de diferencia → incompatible
   const weak = fuse(A, C);                                              // incompatible: igual fusiona pero sin subir parte
   assert.ok(weak);
@@ -139,13 +139,35 @@ ok('subelemento: ventajas de ambos, sin sumar debilidades', () => {
   assert.equal(typeMultiplier('fuego', 'agua+fuego'), 1);       // el dual resiste/neutraliza por sus ingredientes
 });
 
-ok('impuesto de mezcla: pura 100%, mezclada nace débil y se recupera a legendaria', () => {
-  assert.equal(mixFactor('fuego', 0), 1);                                  // pura sin impuesto (cualquier rareza)
-  assert.equal(mixFactor('fuego', 4), 1);
-  assert.equal(Math.round(mixFactor('agua+fuego', 0) * 100), 80);          // dual común −20%
-  assert.equal(mixFactor('agua+fuego', 4), 1);                             // dual legendaria 100%
-  assert.equal(Math.round(mixFactor('agua+fuego+planta', 0) * 100), 60);   // triple común −40% (héroe débil)
-  assert.equal(mixFactor('agua+fuego+planta', 4), 1);                      // triple legendaria 100% en todo
+ok('potencia: puro 1.0, subelemento/triple débiles al nacer y más potentes al madurar', () => {
+  assert.equal(elementMult('fuego', 0), 1);                                   // puro siempre 1.0
+  assert.equal(elementMult('fuego', 4), 1);
+  assert.equal(Math.round(elementMult('agua+fuego', 2) * 100), 105);          // subelemento raro
+  assert.equal(Math.round(elementMult('agua+fuego', 4) * 100), 150);          // subelemento legendaria ×1.5
+  assert.equal(Math.round(elementMult('agua+fuego+planta', 4) * 100), 200);   // triple legendaria ×2.0
+  assert.ok(elementMult('agua+fuego+planta', 0) < 0.7);                       // triple "común" muy débil (héroe débil)
+  assert.equal(Math.round(elementMult('fuego+fuego', 4) * 100), 110);         // puro acumulado: bonus convergente +0.1
+});
+
+ok('capacidad por rareza + recorte determinista (degradado)', () => {
+  assert.equal(capacityFor(0), 1); assert.equal(capacityFor(2), 2); assert.equal(capacityFor(4), 3);
+  assert.equal(clampElement('agua+fuego', 2), 'agua+fuego');         // raro cabe el subelemento
+  assert.equal(clampElement('agua+fuego', 0), 'fuego');              // común recorta a 1 base (fuego < agua por orden)
+  assert.equal(clampElement('agua+fuego+planta', 1), 'fuego');       // infrecuente recorta a 1
+});
+
+ok('degradar: baja un tramo, recorta a la capacidad, conserva identidad (semilla)', () => {
+  const leg = makeCritter(genomeId({ seed: 'sd', element: 'agua+fuego+planta', role: 'dps', appearance: { head: 0, thorax: 0, abdomen: 0, legs: 6, legStyle: 0, antennae: false, hue: 0, pattern: 0 } }));
+  assert.equal(partsOf(leg.appearance), 9);
+  assert.equal(leg.rarityIndex, 4);
+  const epic = degrade(leg);
+  assert.equal(epic.rarityIndex, 3);                                  // legend → épico
+  assert.equal(new Set(epic.element.split('+')).size, 3);             // épico aún cabe el triple
+  assert.equal(epic.name, leg.name);                                 // misma semilla → misma raza/identidad
+  const raro = degrade(epic);
+  assert.equal(raro.rarityIndex, 2);
+  assert.equal(new Set(raro.element.split('+')).size, 2);             // raro = subelemento (perdió 1)
+  assert.equal(raro.name, leg.name);                                 // identidad estable al degradar
 });
 
 ok('catálogo de 36 nombres: combinación + intensidad por acumulación', () => {

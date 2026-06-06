@@ -2,6 +2,7 @@
 // criatura de su id/semilla: rareza, elemento, rol, stats base, pasiva, activa,
 // nombre y parámetros de apariencia. Reproducible por cualquiera con solo el id.
 import { rngFrom, pick, rint } from '../lib/rng.js';
+import { hash32 } from '../lib/hash.js';
 import { ELEMENTS } from './types.js';
 import { ROLES, ROLE_WEIGHTS } from './roles.js';
 import { PASSIVES, ROLE_ACTIVE_POOL, ROLE_PASSIVE_POOL } from './abilities.js';
@@ -29,38 +30,67 @@ export function rarityFromParts (parts) { return RARITIES[rarityIndexFromParts(p
 // Estilo de combate (rasgo): probabilidad de flanquear según el rol.
 const FLANK = { dps: 0.7, distancia: 0.7, control: 0.6, soporte: 0.5, peleador: 0.4, tanque: 0.2 };
 
-// "Genoma-id" de una criatura FUSIONADA: codifica apariencia+elemento+rol en el id
-// para que makeCritter la reconstruya EXACTA (snapshot/PvP siguen siendo solo un id).
+// "Genoma-id" de una criatura FUSIONADA: SEMILLA estable + elemento + rol + apariencia.
+// La SEMILLA (genética) fija nombre/pasiva/activa/jitter y NO cambia al fusionar/degradar
+// (la araña sigue siendo la misma); el elemento y las partes SÍ mutan.
 export function genomeId (g) {
   const a = g.appearance;
-  return ['g', g.element, g.role, a.head, a.thorax, a.abdomen, a.legs, a.legStyle, a.antennae ? 1 : 0, a.hue, a.pattern].join(':');
+  return ['g', g.seed, g.element, g.role, a.head, a.thorax, a.abdomen, a.legs, a.legStyle, a.antennae ? 1 : 0, a.hue, a.pattern].join(':');
 }
+const isElementToken = (s) => !!s && String(s).split('+').every(c => ELEMENTS.includes(c));
 function parseGenome (id) {
-  const p = id.split(':');   // g:el:role:head:thorax:abdomen:legs:legStyle:antennae:hue:pattern
+  const p = id.split(':');
+  const old = isElementToken(p[1]);   // compat formato viejo (sin semilla): elemento en p[1]
+  const seed = old ? id : p[1];
+  const o = old ? 1 : 2;              // offset del elemento
   return {
-    element: p[1] || 'fuego',
-    role: ROLES.includes(p[2]) ? p[2] : ROLES[0],
-    appearance: { head: +p[3] || 0, thorax: p[4] == null ? -1 : +p[4], abdomen: p[5] == null ? -1 : +p[5], legs: +p[6] || 0, legStyle: +p[7] || 0, antennae: p[8] === '1', hue: +p[9] || 0, pattern: +p[10] || 0 },
+    seed,
+    element: p[o] || 'fuego',
+    role: ROLES.includes(p[o + 1]) ? p[o + 1] : ROLES[0],
+    appearance: { head: +p[o + 2] || 0, thorax: p[o + 3] == null ? -1 : +p[o + 3], abdomen: p[o + 4] == null ? -1 : +p[o + 4], legs: +p[o + 5] || 0, legStyle: +p[o + 6] || 0, antennae: p[o + 7] === '1', hue: +p[o + 8] || 0, pattern: +p[o + 9] || 0 },
   };
 }
+/** Semilla genética estable de un id (la del genoma, o el id mismo si es salvaje). */
+export function seedOfId (id) { return (typeof id === 'string' && id.startsWith('g:')) ? parseGenome(id).seed : id; }
 
-// "Impuesto de mezcla": una araña PURA (1 elemento) nace al 100%; cuantos más
-// elementos distintos mezcla, más penalización en rarezas bajas (el "héroe débil"),
-// pero el impuesto SE DESVANECE hacia la legendaria → la triple balanceada legendaria
-// llega al 100% en todo. Pura: sin impuesto. Tunable con MIX_TAX.
-const MIX_TAX = 0.2;
-export function mixFactor (element, rarityIndex = 0) {
-  const d = new Set(String(element).split('+').filter(e => ELEMENTS.includes(e))).size || 1;
-  return 1 - MIX_TAX * (d - 1) * (1 - Math.max(0, Math.min(4, rarityIndex)) / 4);
+// CAPACIDAD elemental por rareza: cuántos elementos DISTINTOS puede EXPRESAR.
+export const CAP_DISTINCT = [1, 1, 2, 3, 3];   // rarityIndex 0..4 (común..legendaria)
+export const capacityFor = (ri) => CAP_DISTINCT[Math.max(0, Math.min(4, ri | 0))];
+const canonEl = (counts) => { const a = []; for (const k in counts) for (let i = 0; i < counts[k]; i++) a.push(k); return (a.length ? a.sort() : ['fuego']).join('+'); };
+/** Recorta el multiset a la capacidad (distintos) de la rareza: conserva los más
+ *  acumulados (multiplicidad desc, luego orden canónico). Determinista. */
+export function clampElement (element, rarityIndex) {
+  const cap = capacityFor(rarityIndex);
+  const counts = {}; for (const c of String(element).split('+')) if (ELEMENTS.includes(c)) counts[c] = (counts[c] || 0) + 1;
+  const distinct = Object.keys(counts);
+  if (!distinct.length) return 'fuego';
+  if (distinct.length <= cap) return canonEl(counts);
+  distinct.sort((a, b) => (counts[b] - counts[a]) || (ELEMENTS.indexOf(a) - ELEMENTS.indexOf(b)));
+  const kept = {}; for (const k of distinct.slice(0, cap)) kept[k] = counts[k];
+  return canonEl(kept);
+}
+
+// POTENCIA del elemento (multiplica el presupuesto de stats). PURO = 1.00. Mezclar da
+// más elementos distintos = más techo, PERO "héroe débil": penalizado al nacer y se
+// realiza al MADURAR (rareza). Los duplicados suman CONVERGENTE (acumular de más = desperdicio).
+export function elementMult (element, rarityIndex = 0) {
+  const all = String(element).split('+').filter(e => ELEMENTS.includes(e));
+  const distinct = new Set(all).size || 1;
+  const extra = Math.max(0, all.length - distinct);
+  const mat = Math.max(0, Math.min(4, rarityIndex)) / 4;
+  const reward = 0.5 * (distinct - 1) * mat;          // subelemento/triple más potentes al madurar
+  const penalty = 0.4 * (distinct - 1) * (1 - mat);   // débil al nacer (mezcladas)
+  const grade = 0.2 * (1 - Math.pow(0.5, extra));     // acumulación convergente (tope +0.2)
+  return Math.max(0.2, 1 - penalty + reward + grade);
 }
 
 // Cuerpo común: dados elemento/rol/apariencia, deriva rareza (por partes), stats,
 // pasiva/activa, flanqueo y nombre con el rng del id. Comparte salvajes y genomas.
-function buildBody (id, rng, element, role, appearance) {
+function buildBody (id, rng, element, role, appearance, nameTier) {
   const rarityIndex = rarityIndexFromParts(partsOf(appearance));
   const rarity = RARITIES[rarityIndex];
   const w = ROLE_WEIGHTS[role] || ROLE_WEIGHTS[ROLES[0]];
-  const budget = BASE_BUDGET * rarity.budget * mixFactor(element, rarityIndex);
+  const budget = BASE_BUDGET * rarity.budget * elementMult(element, rarityIndex);
   const j = () => 0.85 + rng() * 0.30;   // jitter por stat
   const base = {
     HP: Math.round(budget * w.HP * j() * HP_FACTOR),
@@ -75,14 +105,16 @@ function buildBody (id, rng, element, role, appearance) {
   const passive = pick(rng, ROLE_PASSIVE_POOL[role]);
   const active = pick(rng, ROLE_ACTIVE_POOL[role]);
   const flanks = rng() < (FLANK[role] ?? 0.5);
-  const name = makeName(rng, rarityIndex);
+  const name = makeName(rng, nameTier == null ? rarityIndex : nameTier);   // raza estable (no varía con la rareza en genomas)
   return { id, name, element, role, rarity: rarity.key, rarityIndex, base, passive, active, flanks, appearance };
 }
 
 /** Crea la criatura completa a partir de su id. Puro y determinista. */
 export function makeCritter (id) {
+  // Genoma: nombre/pasiva/activa derivan de la SEMILLA estable (no del elemento), así
+  // degradar/fusionar cambia poder y elemento pero NO la identidad de la araña.
+  if (typeof id === 'string' && id.startsWith('g:')) { const g = parseGenome(id); return buildBody(id, rngFrom('critter:' + g.seed), g.element, g.role, g.appearance, hash32(g.seed) % 5); }
   const rng = rngFrom('critter:' + id);
-  if (typeof id === 'string' && id.startsWith('g:')) { const g = parseGenome(id); return buildBody(id, rng, g.element, g.role, g.appearance); }
 
   // SALVAJES/invocadas: pocas partes → rareza 0/1; la rareza alta (hasta 9 =
   // legendaria) se consigue FUSIONANDO. Cabeza obligatoria; tórax/abdomen opcionales.

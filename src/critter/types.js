@@ -19,7 +19,8 @@ export const DIS = 0.8;    // multiplicador con desventaja
 
 // Un SUBELEMENTO (fruto de fusionar dos elementos distintos) se escribe "a+b".
 export const comps = (el) => String(el).split('+');
-export const isSub = (el) => String(el).includes('+');
+// Subelemento = más de UN elemento base DISTINTO (fuego+fuego NO es sub: es puro acumulado).
+export const isSub = (el) => new Set(comps(el).filter(c => ELEMENTS.includes(c))).size > 1;
 // El elemento es la ACUMULACIÓN de ingredientes base de los ancestros (multiset, con
 // multiplicidad). Fusionar = unir TODOS los ingredientes (en profundidad se acumulan).
 // El NOMBRE se resume en un catálogo finito (arquetipo por ingredientes distintos +
