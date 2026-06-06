@@ -118,13 +118,13 @@ hasAb = A.get("abdomen", -1) >= 0
 legs_n = max(0, min(6, int(A.get("legs", 0))))
 seg_z0 = 0.42 if legs_n > 0 else 0.14
 seg_h = 0.62
-topz = seg_z0 + seg_h
+topz = seg_z0 + seg_h * 2   # cabeza al doble de altura → antenas/ojos/mandíbulas se anclan a su tope
 
 # cabeza
 if A.get("head") == 1:      headpts = [(xC, y0-15), (xC+11, y0+7), (xC-11, y0+7)]
 elif A.get("head") == 3:    headpts = [(xC-15, y0+8), (xC-10, y0-11), (xC+10, y0-11), (xC+15, y0+8)]
 else:                       headpts = hexpts(xC, y0, 12, 13)
-add_prism("head", headpts, seg_z0, seg_h, 0.6, chit)
+add_prism("head", headpts, seg_z0, seg_h * 2, 0.6, chit)   # cabeza el DOBLE de altura
 if A.get("head") == 2:      # mandíbulas
     for s in (-1, 1):
         a1 = P2(xC + s*5, y0-11); a2 = P2(xC + s*9, y0-19)
@@ -134,7 +134,7 @@ if hasTh: add_prism("thorax", hexpts(xC, y1, 12, 12), seg_z0, seg_h*0.92, 0.6, c
 if hasAb:
     if A.get("abdomen") == 1: abpts = [(xC, y2-13), (xC+13, y2-2), (xC, y2+15), (xC-13, y2-2)]
     else: abpts = hexpts(xC, y2, 15, 17)
-    add_prism("abdomen", abpts, seg_z0, seg_h*1.1, 0.62, chit)
+    add_prism("abdomen", abpts, seg_z0, seg_h*2.2, 0.62, chit)   # cola (abdomen) el DOBLE de altura
 
 # conectores (cintura)
 midz = seg_z0 + seg_h*0.5
