@@ -146,7 +146,7 @@ ok('potencia: puro 1.0, subelemento/triple débiles al nacer y más potentes al 
   assert.equal(Math.round(elementMult('agua+fuego', 4) * 100), 150);          // subelemento legendaria ×1.5
   assert.equal(Math.round(elementMult('agua+fuego+planta', 4) * 100), 200);   // triple legendaria ×2.0
   assert.ok(elementMult('agua+fuego+planta', 0) < 0.7);                       // triple "común" muy débil (héroe débil)
-  assert.equal(Math.round(elementMult('fuego+fuego', 4) * 100), 110);         // puro acumulado: bonus convergente +0.1
+  assert.equal(elementMult('fuego+fuego', 4), 1);                             // acumular duplicados NO da poder (por rareza, no cantidad)
 });
 
 ok('capacidad por rareza + recorte determinista (degradado)', () => {

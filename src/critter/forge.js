@@ -70,18 +70,17 @@ export function clampElement (element, rarityIndex) {
   return canonEl(kept);
 }
 
-// POTENCIA del elemento (multiplica el presupuesto de stats). PURO = 1.00. Mezclar da
-// más elementos distintos = más techo, PERO "héroe débil": penalizado al nacer y se
-// realiza al MADURAR (rareza). Los duplicados suman CONVERGENTE (acumular de más = desperdicio).
+// POTENCIA del elemento (multiplica el presupuesto de stats). Depende SOLO de la
+// RAREZA y de cuántos elementos DISTINTOS tiene (puro/sub/triple), NO de la cantidad
+// de ingredientes: PURO = 1.00; mezclar da más techo pero "héroe débil" (penalizado al
+// nacer, se realiza al MADURAR por rareza). Acumular duplicados NO da poder (solo cambia
+// el nombre/grado) → amontonar de más es desperdicio.
 export function elementMult (element, rarityIndex = 0) {
-  const all = String(element).split('+').filter(e => ELEMENTS.includes(e));
-  const distinct = new Set(all).size || 1;
-  const extra = Math.max(0, all.length - distinct);
+  const distinct = new Set(String(element).split('+').filter(e => ELEMENTS.includes(e))).size || 1;
   const mat = Math.max(0, Math.min(4, rarityIndex)) / 4;
   const reward = 0.5 * (distinct - 1) * mat;          // subelemento/triple más potentes al madurar
   const penalty = 0.4 * (distinct - 1) * (1 - mat);   // débil al nacer (mezcladas)
-  const grade = 0.2 * (1 - Math.pow(0.5, extra));     // acumulación convergente (tope +0.2)
-  return Math.max(0.2, 1 - penalty + reward + grade);
+  return Math.max(0.2, 1 - penalty + reward);
 }
 
 // Cuerpo común: dados elemento/rol/apariencia, deriva rareza (por partes), stats,
