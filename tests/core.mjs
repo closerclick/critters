@@ -135,13 +135,14 @@ ok('subelemento: ventajas de ambos, sin sumar debilidades', () => {
   assert.equal(typeMultiplier('fuego', 'agua+fuego'), 1);       // defendiendo: el dual resiste (sin extra debilidad)
 });
 
-ok('catálogo de nombres: arquetipo + grado por acumulación', () => {
-  assert.equal(elementInfo('fuego').es, 'Fuego');                    // base, grado 1 → sin sufijo
-  assert.equal(elementInfo('fuego+fuego').es, 'Fuego II');           // acumulado
-  assert.equal(elementInfo('agua+fuego').es, 'Vapor');              // subelemento nombrado
-  assert.equal(elementInfo('agua+fuego+planta').es, 'Prisma');      // avanzado
-  assert.equal(elementInfo('agua+agua+fuego+planta').es, 'Prisma II'); // prisma acumulado
-  assert.equal(typeMultiplier('agua+agua+fuego+planta', 'planta'), 1.25); // combate por ingredientes (no por grado)
+ok('catálogo de 36 nombres: combinación + intensidad por acumulación', () => {
+  assert.equal(elementInfo('fuego').es, 'Brasa');                    // base, intensidad 0
+  assert.equal(elementInfo('fuego+fuego').es, 'Llama');             // fuego acumulado
+  assert.equal(elementInfo('agua+fuego').es, 'Vaho');              // subelemento mínimo
+  assert.equal(elementInfo('agua+fuego+fuego').es, 'Vapor');       // subelemento acumulado
+  assert.equal(elementInfo('agua+fuego+planta').es, 'Amalgama');   // triple (ápice, sin Prisma)
+  assert.equal(elementInfo('agua+agua+fuego+planta').es, 'Quimera'); // triple acumulado
+  assert.equal(typeMultiplier('agua+agua+fuego+planta', 'planta'), 1.25); // combate por ingredientes (no por nombre)
 });
 
 // Muestra: imprime un resumen de una batalla para inspección manual.

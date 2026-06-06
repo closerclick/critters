@@ -51,17 +51,24 @@ export function typeMultiplier (att, def) {
 const hx = (h) => { h = String(h).replace('#', ''); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16) || 0); };
 const rgbHex = (r, g, b) => '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
 
-// Catálogo de nombres: arquetipo por conjunto de ingredientes DISTINTOS + GRADO romano.
-const DUAL_NAMES = {
-  'agua+fuego': { es: 'Vapor', en: 'Steam' },
-  'fuego+planta': { es: 'Ceniza', en: 'Ash' },
-  'agua+planta': { es: 'Pantano', en: 'Marsh' },
+// Catálogo de 36 NOMBRES alusivos a la combinación + intensidad (acumulación):
+// 3 bases × 4 · 3 subelementos × 6 · 1 triple × 6 = 36. La clave es el conjunto de
+// ingredientes DISTINTOS (canónico, ordenado); el índice es cuánto se acumuló.
+const ELEMENT_NAMES = {
+  // bases (4 intensidades)
+  fuego:  [['Brasa', 'Ember'], ['Llama', 'Flame'], ['Hoguera', 'Bonfire'], ['Infierno', 'Inferno']],
+  agua:   [['Rocío', 'Dew'], ['Marea', 'Tide'], ['Torrente', 'Torrent'], ['Abismo', 'Abyss']],
+  planta: [['Brote', 'Sprout'], ['Enredadera', 'Vine'], ['Selva', 'Jungle'], ['Ancestral', 'Elderwood']],
+  // subelementos (6 intensidades)
+  'agua+fuego':   [['Vaho', 'Haze'], ['Vapor', 'Steam'], ['Géiser', 'Geyser'], ['Tormenta', 'Storm'], ['Tifón', 'Typhoon'], ['Cataclismo', 'Cataclysm']],          // fuego + agua
+  'fuego+planta': [['Rescoldo', 'Cinder'], ['Ceniza', 'Ash'], ['Incendio', 'Wildfire'], ['Pira', 'Pyre'], ['Magma', 'Magma'], ['Volcán', 'Volcano']],               // fuego + planta
+  'agua+planta':  [['Musgo', 'Moss'], ['Limo', 'Silt'], ['Pantano', 'Marsh'], ['Ciénaga', 'Bog'], ['Manglar', 'Mangrove'], ['Diluvio', 'Deluge']],                  // agua + planta
+  // triple (6 intensidades) — el ápice, sin "Prisma"
+  'agua+fuego+planta': [['Amalgama', 'Amalgam'], ['Quimera', 'Chimera'], ['Vórtice', 'Vortex'], ['Génesis', 'Genesis'], ['Edén', 'Eden'], ['Gaia', 'Gaia']],
 };
-const TRIPLE_NAME = { es: 'Prisma', en: 'Prism' };
-const ROMAN = ['', '', 'II', 'III', 'IV', 'V', 'VI'];
 
-/** Etiqueta/colores de un elemento: arquetipo (por sus ingredientes base distintos) +
- *  GRADO según cuántos ingredientes acumuló; color promediado por proporción. */
+/** Etiqueta/colores de un elemento: NOMBRE del catálogo (combinación + intensidad por
+ *  acumulación); color promediado por proporción de ingredientes. */
 export function elementInfo (el) {
   const all = comps(el).filter(c => ELEMENT_INFO[c]);
   if (!all.length) return ELEMENT_INFO.fuego;
@@ -70,11 +77,10 @@ export function elementInfo (el) {
   for (const c of all) { const i = ELEMENT_INFO[c]; const [x, y, z] = hx(i.color); const [x2, y2, z2] = hx(i.color2); r += x; g += y; b += z; r2 += x2; g2 += y2; b2 += z2; }
   const color = rgbHex(r / all.length, g / all.length, b / all.length);
   const color2 = rgbHex(r2 / all.length, g2 / all.length, b2 / all.length);
-  let base;
-  if (distinct.length === 1) base = ELEMENT_INFO[distinct[0]];
-  else if (distinct.length >= 3) base = TRIPLE_NAME;
-  else base = DUAL_NAMES[distinct.join('+')] || { es: distinct.map(d => ELEMENT_INFO[d].es).join('/'), en: distinct.map(d => ELEMENT_INFO[d].en).join('/') };
-  const grade = all.length - distinct.length + 1;   // 1 = forma mínima; sube al acumular
-  const suf = grade > 1 ? ' ' + (grade <= 6 ? ROMAN[grade] : grade) : '';
-  return { es: base.es + suf, en: base.en + suf, color, color2, sub: distinct.length > 1, grade, distinct };
+  const names = ELEMENT_NAMES[distinct.join('+')];
+  const intensity = all.length - distinct.length;   // 0 = forma mínima; sube al acumular ingredientes
+  let label;
+  if (names) label = { es: names[Math.min(intensity, names.length - 1)][0], en: names[Math.min(intensity, names.length - 1)][1] };
+  else label = { es: distinct.map(d => ELEMENT_INFO[d].es).join('/'), en: distinct.map(d => ELEMENT_INFO[d].en).join('/') };
+  return { es: label.es, en: label.en, color, color2, sub: distinct.length > 1, intensity, distinct };
 }
