@@ -75,6 +75,36 @@ function onMove (e) {
 function onUp (e) { pointers.delete(e.pointerId); if (pointers.size < 2) pinchStart = null; if (pointers.size === 0) panStart = null; }
 function onWheel (e) { setZoom(zoom.value * (e.deltaY < 0 ? 1.12 : 1 / 1.12)); }
 function play (n) { if (movedFlag) { movedFlag = false; return; } if (unlocked(n.id)) emit('fight', n.id); }
+
+// TERRENO como REGIONES de fondo (Voronoi): cada celda es el área más cercana a un nodo; sus
+// bordes son los bisectores (PUNTOS MEDIOS entre niveles). Se pintan las celdas con terreno
+// (las neutrales quedan sin pintar) → zonas contiguas que envuelven áreas enteras de niveles.
+const TERR_MARGIN = 1.3 * RING_GAP;
+function clipHalf (poly, P, Q) {   // recorta `poly` al semiplano más cercano a P que a Q (Sutherland–Hodgman)
+  const mx = (P.x + Q.x) / 2, my = (P.y + Q.y) / 2, nx = Q.x - P.x, ny = Q.y - P.y;
+  const side = (p) => (p.x - mx) * nx + (p.y - my) * ny;   // <= 0 → lado de P
+  const out = [];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], b = poly[(i + 1) % poly.length], da = side(a), db = side(b);
+    if (da <= 0) out.push(a);
+    if ((da <= 0) !== (db <= 0)) { const t = da / (da - db); out.push({ x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) }); }
+  }
+  return out;
+}
+const terrainCells = computed(() => {
+  const ns = nodes.value; if (ns.length < 2) return [];
+  let mnx = Infinity, mny = Infinity, mxx = -Infinity, mxy = -Infinity;
+  for (const n of ns) { if (n.x < mnx) mnx = n.x; if (n.y < mny) mny = n.y; if (n.x > mxx) mxx = n.x; if (n.y > mxy) mxy = n.y; }
+  const box = [{ x: mnx - TERR_MARGIN, y: mny - TERR_MARGIN }, { x: mxx + TERR_MARGIN, y: mny - TERR_MARGIN }, { x: mxx + TERR_MARGIN, y: mxy + TERR_MARGIN }, { x: mnx - TERR_MARGIN, y: mxy + TERR_MARGIN }];
+  const out = [];
+  for (const P of ns) {
+    if (!P.terrain) continue;
+    let poly = box;
+    for (const Q of ns) { if (Q !== P) { poly = clipHalf(poly, P, Q); if (poly.length < 3) break; } }
+    if (poly.length >= 3) out.push({ key: P.id, color: elementInfo(P.terrain).color, points: poly.map(p => p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ') });
+  }
+  return out;
+});
 </script>
 
 <template>
@@ -83,10 +113,11 @@ function play (n) { if (movedFlag) { movedFlag = false; return; } if (unlocked(n
   <div class="webwrap">
     <svg ref="svgEl" :viewBox="viewBox" class="web" preserveAspectRatio="xMidYMid meet"
          @wheel.prevent="onWheel" @pointerdown="onDown" @pointermove="onMove" @pointerup="onUp" @pointercancel="onUp">
+      <!-- TERRENO: regiones de fondo (Voronoi) que envuelven áreas de niveles -->
+      <polygon v-for="c in terrainCells" :key="c.key" :points="c.points" :fill="c.color" :stroke="c.color" class="terr-cell" />
       <line v-for="(e, i) in E" :key="i" :x1="nmap[e[0]].x" :y1="nmap[e[0]].y" :x2="nmap[e[1]].x" :y2="nmap[e[1]].y"
             class="thread" :class="{ on: access(e[0]) && access(e[1]) }" />
       <g v-for="n in nodes" :key="n.id" class="node" :class="nodeCls(n)" @click="play(n)">
-        <circle v-if="terrainShow(n)" :cx="n.x" :cy="n.y" :r="nodeR(n) + 11" :fill="terrainShow(n)" opacity="0.16" />
         <circle :cx="n.x" :cy="n.y" :r="nodeR(n) + 9" fill="transparent" />
         <circle :cx="n.x" :cy="n.y" :r="nodeR(n)" class="dot" :style="terrainShow(n) ? { stroke: terrainShow(n) } : {}" />
         <text v-if="n.id !== 'core'" :x="n.x" :y="n.y + 6" class="lab">{{ access(n.id) ? (n.boss ? '★' : n.diff) : '🔒' }}</text>
@@ -110,6 +141,7 @@ function play (n) { if (movedFlag) { movedFlag = false; return; } if (unlocked(n
 .web{width:100%;height:100%;display:block;touch-action:none;cursor:grab;
   background:radial-gradient(circle at 50% 50%, rgba(167,139,250,.06), transparent 70%);border-radius:16px}
 .web:active{cursor:grabbing}
+.terr-cell{opacity:.17;stroke-width:1.5}   /* regiones de terreno; el stroke del mismo color tapa costuras entre celdas iguales */
 .thread{stroke:rgba(167,139,250,.12);stroke-width:3}
 .thread.on{stroke:rgba(167,139,250,.5);stroke-width:4}
 .node{cursor:default}
