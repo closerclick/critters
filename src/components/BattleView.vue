@@ -14,7 +14,8 @@ const emit = defineEmits(['close', 'next']);
 const U = reactive({});           // uid → estado vivo
 const list = ref([]);             // uids para render
 const finished = ref(false);
-let timer = null, i = 0, alive = true;
+let timer = null, endTimer = null, i = 0, alive = true, ended = false;
+const modalHidden = ref(false);   // "Ver campo": oculta el modal de resultado para mirar el campo
 
 // Velocidad de reproducción (compartida/persistida; se elige en el modal de encuentro).
 // El replay apunta a ~8 s a 1×; 2×/5×/10× dividen el intervalo por evento.
@@ -51,17 +52,25 @@ function applyEv (ev, silent) {
   else if (ev.t === 'active') { if (!silent) sfx.active(); }
   else if (ev.t === 'faint') { if (u) { u.hp = 0; u.dead = true; if (!silent) sfx.faint(); } }
 }
-function step () { const log = res().log; if (i >= log.length) { finish(); return; } applyEv(log[i++]); }
-function finish () {
-  clearInterval(timer); timer = null; finished.value = true;
-  if (props.payload.win) { sfx.victory(); if (props.payload.captured) setTimeout(() => sfx.capture(), 500); }
-  else sfx.defeat();
+function step () { const log = res().log; if (i >= log.length) { endBattle(); return; } applyEv(log[i++]); }
+function playOutcome () { if (props.payload.win) { sfx.victory(); if (props.payload.captured) setTimeout(() => { if (alive) sfx.capture(); }, 800); } else sfx.defeat(); }
+// El replay terminó: suena el jingle y se deja ~3 s viendo el campo antes del modal.
+function endBattle () {
+  if (ended) return; ended = true;
+  clearInterval(timer); timer = null;
+  playOutcome();
+  clearTimeout(endTimer); endTimer = setTimeout(() => { if (alive) finished.value = true; }, 3000);
 }
-function skip () { if (finished.value) return; const log = res().log; while (i < log.length) applyEv(log[i++], true); finish(); }
-function start () { initUnits(); finished.value = false; i = 0; clearInterval(timer); baseMs = Math.max(60, Math.min(260, Math.round(8000 / Math.max(1, res().log.length)))); timer = setInterval(step, curMs()); }
+function skip () { if (finished.value || ended) return; const log = res().log; while (i < log.length) applyEv(log[i++], true); endBattle(); }
+function onArena () {
+  if (finished.value) { if (modalHidden.value) modalHidden.value = false; return; }   // modal oculto → restaurar
+  if (ended) { clearTimeout(endTimer); finished.value = true; return; }                // saltar la pausa de 3 s
+  skip();                                                                              // saltar el replay
+}
+function start () { initUnits(); finished.value = false; modalHidden.value = false; ended = false; i = 0; clearInterval(timer); clearTimeout(endTimer); baseMs = Math.max(120, Math.min(500, Math.round(16000 / Math.max(1, res().log.length)))); timer = setInterval(step, curMs()); }
 
 onMounted(start);
-onUnmounted(() => { alive = false; clearInterval(timer); });
+onUnmounted(() => { alive = false; clearInterval(timer); clearTimeout(endTimer); });
 watch(() => props.payload, start);
 watch(speed, () => { if (timer) { clearInterval(timer); timer = setInterval(step, curMs()); } });   // aplica el cambio de velocidad en vivo
 
@@ -95,7 +104,7 @@ const summary = computed(() => {
     <closer-click-back class="battle-back" style="--cc-back-size:32px;color:var(--text)"></closer-click-back>
     <h2>{{ t('campana') }} · {{ payload.boss ? 'BOSS ★' : (t('nivel') + ' ' + payload.level) }}</h2>
     <div v-if="terrainInfo" class="bterrain" :style="{ color: terrainInfo.color }">🌍 {{ loc(terrainInfo) }} · {{ t('favorece') }}</div>
-    <div class="arena" @click="skip">
+    <div class="arena" @click="onArena">
       <div class="field" :style="terrainInfo ? { '--terr': terrainInfo.color } : {}">
         <div class="zone you"></div><div class="zone foe"></div>
         <svg class="trails" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -118,7 +127,7 @@ const summary = computed(() => {
     </div>
   </div>
 
-  <div class="result-modal" v-if="finished">
+  <div class="result-modal" v-if="finished && !modalHidden">
     <div class="result-card" :class="outcome">
       <div class="rc-title" :class="outcome">{{ outcome === 'win' ? t('victoria') : (outcome === 'lose' ? t('derrota') : t('empate')) }}</div>
       <div class="rc-rewards" v-if="payload.win">
@@ -145,10 +154,13 @@ const summary = computed(() => {
 
       <div class="rc-btns">
         <button class="btn sec" @click="start">↻ {{ t('repetir') }}</button>
+        <button class="btn sec" @click="modalHidden = true">👁 {{ t('verCampo') }}</button>
         <button class="btn" @click="emit('close')">{{ t('alMapa') }}</button>
       </div>
     </div>
   </div>
+
+  <button v-if="finished && modalHidden" class="show-modal" @click="modalHidden = false">{{ t('resumen') }} ▸</button>
 </template>
 
 <style scoped>
@@ -173,6 +185,7 @@ const summary = computed(() => {
 .hpbar{width:80%;height:4px;background:rgba(7,6,17,.85);border-radius:3px;overflow:hidden;margin-top:1px}
 .hpbar i{display:block;height:100%;background:linear-gradient(90deg,#4ade80,#a3e635);transition:width .22s}
 .hpbar.low i{background:linear-gradient(90deg,#ff5d6c,#fb923c)}
+.fu.foe .hpbar i{background:linear-gradient(90deg,#ef4444,#b91c1c)}   /* rivales: HP en rojo */
 .dmgnum{position:absolute;top:-2px;font-family:var(--fdisplay);font-weight:900;font-size:14px;color:#fff;text-shadow:0 2px 6px #000;pointer-events:none;animation:rise .7s ease-out forwards;z-index:4}
 .dmgnum.crit{color:var(--gold);font-size:17px}
 .dmgnum.heal{color:#86efac}
@@ -211,4 +224,7 @@ const summary = computed(() => {
 .spd-btn{font-family:var(--fmono);font-weight:800;font-size:12px;padding:5px 11px;border-radius:9px;border:1px solid var(--line2);
   background:rgba(167,139,250,.08);color:var(--muted);min-width:40px}
 .spd-btn.on{background:var(--accent2);border-color:var(--accent);color:#fff;box-shadow:0 0 10px color-mix(in srgb,var(--accent) 55%,transparent)}
+.show-modal{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 16px);transform:translateX(-50%);z-index:36;
+  font-family:var(--fdisplay);font-weight:800;font-size:13px;padding:9px 18px;border-radius:12px;border:1px solid var(--accent);
+  background:var(--accent2);color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.5)}
 </style>

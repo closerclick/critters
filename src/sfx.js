@@ -71,6 +71,18 @@ export function heal () { if (muted) return; try { tone({ freq: 520, to: 760, du
 export function active () { if (muted) return; try { noise({ dur: 0.22, gain: 0.18, type: 'bandpass', freq: 600, to: 3000, q: 0.6 }); tone({ freq: 220, to: 660, dur: 0.18, type: 'sawtooth', gain: 0.14 }); } catch {} }
 export function summon () { if (muted) return; try { [523, 659, 880].forEach((f, i) => tone({ freq: f, dur: 0.16, type: 'triangle', gain: 0.18, delay: i * 0.08 })); tone({ freq: 1320, dur: 0.25, type: 'sine', gain: 0.12, delay: 0.24 }); } catch {} }
 export function capture () { if (muted) return; try { tone({ freq: 660, dur: 0.12, type: 'triangle', gain: 0.18 }); tone({ freq: 990, dur: 0.2, type: 'triangle', gain: 0.16, delay: 0.1 }); } catch {} }
-export function victory () { if (muted) return; try { [523, 659, 784, 1046].forEach((f, i) => tone({ freq: f, dur: 0.18, type: 'triangle', gain: 0.2, delay: i * 0.11 })); } catch {} }
-export function defeat () { if (muted) return; try { tone({ freq: 330, to: 196, dur: 0.5, type: 'sawtooth', gain: 0.2 }); tone({ freq: 196, to: 110, dur: 0.6, type: 'sine', gain: 0.16, delay: 0.18 }); } catch {} }
+export function victory () {
+  if (muted) return;
+  try {
+    [[523, 0, 0.16], [659, 0.12, 0.16], [784, 0.24, 0.16], [1046, 0.40, 0.55]].forEach(([f, d, dur]) => tone({ freq: f, dur, type: 'triangle', gain: 0.22, delay: d }));
+    [1046, 1318, 1568].forEach(f => tone({ freq: f, dur: 0.55, type: 'sine', gain: 0.11, delay: 0.40 }));   // acorde final brillante
+  } catch {}
+}
+export function defeat () {
+  if (muted) return;
+  try {
+    [[440, 0, 0.22], [392, 0.20, 0.22], [330, 0.40, 0.26], [262, 0.62, 0.7]].forEach(([f, d, dur]) => tone({ freq: f, dur, type: 'sawtooth', gain: 0.18, delay: d }));
+    tone({ freq: 131, to: 98, dur: 0.9, type: 'sine', gain: 0.14, delay: 0.62 });   // bajo grave que cae
+  } catch {}
+}
 export function tap () { if (muted) return; try { tone({ freq: 320, dur: 0.05, type: 'square', gain: 0.08 }); } catch {} }
