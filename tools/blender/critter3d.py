@@ -154,19 +154,11 @@ add_area("key", (3.5, 4.5, 5.5), 350, 4)        # frente (+Y, lado de la cara)
 add_area("fill", (-4.5, 3, 3), 110, 5)
 add_area("rim", (-2.5, -5.5, 3.5), 600, 4, (1.0, 0.55, 0.35))   # atrás (-Y), rim cálido
 
-# encuadre automático: bbox de todo el critter → cámara 3/4 que lo enmarca completo
-mn = Vector((1e9, 1e9, 1e9)); mx = -mn
-for ob in bpy.context.scene.objects:
-    if ob.type in ('MESH', 'CURVE'):
-        for c in ob.bound_box:
-            wv = ob.matrix_world @ Vector(c)
-            mn = Vector(map(min, mn, wv)); mx = Vector(map(max, mx, wv))
-center = (mn + mx) / 2; maxdim = max((mx - mn))
+# CÁMARA: posición fijada a mano en la GUI (registrada con dump_blend.py, 2026-06-06).
 cam_d = bpy.data.cameras.new("cam"); cam = bpy.data.objects.new("cam", cam_d); bpy.context.collection.objects.link(cam)
-cam_d.lens = 60
-dirv = Vector((0.5, 1.0, 0.42)).normalized()   # lado de la CARA (+Y): se ven ojos/mandíbulas
-cam.location = center + dirv * (maxdim * 1.7 + 1.6)
-look = center - cam.location; cam.rotation_euler = look.to_track_quat('-Z', 'Y').to_euler()
+cam_d.lens = 60.0
+cam.location = (6.6532, 12.8566, 3.6338)
+cam.rotation_euler = (math.radians(77.36), math.radians(0.0), math.radians(152.54))
 bpy.context.scene.camera = cam
 
 w = bpy.data.worlds.new("w"); bpy.context.scene.world = w; w.use_nodes = True
