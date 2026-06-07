@@ -62,6 +62,8 @@ watch(battle, (b) => { if (b && !battleNav) battleNav = nav.open(() => closeBatt
 // asíncrona del back al abrir la batalla.
 const encounter = ref(null);
 function onFightRequest (n) { encounter.value = n; }
+// Nodo bloqueado por GATE de terreno: toast con las estrellas que faltan (no abre el encuentro).
+function onGated ({ need, have }) { showToast(t('gateFaltan').replace('{n}', Math.max(0, need - have))); }
 function onEncounterClose () { encounter.value = null; }
 function startEncounter () { const id = encounter.value; encounter.value = null; fight(id); }
 
@@ -99,7 +101,7 @@ watch(() => ui.detailUid, (v) => { if (v && !detailNav) detailNav = nav.open(() 
   </nav>
 
   <main class="view" v-if="game.ready">
-    <CampaignView v-if="tab === 'campana'" @fight="onFightRequest" />
+    <CampaignView v-if="tab === 'campana'" @fight="onFightRequest" @gated="onGated" />
     <TeamView v-else-if="tab === 'equipo'" />
     <CollectionView v-else-if="tab === 'coleccion'" />
     <FusionView v-else-if="tab === 'fusion'" />

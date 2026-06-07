@@ -1,7 +1,7 @@
 // Acciones del juego: invocación (gacha), XP/nivel, gestión del equipo 3×3 y
 // batalla de campaña. Operan sobre el estado reactivo y persisten.
 import { game, persist, newUid, instanceByUid, critterById } from './state.js';
-import { neighbors, nodeById, enemyTeam, reward, captureDrop, nodeBattleSeed, starCycleLimit } from './campaign.js';
+import { neighbors, nodeById, enemyTeam, reward, captureDrop, nodeBattleSeed, starCycleLimit, zoneOpen, starReward, REPLAY_COIN_FACTOR } from './campaign.js';
 import { simulate } from '../battle/engine.js';
 import { xpForNext, pointsFree, totalXp, levelXpFromTotal } from '../critter/forge.js';
 import { canFuse, fuse, fuseKind } from './fusion.js';
@@ -160,7 +160,12 @@ export function fuseCritters (uidA, uidB) {
 }
 
 // ---- telaraña de campaña ----
-export function isUnlocked (id) { return id === 'core' || neighbors(game.seed, id).some(nb => game.cleared.includes(nb)); }
+export function isUnlocked (id) {
+  if (id === 'core') return true;
+  if (game.cleared.includes(id)) return true;   // ya despejado → siempre re-jugable (no se re-bloquea por gate)
+  // frontera topológica (vecino despejado) + GATE por terreno (estrellas suficientes)
+  return neighbors(game.seed, id).some(nb => game.cleared.includes(nb)) && zoneOpen(nodeById(game.seed, id));
+}
 
 /** Pelea el NODO de la telaraña con el equipo actual. */
 export function fightCampaign (nodeId) {
@@ -202,12 +207,22 @@ export function fightCampaign (nodeId) {
     const flawless = !result.log.some(e => e.t === 'faint' && String(e.target).startsWith('0:'));
     const stars = 1 + (fast ? 1 : 0) + (flawless ? 1 : 0);
     if (!game.stars) game.stars = {};
-    game.stars[node.id] = Math.max(game.stars[node.id] || 0, stars);
+    const prevStars = game.stars[node.id] || 0;
+    const bestStars = Math.max(prevStars, stars);
+    const newStars = Math.max(0, bestStars - prevStars);   // estrellas de RÉCORD ganadas en esta pelea
+    game.stars[node.id] = bestStars;
     payload.stars = stars;
     payload.starInfo = { fast, flawless, limit, cycles: result.cycles };
-    const rw = reward(node);
-    game.wallet.coins += rw.coins; game.wallet.frags += rw.frags;
+    // Recompensa base: COMPLETA al 1er despeje; REDUCIDA al re-pelear (anti-farm, sin fragmentos).
+    const base = reward(node);
+    const rw = firstClear ? base : { coins: Math.round(base.coins * REPLAY_COIN_FACTOR), frags: 0 };
+    // Bono ÚNICO por estrellas NUEVAS de récord (no se repite si no mejorás).
+    const starBonus = newStars > 0 ? starReward(node, newStars) : 0;
+    game.wallet.coins += rw.coins + starBonus; game.wallet.frags += rw.frags;
     payload.reward = rw;
+    payload.starBonus = starBonus;
+    payload.newStars = newStars;
+    payload.replay = !firstClear;
     if (firstClear) {
       game.cleared.push(node.id);
       payload.firstClear = true;

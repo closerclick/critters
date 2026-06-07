@@ -196,7 +196,8 @@ const summary = computed(() => {
       </div>
       <div class="rc-rewards" v-if="payload.win">
         <span v-if="payload.reward" class="rc-chip coin">+🪙 {{ payload.reward.coins }}</span>
-        <span v-if="payload.reward" class="rc-chip frag">+🔹 {{ payload.reward.frags }}</span>
+        <span v-if="payload.reward && payload.reward.frags" class="rc-chip frag">+🔹 {{ payload.reward.frags }}</span>
+        <span v-if="payload.starBonus" class="rc-chip star">★ +🪙 {{ payload.starBonus }} · {{ t('nuevoRecord') }}</span>
         <span v-if="payload.captured" class="rc-chip cap">✨ {{ critterById(payload.captured.id).name }}</span>
       </div>
 
@@ -291,6 +292,7 @@ const summary = computed(() => {
 .rc-rewards{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:12px}
 .rc-chip{font-family:var(--fmono);font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;border:1px solid var(--line2);background:rgba(167,139,250,.08)}
 .rc-chip.coin{color:var(--gold)} .rc-chip.frag{color:var(--cyan)} .rc-chip.cap{color:#e9d5ff}
+.rc-chip.star{color:var(--gold);border-color:color-mix(in srgb,var(--gold) 45%,var(--line2));background:rgba(245,158,11,.12)}
 .rtable{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:14px;background:rgba(7,6,17,.35)}
 .rt-head,.rt-row{display:grid;grid-template-columns:1fr 64px 52px 56px;align-items:center;gap:4px;padding:7px 10px}
 .rt-head{font-family:var(--fdisplay);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);background:rgba(167,139,250,.08);border-bottom:1px solid var(--line)}

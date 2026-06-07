@@ -7,7 +7,7 @@ import { rngFrom } from '../lib/rng.js';
 import { battleSeed } from '../battle/engine.js';
 import { makeCritter, autoAlloc } from '../critter/forge.js';
 import { ELEMENTS } from '../critter/types.js';
-import { game } from './state.js';
+import { game, totalStars } from './state.js';
 
 export const SLOTS5 = [4, 0, 2, 6, 8];
 const BASE = 5, GROWTH = 2;            // anillo r tiene BASE+(r-1)*GROWTH nodos
@@ -33,12 +33,20 @@ function sectorsForBand (band) {
   for (let r = band * TERR_BANDS + 1; r <= band * TERR_BANDS + TERR_BANDS; r++) total += nodesInRing(r);
   return Math.max(1, Math.round(total / TERR_ZONE));
 }
-function terrainFor (seed, n) {
+// Clave de ZONA de terreno (banda × sector): identidad estable de la región Voronoi.
+// `core` (ring 0) no pertenece a ninguna zona.
+export function zoneKeyOf (n) {
+  if (!n || n.ring === 0) return null;
   const band = Math.floor((n.ring - 1) / TERR_BANDS);
   const sectors = sectorsForBand(band);
   const ang = (Math.atan2(n.y, n.x) / (Math.PI * 2) + 1) % 1;
   const sector = Math.floor(ang * sectors) % sectors;
-  const rng = rngFrom(seed + ':terr:' + band + ':' + sector);
+  return band + ':' + sector;
+}
+function terrainFor (seed, n) {
+  const key = zoneKeyOf(n);
+  if (!key) return null;
+  const rng = rngFrom(seed + ':terr:' + key);   // mismo string que antes (band:sector) → layout idéntico
   if (rng() < 0.25) return null;   // mayormente con terreno; algún bolsón neutral
   return ELEMENTS[Math.floor(rng() * ELEMENTS.length)];
 }
@@ -58,15 +66,26 @@ function build (seed, RINGS) {
     }
     ringNodes.push(arr); nodes.push(...arr);
   }
-  // dificultad + jefes (índice global ESTABLE al crecer) + terreno
-  const bossOff = Math.floor(rngFrom(seed + ':boss')() * 10);
-  nodes.forEach((n, idx) => {
+  // dificultad + terreno por nodo
+  nodes.forEach((n) => {
     if (n.ring === 0) return;
     n.diff = Math.max(1, (n.ring - 1) * 2 + 1 + Math.floor(rngFrom(seed + ':d:' + n.id)() * 2));   // anillo 1 = diff 1-2 (onboarding suave)
-    n.boss = idx % 10 === bossOff;
-    if (n.boss) n.diff = Math.round(n.diff * 1.6) + 2;
+    n.boss = false;
     n.terrain = terrainFor(seed, n);
   });
+  // JEFES: cada ZONA (banda × sector, INCLUIDAS las neutrales) tiene AL MENOS un boss. Se elige
+  // determinista entre los nodos de la zona en el anillo INTERNO de su banda (band 0 → anillo 3,
+  // para no poner boss en el onboarding) → estable aunque la telaraña crezca de forma perezosa.
+  const zoneMap = new Map();
+  for (const n of nodes) { if (n.ring === 0) continue; const k = zoneKeyOf(n); if (!zoneMap.has(k)) zoneMap.set(k, []); zoneMap.get(k).push(n); }
+  for (const [k, zn] of zoneMap) {
+    const band = +k.split(':')[0];
+    const bossRing = band === 0 ? 3 : band * TERR_BANDS + 1;
+    let cands = zn.filter(n => n.ring === bossRing);
+    if (!cands.length) { const minR = Math.min(...zn.map(n => n.ring)); cands = zn.filter(n => n.ring === minR); }
+    const pick = cands[Math.floor(rngFrom(seed + ':zboss:' + k)() * cands.length)];
+    if (pick) { pick.boss = true; pick.diff = Math.round(pick.diff * 1.6) + 2; }
+  }
   // adyacencia: circular dentro del anillo + radial al ángulo más cercano del interior
   const adj = {}; nodes.forEach(n => (adj[n.id] = new Set()));
   const link = (a, b) => { adj[a].add(b); adj[b].add(a); };
@@ -106,6 +125,39 @@ export function enemyTeam (node, seed) {
   return out;
 }
 export function reward (node) { const d = node.diff, m = node.boss ? 2.5 : 1; return { coins: Math.round((30 + d * 10) * m), frags: Math.round((1 + Math.floor(d / 3)) * m) }; }
+
+// ---- GATE por terreno: las estrellas son la LLAVE ----
+// Estrellas TOTALES (peleando + bonus de referidos) necesarias para entrar a la zona del nodo.
+// Escala por profundidad (anillo interno de la banda). Zonas neutrales (sin elemento) y el core: libres.
+export function zoneReqOf (n) {
+  if (!n || n.ring === 0 || !n.terrain) return 0;
+  const band = Math.floor((n.ring - 1) / TERR_BANDS);
+  return band * TERR_BANDS * 4;   // = (anilloInterno-1)*4 estrellas totales
+}
+export function zoneOpen (n) { return totalStars() >= zoneReqOf(n); }
+
+// Nodos VISIBLES: solo las zonas de terreno ya alcanzadas + sus zonas vecinas (se "destapan"
+// TERRENOS, no anillos enteros). El core y los nodos despejados siempre se ven.
+export function visibleNodeIds (seed) {
+  const g = graph(seed);
+  const disc = new Set();
+  const around = (id) => {
+    const n = g.byId[id]; if (!n) return;
+    const z = zoneKeyOf(n); if (z) disc.add(z);
+    for (const nb of g.adj[id] || []) { const zz = zoneKeyOf(g.byId[nb]); if (zz) disc.add(zz); }
+  };
+  around('core');
+  for (const id of (game.cleared || [])) around(id);
+  const out = new Set(['core']);
+  for (const n of g.nodes) { const z = zoneKeyOf(n); if (z && disc.has(z)) out.add(n.id); }
+  for (const id of (game.cleared || [])) out.add(id);
+  return out;
+}
+
+// Monedas al re-pelear un nivel ya despejado (anti-farm) + bono ÚNICO por estrellas NUEVAS de récord
+// (escala por dificultad; boss ×2.5).
+export const REPLAY_COIN_FACTOR = 0.3;
+export function starReward (node, count) { const m = node.boss ? 2.5 : 1; return Math.round((15 + node.diff * 5) * m) * Math.max(0, count); }
 export function captureDrop (node, seed) {
   if (!(node.boss || rngFrom('cap:' + seed + ':' + node.id)() < 0.6)) return null;
   const team = enemyTeam(node, seed);   // la captura es uno de los enemigos reales (nativo del terreno)

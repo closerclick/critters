@@ -1,27 +1,33 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { game } from '../game/state.js';
+import { game, totalStars } from '../game/state.js';
 import { teamCount, isUnlocked } from '../game/actions.js';
-import { allNodes, edges, RING_GAP } from '../game/campaign.js';
+import { allNodes, edges, RING_GAP, zoneReqOf, zoneOpen, visibleNodeIds } from '../game/campaign.js';
 import { elementInfo } from '../critter/types.js';
 import { t, loc } from '../i18n.js';
 
-const emit = defineEmits(['fight']);
+const emit = defineEmits(['fight', 'gated']);
 const nodes = computed(() => allNodes(game.seed));
 const nmap = computed(() => Object.fromEntries(nodes.value.map(n => [n.id, n])));
 const E = computed(() => edges(game.seed));
 
 const cleared = (id) => game.cleared.includes(id);
 const unlocked = (id) => isUnlocked(id);
+const visible = computed(() => visibleNodeIds(game.seed));
+const isVisible = (id) => id === 'core' || visible.value.has(id);
+const reqOf = (id) => zoneReqOf(nmap.value[id]);
+const gated = (id) => { const n = nmap.value[id]; if (!n || id === 'core' || cleared(id)) return false; return reqOf(id) > 0 && !zoneOpen(n); };
 const access = (id) => cleared(id) || unlocked(id);
-const nodeCls = (n) => ({ core: n.id === 'core', boss: n.boss, cleared: cleared(n.id), open: unlocked(n.id) && !cleared(n.id), locked: !unlocked(n.id) && !cleared(n.id) });
+const nodeCls = (n) => ({ core: n.id === 'core', boss: n.boss, cleared: cleared(n.id), open: unlocked(n.id) && !cleared(n.id), gated: gated(n.id), locked: !unlocked(n.id) && !cleared(n.id) && !gated(n.id) });
 const starsOf = (id) => (game.stars && game.stars[id]) || 0;
 const starStr = (id) => '★'.repeat(starsOf(id)) + '☆'.repeat(3 - starsOf(id));
+const shownNodes = computed(() => nodes.value.filter(n => isVisible(n.id)));
+const shownEdges = computed(() => E.value.filter(e => isVisible(e[0]) && isVisible(e[1])));
 
 const NR = 22, BR = 26, CR = 28;     // radios de nodo (unidades de mundo)
 const nodeR = (n) => (n.id === 'core' ? CR : (n.boss ? BR : NR));
 const terrainColor = (n) => (n.terrain ? elementInfo(n.terrain).color : null);
-const terrainShow = (n) => (n.terrain && access(n.id)) ? elementInfo(n.terrain).color : null;
+const terrainShow = (n) => (n.terrain && isVisible(n.id)) ? elementInfo(n.terrain).color : null;
 
 // Vista paneable que LLENA todo el área: el viewBox toma el aspecto del contenedor
 // (la dimensión menor muestra ~3.4 anillos; la mayor muestra más) → sin recorte ni
@@ -74,7 +80,11 @@ function onMove (e) {
 }
 function onUp (e) { pointers.delete(e.pointerId); if (pointers.size < 2) pinchStart = null; if (pointers.size === 0) panStart = null; }
 function onWheel (e) { setZoom(zoom.value * (e.deltaY < 0 ? 1.12 : 1 / 1.12)); }
-function play (n) { if (movedFlag) { movedFlag = false; return; } if (unlocked(n.id)) emit('fight', n.id); }
+function play (n) {
+  if (movedFlag) { movedFlag = false; return; }
+  if (unlocked(n.id)) emit('fight', n.id);
+  else if (gated(n.id)) emit('gated', { need: reqOf(n.id), have: totalStars() });
+}
 
 // TERRENO como REGIONES de fondo (Voronoi): cada celda es el área más cercana a un nodo; sus
 // bordes son los bisectores (PUNTOS MEDIOS entre niveles). Se pintan las celdas con terreno
@@ -98,7 +108,7 @@ const terrainCells = computed(() => {
   const box = [{ x: mnx - TERR_MARGIN, y: mny - TERR_MARGIN }, { x: mxx + TERR_MARGIN, y: mny - TERR_MARGIN }, { x: mxx + TERR_MARGIN, y: mxy + TERR_MARGIN }, { x: mnx - TERR_MARGIN, y: mxy + TERR_MARGIN }];
   const out = [];
   for (const P of ns) {
-    if (!P.terrain) continue;
+    if (!P.terrain || !isVisible(P.id)) continue;
     let poly = box;
     for (const Q of ns) { if (Q !== P) { poly = clipHalf(poly, P, Q); if (poly.length < 3) break; } }
     if (poly.length >= 3) out.push({ key: P.id, color: elementInfo(P.terrain).color, points: poly.map(p => p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ') });
@@ -125,14 +135,15 @@ const terrainGroups = computed(() => {
       <g v-for="g in terrainGroups" :key="g.color" class="terr-g">
         <polygon v-for="(p, i) in g.polys" :key="i" :points="p" :fill="g.color" :stroke="g.color" />
       </g>
-      <line v-for="(e, i) in E" :key="i" :x1="nmap[e[0]].x" :y1="nmap[e[0]].y" :x2="nmap[e[1]].x" :y2="nmap[e[1]].y"
+      <line v-for="(e, i) in shownEdges" :key="i" :x1="nmap[e[0]].x" :y1="nmap[e[0]].y" :x2="nmap[e[1]].x" :y2="nmap[e[1]].y"
             class="thread" :class="{ on: access(e[0]) && access(e[1]) }" />
-      <g v-for="n in nodes" :key="n.id" class="node" :class="nodeCls(n)" @click="play(n)">
+      <g v-for="n in shownNodes" :key="n.id" class="node" :class="nodeCls(n)" @click="play(n)">
         <circle :cx="n.x" :cy="n.y" :r="nodeR(n) + 9" fill="transparent" />
         <circle :cx="n.x" :cy="n.y" :r="nodeR(n)" class="dot" :style="terrainShow(n) ? { stroke: terrainShow(n) } : {}" />
         <text v-if="n.id !== 'core'" :x="n.x" :y="n.y + 6" class="lab">{{ access(n.id) ? (n.boss ? '★' : n.diff) : '🔒' }}</text>
         <text v-else :x="n.x" :y="n.y + 7" class="lab">◆</text>
         <text v-if="cleared(n.id)" :x="n.x" :y="n.y - nodeR(n) - 7" class="nstars">{{ starStr(n.id) }}</text>
+        <text v-if="gated(n.id)" :x="n.x" :y="n.y + nodeR(n) + 15" class="gatereq">★ {{ totalStars() }}/{{ reqOf(n.id) }}</text>
         <text v-if="n.id === game.lastNode" :x="n.x" :y="n.y - nodeR(n) - 19" class="lastpin">⚑</text>
       </g>
     </svg>
@@ -160,6 +171,10 @@ const terrainGroups = computed(() => {
 .node .lab{font-family:var(--fmono);font-size:18px;text-anchor:middle;dominant-baseline:middle;fill:#e2e8f0;pointer-events:none}
 .node.locked .dot{fill:#1a1633;stroke:rgba(148,163,184,.25)}
 .node.locked .lab{fill:#6b6494}
+.node.gated{cursor:pointer}
+.node.gated .dot{fill:#241d3a;stroke:var(--gold);stroke-dasharray:4 4;opacity:.85}
+.node.gated .lab{fill:var(--gold)}
+.node .gatereq{font-family:var(--fmono);font-size:12px;font-weight:700;text-anchor:middle;dominant-baseline:middle;fill:var(--gold);pointer-events:none}
 .node.open{cursor:pointer}
 .node.open .dot{fill:#241d44;stroke:var(--accent);filter:drop-shadow(0 0 6px var(--accent))}
 .node.cleared{cursor:pointer}
