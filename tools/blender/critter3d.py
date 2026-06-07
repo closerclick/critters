@@ -25,10 +25,10 @@ def mat_chitin():
     m = bpy.data.materials.new("chitin"); m.use_nodes = True
     b = m.node_tree.nodes["Principled BSDF"]
     b.inputs["Base Color"].default_value = (*CHITIN, 1)
-    for k, v in (("Metallic", 0.15), ("Roughness", 0.50)):
+    for k, v in (("Metallic", 0.05), ("Roughness", 0.80)):   # más difuso/mate (menos brillo)
         if k in b.inputs: b.inputs[k].default_value = v
     for k in ("Coat Weight", "Clearcoat", "Coat"):
-        if k in b.inputs: b.inputs[k].default_value = 0.4; break
+        if k in b.inputs: b.inputs[k].default_value = 0.1; break
     return m
 
 def mat_glow(strength=9.0):
@@ -139,10 +139,12 @@ if A.get("head") == 1:      headpts = [(xC, y0-15), (xC+11, y0+7), (xC-11, y0+7)
 elif A.get("head") == 3:    headpts = [(xC-15, y0+8), (xC-10, y0-11), (xC+10, y0-11), (xC+15, y0+8)]
 else:                       headpts = hexpts(xC, y0, 12, 13)
 add_prism("head", headpts, zg_head, head_up, 0.6, chit, down=head_dn)   # cabeza: gema alta por arriba Y por abajo
-if A.get("head") == 2:      # mandíbulas
-    for s in (-1, 1):
-        a1 = P2(xC + s*5, y0-11); a2 = P2(xC + s*9, y0-19)
-        add_tube("mand%d" % s, [(*a1, topz*0.9), (*a2, topz*0.95)], 0.05, chit)
+if A.get("head") == 2:      # mandíbulas: a la ALTURA DEL ANILLO CENTRAL (girdle), con la raíz
+    for s in (-1, 1):       # EMBEBIDA dentro de la cabeza y la punta curvando hacia adentro (pinza).
+        m0 = (*P2(xC + s*3, y0-2),  zg_head)         # raíz DENTRO de la cabeza, en el girdle
+        m1 = (*P2(xC + s*6, y0-13), zg_head)         # sale por la cara frontal
+        m2 = (*P2(xC + s*4, y0-21), zg_head + 0.03)  # punta hacia adelante, curva adentro
+        add_tube("mand%d" % s, [m0, m1, m2], 0.05, chit)
 
 if hasTh: add_prism("thorax", hexpts(xC, y1, 12, 12), seg_z0, seg_h*0.92, 0.6, chit)
 if hasAb:
