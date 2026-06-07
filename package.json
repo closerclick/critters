@@ -18,7 +18,7 @@
     "@closerclick/closer-click-notifications": "0.3.0",
     "@closerclick/closer-click-proxy-client": "^0.6.0",
     "@closerclick/closer-click-store": "^0.3.0",
-    "@closerclick/closer-click-support": "0.3.8",
+    "@closerclick/closer-click-support": "0.3.9",
     "vue": "^3.5.25"
   },
   "devDependencies": {
