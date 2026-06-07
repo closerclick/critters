@@ -165,11 +165,14 @@ for i in range(legs_n):
     add_tube("leg%d" % i, [pa, pk, pf], 0.06, chit)
     add_diamond("foot%d" % i, (pf[0], pf[1], 0.03), 0.108, glow)   # pies 20% más grandes
 
-# antenas
+# antenas: la BASE va EMBEBIDA dentro de la cabeza (atrás hacia el centro y abajo, donde la
+# sección es ancha) → el tubo atraviesa la superficie y queda enchufado, no flotando.
 if A.get("antennae"):
     for s in (-1, 1):
-        p1 = (*P2(xC + s*3, y0-11), topz*0.95); p2 = (*P2(xC + s*8, y0-18), topz+0.35); p3 = (*P2(xC + s*6, y0-24), topz+0.7)
-        add_tube("ant%d" % s, [p1, p2, p3], 0.035, chit)
+        p0 = (*P2(xC + s*3, y0-3),  topz*0.78)   # raíz DENTRO de la cabeza
+        p1 = (*P2(xC + s*6, y0-12), topz*0.98)   # sale por la corona
+        p2 = (*P2(xC + s*8, y0-18), topz+0.35); p3 = (*P2(xC + s*6, y0-24), topz+0.7)
+        add_tube("ant%d" % s, [p0, p1, p2, p3], 0.035, chit)
         add_diamond("anttip%d" % s, p3, 0.06, glow)
 
 # ojos: sobre la cara FRONTAL de la corona, bien por DEBAJO del tope (las antenas salen de arriba, no de los ojos)
