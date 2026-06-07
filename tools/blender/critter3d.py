@@ -68,6 +68,28 @@ def mat_plate():   # placas/acoples/remaches: más oscuro y metálico (lee como 
         if k in b.inputs: b.inputs[k].default_value = v
     return m
 
+def _principled(name, color, metallic, rough, coat=0.0):
+    m = bpy.data.materials.get(name)
+    if m: return m
+    m = bpy.data.materials.new(name); m.use_nodes = True
+    b = m.node_tree.nodes["Principled BSDF"]
+    b.inputs["Base Color"].default_value = (*color, 1)
+    for k, v in (("Metallic", metallic), ("Roughness", rough)):
+        if k in b.inputs: b.inputs[k].default_value = v
+    if coat:
+        for k in ("Coat Weight", "Clearcoat", "Coat"):
+            if k in b.inputs: b.inputs[k].default_value = coat; break
+    return m
+
+def mat_frame():   # ESTRUCTURA: metal gris OSCURO neutro
+    return _principled("frame", (0.07, 0.07, 0.08), 0.6, 0.42)
+
+def mat_panel():   # PANEL acento: color del elemento, brillante
+    return _principled("panel", tuple(min(1.0, c*0.85 + 0.04) for c in GLOW), 0.35, 0.28, coat=0.45)
+
+def mat_panel2():  # PANEL claro casi blanco (multitono tipo mecha)
+    return _principled("panel2", (0.72, 0.73, 0.76), 0.5, 0.26, coat=0.45)
+
 def shade_smooth(me):
     for p in me.polygons: p.use_smooth = True
     if hasattr(me, "use_auto_smooth"):
@@ -324,6 +346,7 @@ def shade_auto(ob, angle_deg=33):   # suave en lo curvo, FILOSO en los cortes de
 # ---------- construir el critter ----------
 chit = mat_chitin(); glow = mat_glow(9); eye_mat = mat_eye()
 plate = mat_plate(); glowB = mat_glow(15)   # piezas mecánicas + tiritas/energía brillantes
+frame = mat_frame(); panel = mat_panel(); panel2 = mat_panel2()   # mecha: estructura + paneles a 2 tonos
 xC, y0, y1, y2 = 50, 24, 50, 76
 rowY = [y0, y1, y2]
 hasTh = A.get("thorax", -1) >= 0
@@ -339,41 +362,47 @@ hrx, hry, hhz = 1.18, 1.28, 0.70
 if A.get("head") == 3: hrx, hry = 1.45, 1.15
 htap = 1.0 if A.get("head") == 1 else 0.0          # punta al FRENTE (+Y)
 head_cz = zb + 0.05
-add_organic("head", hcx, hcy, head_cz, hrx, hry, hhz, chit, taper_y=htap, drop=0.05)
+add_organic("head", hcx, hcy, head_cz, hrx, hry, hhz, frame, taper_y=htap, drop=0.05)
 topz = head_cz + hhz
 
-# MANDÍBULAS (head 2): al frente, a media altura de la cabeza, punta en pinza
+# MANDÍBULAS (head 2): LARGAS y AFILADAS hacia adelante (como la mecha de referencia)
 if A.get("head") == 2:
     for s in (-1, 1):
-        m0 = (*P2(xC + s*3, y0-1),  head_cz)
-        m1 = (*P2(xC + s*6, y0-13), head_cz + 0.02)
-        m2 = (*P2(xC + s*4, y0-22), head_cz + 0.04)
-        add_tube("mand%d" % s, [m0, m1, m2], 0.05, chit)
+        base = (*P2(xC + s*5, y0-9), head_cz)
+        d = (P2(xC + s*8, y0-26)[0]-base[0], P2(xC + s*8, y0-26)[1]-base[1], 0.06)
+        add_spike("mand%d" % s, base, d, 0.62, 0.055, plate)
 
 # TÓRAX (elipsoide)
-if hasTh: add_organic("thorax", tcx, tcy, zb, 1.16, 1.22, 0.62, chit)
+if hasTh: add_organic("thorax", tcx, tcy, zb, 1.16, 1.22, 0.62, frame)
 
 # ABDOMEN / gáster: LÁGRIMA apuntando hacia ATRÁS (-Y) y cayendo
 if hasAb:
     atap = -1.0 if A.get("abdomen") == 1 else -0.6
-    add_organic("abdomen", acx, acy, zb + 0.02, 1.5, 1.78, 0.74, chit, taper_y=atap, drop=0.30)
+    add_organic("abdomen", acx, acy, zb + 0.02, 1.5, 1.78, 0.74, frame, taper_y=atap, drop=0.30)
 
 # conectores (cuello/cintura) — rellenan donde los elipsoides no se solapan
 midz = zb
-if hasTh: add_tube("neck", [(*P2(xC, y0+9), midz), (*P2(xC, y1-9), midz)], 0.10, chit)
-if hasTh and hasAb: add_tube("waist", [(*P2(xC, y1+9), midz), (*P2(xC, y2-13), midz)], 0.11, chit)
+if hasTh: add_tube("neck", [(*P2(xC, y0+9), midz), (*P2(xC, y1-9), midz)], 0.10, frame)
+if hasTh and hasAb: add_tube("waist", [(*P2(xC, y1+9), midz), (*P2(xC, y2-13), midz)], 0.11, frame)
 
-# patas
+# PATAS ARTICULADAS mecánicas: cadera + fémur + rodilla(glow) + tibia + tarso + garra afilada
 LEG_CELLS = [(0, -1), (0, 1), (1, -1), (1, 1), (2, -1), (2, 1)]
 for i in range(legs_n):
     r, side = LEG_CELLS[i]; yy = rowY[r]
-    ax = xC + side*8; kx = xC + side*20; fx = xC + side*31
-    knee_up = 0.55 if A.get("legStyle") == 1 else 0.35   # el codo dobla HACIA ARRIBA (Z), no al frente
-    pa = (*P2(ax, yy), seg_z0 + 0.10); pk = (*P2(kx, yy), seg_z0 + knee_up); pf = (*P2(fx, yy + 4), 0.0)
-    add_tube("leg%d" % i, [pa, pk, pf], 0.06, chit)
-    add_sphere("hip%d" % i, pa, 0.10, plate)        # acople de cadera (pieza)
-    add_sphere("knee%d" % i, pk, 0.07, glowB)       # junta ILUMINADA en el codo
-    add_diamond("foot%d" % i, (pf[0], pf[1], 0.03), 0.108, glow)   # pies 20% más grandes
+    knee_up = 0.74 if A.get("legStyle") == 1 else 0.54
+    hip   = (*P2(xC + side*9,  yy),     zb*0.85)
+    knee  = (*P2(xC + side*22, yy-1),   seg_z0 + knee_up)   # codo ALTO (mecha)
+    ankle = (*P2(xC + side*33, yy+2),   seg_z0 + 0.14)
+    foot  = (*P2(xC + side*37, yy+4),   0.0)
+    add_sphere("coxa%d" % i, hip, 0.16, plate)              # cadera (junta)
+    add_tube("femur%d" % i, [hip, knee], 0.12, frame)       # fémur grueso
+    add_sphere("knee%d" % i, knee, 0.13, plate)             # rodilla
+    add_sphere("kneeg%d" % i, knee, 0.07, glowB)            # acento ILUMINADO en la junta
+    add_tube("tibia%d" % i, [knee, ankle], 0.08, frame)     # tibia
+    add_tube("tars%d" % i, [ankle, foot], 0.05, frame)      # tarso
+    cd = Vector((foot[0]-ankle[0], foot[1]-ankle[1], 0))    # garra afilada hacia abajo/afuera
+    add_spike("claw%d" % i, foot, (cd.x, cd.y, -0.7), 0.24, 0.045, plate)
+    add_diamond("ftip%d" % i, (foot[0], foot[1], 0.02), 0.07, glow)   # punta glow
 
 # antenas: la BASE va EMBEBIDA dentro de la cabeza (atrás hacia el centro y abajo, donde la
 # sección es ancha) → el tubo atraviesa la superficie y queda enchufado, no flotando.
@@ -447,7 +476,7 @@ def detail_segment(seg):
 def kitbash(seg):
     ob = seg["ob"]; cx, cy, zmid = seg["cx"], seg["cy"], seg["zmid"]
     rx, ry, hz = seg["rx"], seg["ry"], seg["hz"]; is_head = (seg["name"] == "head")
-    for i in range(RNG.randint(14, 20)):
+    for i in range(RNG.randint(22, 30)):
         ux = uy = uz = 0.0                                   # dirección sobre el elipsoide
         for _ in range(8):
             x, y, z = RNG.uniform(-1, 1), RNG.uniform(-1, 1), RNG.uniform(-1, 1)
@@ -458,16 +487,22 @@ def kitbash(seg):
             continue
         loc = Vector((cx + rx*ux, cy + ry*uy, zmid + hz*uz))
         n = Vector((ux/max(rx, 1e-3), uy/max(ry, 1e-3), uz/max(hz, 1e-3))); n.normalize()
-        big = RNG.random() < 0.35
-        b = RNG.uniform(0.34, 0.55) if big else RNG.uniform(0.12, 0.24)
-        size = (b*RNG.uniform(0.6, 1.7), b*RNG.uniform(0.6, 1.7), b*RNG.uniform(0.5, 1.3))
+        big = RNG.random() < 0.4
+        union = RNG.random() < 0.68
         q = n.to_track_quat('Z', 'Y').to_euler()            # Z hacia la normal + giro/inclinación
-        rot = (q.x + RNG.uniform(-0.5, 0.5), q.y + RNG.uniform(-0.5, 0.5), q.z + RNG.uniform(-math.pi, math.pi))
-        union = RNG.random() < 0.6
-        c = loc + n*(size[2]*0.15 if union else -size[2]*0.1)
-        cutter = make_cube_obj("cut%d" % i, (c.x, c.y, c.z), size, rot, mat=(chit if union else None))
-        apply_boolean(ob, cutter, 'UNION' if union else 'DIFFERENCE')
-    shade_auto(ob, 33)
+        rot = (q.x + RNG.uniform(-0.35, 0.35), q.y + RNG.uniform(-0.35, 0.35), q.z + RNG.uniform(-math.pi, math.pi))
+        if union:                                           # PANEL plano y ancho (placa de armadura, 2 tonos)
+            b = RNG.uniform(0.42, 0.66) if big else RNG.uniform(0.18, 0.32)
+            size = (b*RNG.uniform(0.9, 1.6), b*RNG.uniform(0.9, 1.6), b*RNG.uniform(0.18, 0.32))
+            c = loc + n*(size[2]*0.42)                       # sobresale más (placa montada)
+            pm = panel2 if RNG.random() < 0.5 else panel
+            apply_boolean(ob, make_cube_obj("pan%d" % i, (c.x, c.y, c.z), size, rot, mat=pm), 'UNION')
+        else:                                               # MUESCA / corte
+            b = RNG.uniform(0.18, 0.34)
+            size = (b*RNG.uniform(0.7, 1.4), b*RNG.uniform(0.7, 1.4), b*RNG.uniform(0.8, 1.4))
+            c = loc - n*(size[2]*0.12)
+            apply_boolean(ob, make_cube_obj("notch%d" % i, (c.x, c.y, c.z), size, rot), 'DIFFERENCE')
+    shade_auto(ob, 24)   # bordes más filosos (look hard-surface)
 
 for _seg in list(SEGS):
     if _seg["name"] in ("head", "thorax", "abdomen"): kitbash(_seg)
@@ -478,9 +513,10 @@ def add_area(name, loc, energy, size, color=(1, 1, 1), rot=None):
     o = bpy.data.objects.new(name, l); o.location = loc; bpy.context.collection.objects.link(o)
     if rot is not None: o.rotation_euler = rot
     else: o.rotation_euler = (Vector((0, 0, 0.4)) - Vector(loc)).to_track_quat('-Z', 'Y').to_euler()
-add_area("key", (3.5, 4.5, 5.5), 350, 4)        # frente (+Y, lado de la cara)
-add_area("fill", (-4.5, 3, 3), 110, 5)
-add_area("rim", (-2.5, -5.5, 3.5), 600, 4, (1.0, 0.55, 0.35))   # atrás (-Y), rim cálido
+add_area("key", (3.5, 4.5, 5.5), 600, 4)        # frente (+Y, lado de la cara)
+add_area("fill", (-4.5, 3, 3), 200, 5)
+add_area("top", (0.5, 0.5, 7.0), 350, 6)        # cenital (saca brillo en los paneles de arriba)
+add_area("rim", (-2.5, -5.5, 3.5), 700, 4, (1.0, 0.55, 0.35))   # atrás (-Y), rim cálido
 # rim2: área cálido extra por DEBAJO y al FRENTE (ajustado a mano en el blend, rotación propia)
 add_area("rim2", (4.2555, 7.1332, -2.0159), 600, 4, (1.0, 0.55, 0.35),
          rot=(math.radians(-35.37), math.radians(4.91), math.radians(-8.21)))
@@ -492,8 +528,17 @@ cam.location = (6.6532, 12.8566, 3.6338)
 cam.rotation_euler = (math.radians(77.36), math.radians(0.0), math.radians(152.54))
 bpy.context.scene.camera = cam
 
+# MUNDO: la cámara ve NEGRO (aislado), pero los reflejos/AO ven un entorno gris → el metal "lee"
 w = bpy.data.worlds.new("w"); bpy.context.scene.world = w; w.use_nodes = True
-bg = w.node_tree.nodes["Background"]; bg.inputs[0].default_value = (0, 0, 0, 1); bg.inputs[1].default_value = 1.0
+nt = w.node_tree; nt.nodes.clear()
+o_w = nt.nodes.new("ShaderNodeOutputWorld"); mix = nt.nodes.new("ShaderNodeMixShader")
+lp = nt.nodes.new("ShaderNodeLightPath")
+bg_k = nt.nodes.new("ShaderNodeBackground"); bg_k.inputs[0].default_value = (0, 0, 0, 1)
+bg_e = nt.nodes.new("ShaderNodeBackground"); bg_e.inputs[0].default_value = (0.22, 0.23, 0.27, 1); bg_e.inputs[1].default_value = 0.7
+nt.links.new(lp.outputs["Is Camera Ray"], mix.inputs[0])
+nt.links.new(bg_e.outputs[0], mix.inputs[1])   # rayos no-cámara (reflejo/difuso) → entorno gris
+nt.links.new(bg_k.outputs[0], mix.inputs[2])   # rayos de cámara → negro
+nt.links.new(mix.outputs[0], o_w.inputs[0])
 
 sc = bpy.context.scene
 sc.render.engine = 'CYCLES'
