@@ -124,11 +124,13 @@ hasAb = A.get("abdomen", -1) >= 0
 legs_n = max(0, min(6, int(A.get("legs", 0))))
 seg_z0 = 0.42 if legs_n > 0 else 0.14
 seg_h = 0.62
-# Gemas verticales SIMÉTRICAS: misma altura por ARRIBA y por ABAJO desde el girdle
-# → la cara de la BASE tiene el mismo tamaño que la cara de ENCIMA.
-head_up = head_dn = seg_h * 1.5                  # cabeza alta (simétrica arriba/abajo)
-ab_up   = ab_dn   = head_up / 2                  # abdomen la MITAD de alto que la cabeza
-zg_head = seg_z0 + seg_h * 0.75                  # girdle (parte ancha) centrado en el cuerpo
+# Gemas verticales: cara de la base = cara de encima (mismo tamaño), pero la cara de ABAJO
+# queda CERCA del anillo del medio → su distancia al girdle es la MITAD que la de arriba.
+head_up = seg_h * 1.5                            # cara de arriba: lejos del girdle (cabeza alta)
+head_dn = head_up / 2                            # cara de abajo: cerca del girdle (la mitad)
+ab_up   = head_up / 2                            # abdomen la MITAD de alto que la cabeza
+ab_dn   = head_dn / 2
+zg_head = seg_z0 + seg_h * 0.75                  # girdle (parte ancha) del cuerpo
 zg_ab   = seg_z0 + seg_h * 0.45
 topz = zg_head + head_up   # tope REAL de la cabeza → antenas/ojos/mandíbulas se anclan ahí
 
