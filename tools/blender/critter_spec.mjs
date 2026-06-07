@@ -15,6 +15,7 @@ const PRESETS = {
   plant:     ['planta', { head: 3, thorax: 2, abdomen: 1, legs: 6, legStyle: 1, antennae: true,  hue: 0, pattern: 0 }],
   min:       ['fuego',  { head: 2, thorax: -1, abdomen: -1, legs: 0, legStyle: 0, antennae: false, hue: 0, pattern: 0 }],
   nolegs:    ['fuego',  { head: 1, thorax: 0, abdomen: 0, legs: 0, legStyle: 0, antennae: true,  hue: 0, pattern: 1 }],
+  oneleg:    ['fuego',  { head: 2, thorax: 0, abdomen: 0, legs: 1, legStyle: 1, antennae: true,  hue: 0, pattern: 1 }],
 };
 
 const arg = process.argv[2] || 'fire_full';
