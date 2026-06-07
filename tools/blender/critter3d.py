@@ -212,6 +212,76 @@ def ring_at(seg, t):   # (cx,cy,z,rx,ry) del segmento a la altura t
     z = seg["zg"] + (t*(seg["ztop"]-seg["zg"]) if t >= 0 else (-t)*(seg["zbot"]-seg["zg"]))
     return seg["cx"], seg["cy"], z, seg["rx"]*sc, seg["ry"]*sc
 
+def add_shell_plate(name, seg, th0, th1, t0, t1, lift, thick, flare, mat, nu=14, nv=4, bevel=0.02, smooth=True):
+    # PLACA-CORAZA curva: sigue la superficie del segmento entre [th0,th1]x[t0,t1], levantada 'lift'
+    # hacia afuera y con el BORDE INFERIOR saliente ('flare') → labio que sobresale (rompe el monolito).
+    bm = bmesh.new()
+    O = [[None]*(nv+1) for _ in range(nu+1)]; I = [[None]*(nv+1) for _ in range(nu+1)]
+    for iu in range(nu+1):
+        th = th0 + (th1-th0)*iu/nu
+        for iv in range(nv+1):
+            f = iv/nv; t = t0 + (t1-t0)*f
+            loc, nrm = seg_surface(seg, th, t)
+            lf = lift + flare*(1-f)                       # más saliente abajo (en t0)
+            o = loc + nrm*lf; inn = loc + nrm*(lf - thick)
+            O[iu][iv] = bm.verts.new((o.x, o.y, o.z)); I[iu][iv] = bm.verts.new((inn.x, inn.y, inn.z))
+    def F(a, b, c, d): bm.faces.new([a, b, c, d])
+    for iu in range(nu):
+        for iv in range(nv):
+            F(O[iu][iv], O[iu+1][iv], O[iu+1][iv+1], O[iu][iv+1])
+            F(I[iu][iv], I[iu][iv+1], I[iu+1][iv+1], I[iu+1][iv])
+    for iu in range(nu):
+        F(O[iu][0], I[iu][0], I[iu+1][0], O[iu+1][0]); F(O[iu][nv], O[iu+1][nv], I[iu+1][nv], I[iu][nv])
+    for iv in range(nv):
+        F(O[0][iv], O[0][iv+1], I[0][iv+1], I[0][iv]); F(O[nu][iv], I[nu][iv], I[nu][iv+1], O[nu][iv+1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    me = bpy.data.meshes.new(name); ob = bpy.data.objects.new(name, me); bpy.context.collection.objects.link(ob)
+    bm.to_mesh(me); bm.free(); ob.data.materials.append(mat)
+    if bevel > 0:
+        bv = ob.modifiers.new("bevel", "BEVEL"); bv.width = bevel; bv.segments = 2
+    shade_smooth(me); return ob
+
+def add_spike(name, base, direction, length, width, mat):
+    # PÚA piramidal de 4 caras orientada hacia 'direction' (cresta / espinas grandes).
+    up = Vector(direction); up.normalize()
+    ref = Vector((0, 0, 1)) if abs(up.z) < 0.9 else Vector((1, 0, 0))
+    ax = up.cross(ref); ax.normalize(); ay = up.cross(ax); ay.normalize()
+    b = Vector(base); w = width
+    bm = bmesh.new()
+    quad = [b+ax*w+ay*w, b+ax*w-ay*w, b-ax*w-ay*w, b-ax*w+ay*w]
+    bv = [bm.verts.new((p.x, p.y, p.z)) for p in quad]
+    tip = bm.verts.new((*(b+up*length),))
+    bm.faces.new(bv[::-1])
+    for i in range(4): bm.faces.new([bv[i], bv[(i+1) % 4], tip])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    me = bpy.data.meshes.new(name); ob = bpy.data.objects.new(name, me); bpy.context.collection.objects.link(ob)
+    bm.to_mesh(me); bm.free(); ob.data.materials.append(mat)
+    bvm = ob.modifiers.new("bevel", "BEVEL"); bvm.width = 0.01; bvm.segments = 2
+    shade_smooth(me); return ob
+
+def add_organic(name, cx, cy, zmid, rx, ry, hz, mat, taper_y=0.0, drop=0.0, flat=0.18, sub=3):
+    # CUERPO ORGÁNICO: elipsoide suave (NO gema). taper_y!=0 afina una punta hacia +Y(>0)/-Y(<0)=lágrima.
+    me = bpy.data.meshes.new(name); ob = bpy.data.objects.new(name, me); bpy.context.collection.objects.link(ob)
+    bm = bmesh.new()
+    try: bmesh.ops.create_icosphere(bm, subdivisions=sub, radius=1.0)
+    except TypeError: bmesh.ops.create_icosphere(bm, subdivisions=sub, diameter=2.0)
+    sgn = 1.0 if taper_y >= 0 else -1.0
+    for v in bm.verts:
+        x, y, z = v.co
+        wx, wy, wz = x*rx, y*ry, z*hz
+        if taper_y != 0:
+            f = max(0.0, y*sgn); k = f**1.4     # 0..1 hacia la punta (lágrima)
+            wx *= (1 - 0.82*k); wy *= (1 + 0.20*f); wz = wz*(1 - 0.4*k) - drop*k
+        if z < 0: wz *= (1 - flat*(-z))         # base un poco aplanada (orgánico)
+        v.co = (cx+wx, cy+wy, zmid+wz)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:]); bm.to_mesh(me); bm.free()
+    ob.data.materials.append(mat)
+    ss = ob.modifiers.new("subsurf", "SUBSURF"); ss.levels = 1; ss.render_levels = 1
+    shade_smooth(me)
+    SEGS.append({"name": name, "cx": cx, "cy": cy, "zg": zmid, "ztop": zmid+hz, "zbot": zmid-hz,
+                 "rx": rx, "ry": ry, "taper": 0.5})
+    return ob
+
 # ---------- construir el critter ----------
 chit = mat_chitin(); glow = mat_glow(9); eye_mat = mat_eye()
 plate = mat_plate(); glowB = mat_glow(15)   # piezas mecánicas + tiritas/energía brillantes
@@ -221,39 +291,38 @@ hasTh = A.get("thorax", -1) >= 0
 hasAb = A.get("abdomen", -1) >= 0
 legs_n = max(0, min(6, int(A.get("legs", 0))))
 seg_z0 = 0.42 if legs_n > 0 else 0.14
-seg_h = 0.62
-# Gemas verticales: cara de la base = cara de encima (mismo tamaño), pero la cara de ABAJO
-# queda CERCA del anillo del medio → su distancia al girdle es la MITAD que la de arriba.
-head_up = seg_h * 1.5                            # cara de arriba: lejos del girdle (cabeza alta)
-head_dn = head_up / 2                            # cara de abajo: cerca del girdle (la mitad)
-ab_up   = head_up / 2                            # abdomen la MITAD de alto que la cabeza
-ab_dn   = head_dn / 2
-zg_head = seg_z0 + seg_h * 0.75                  # girdle (parte ancha) del cuerpo
-zg_ab   = seg_z0 + seg_h * 0.45
-topz = zg_head + head_up   # tope REAL de la cabeza → antenas/ojos/mandíbulas se anclan ahí
+# === CUERPO ORGÁNICO (elipsoides / lágrimas suaves, NO gemas) ===
+zb = seg_z0 + 0.50                       # centro vertical del cuerpo
+hcx, hcy = P2(xC, y0); tcx, tcy = P2(xC, y1); acx, acy = P2(xC, y2)
 
-# cabeza
-if A.get("head") == 1:      headpts = [(xC, y0-15), (xC+11, y0+7), (xC-11, y0+7)]
-elif A.get("head") == 3:    headpts = [(xC-15, y0+8), (xC-10, y0-11), (xC+10, y0-11), (xC+15, y0+8)]
-else:                       headpts = hexpts(xC, y0, 12, 13)
-add_prism("head", headpts, zg_head, head_up, 0.6, chit, down=head_dn, grooves=(0.45, -0.4))   # cabeza: gema alta + costuras
-if A.get("head") == 2:      # mandíbulas: a la ALTURA DEL ANILLO CENTRAL (girdle), con la raíz
-    for s in (-1, 1):       # EMBEBIDA dentro de la cabeza y la punta curvando hacia adentro (pinza).
-        m0 = (*P2(xC + s*3, y0-2),  zg_head)         # raíz DENTRO de la cabeza, en el girdle
-        m1 = (*P2(xC + s*6, y0-13), zg_head)         # sale por la cara frontal
-        m2 = (*P2(xC + s*4, y0-21), zg_head + 0.03)  # punta hacia adelante, curva adentro
+# CABEZA redonda (head 1 = hocico al frente, head 3 = más ancha)
+hrx, hry, hhz = 1.18, 1.28, 0.70
+if A.get("head") == 3: hrx, hry = 1.45, 1.15
+htap = 1.0 if A.get("head") == 1 else 0.0          # punta al FRENTE (+Y)
+head_cz = zb + 0.05
+add_organic("head", hcx, hcy, head_cz, hrx, hry, hhz, chit, taper_y=htap, drop=0.05)
+topz = head_cz + hhz
+
+# MANDÍBULAS (head 2): al frente, a media altura de la cabeza, punta en pinza
+if A.get("head") == 2:
+    for s in (-1, 1):
+        m0 = (*P2(xC + s*3, y0-1),  head_cz)
+        m1 = (*P2(xC + s*6, y0-13), head_cz + 0.02)
+        m2 = (*P2(xC + s*4, y0-22), head_cz + 0.04)
         add_tube("mand%d" % s, [m0, m1, m2], 0.05, chit)
 
-if hasTh: add_prism("thorax", hexpts(xC, y1, 12, 12), seg_z0, seg_h*0.92, 0.6, chit, grooves=(0.5,))
-if hasAb:
-    if A.get("abdomen") == 1: abpts = [(xC, y2-13), (xC+13, y2-2), (xC, y2+15), (xC-13, y2-2)]
-    else: abpts = hexpts(xC, y2, 15, 17)
-    add_prism("abdomen", abpts, zg_ab, ab_up, 0.62, chit, down=ab_dn, grooves=(0.4, -0.35))   # cola + costuras
+# TÓRAX (elipsoide)
+if hasTh: add_organic("thorax", tcx, tcy, zb, 1.16, 1.22, 0.62, chit)
 
-# conectores (cintura)
-midz = seg_z0 + seg_h*0.5
-if hasTh: add_tube("neck", [(*P2(xC, y0+9), midz), (*P2(xC, y1-9), midz)], 0.07, chit)
-if hasTh and hasAb: add_tube("waist", [(*P2(xC, y1+9), midz), (*P2(xC, y2-13), midz)], 0.07, chit)
+# ABDOMEN / gáster: LÁGRIMA apuntando hacia ATRÁS (-Y) y cayendo
+if hasAb:
+    atap = -1.0 if A.get("abdomen") == 1 else -0.6
+    add_organic("abdomen", acx, acy, zb + 0.02, 1.5, 1.78, 0.74, chit, taper_y=atap, drop=0.30)
+
+# conectores (cuello/cintura) — rellenan donde los elipsoides no se solapan
+midz = zb
+if hasTh: add_tube("neck", [(*P2(xC, y0+9), midz), (*P2(xC, y1-9), midz)], 0.10, chit)
+if hasTh and hasAb: add_tube("waist", [(*P2(xC, y1+9), midz), (*P2(xC, y2-13), midz)], 0.11, chit)
 
 # patas
 LEG_CELLS = [(0, -1), (0, 1), (1, -1), (1, 1), (2, -1), (2, 1)]
@@ -271,57 +340,73 @@ for i in range(legs_n):
 # sección es ancha) → el tubo atraviesa la superficie y queda enchufado, no flotando.
 if A.get("antennae"):
     for s in (-1, 1):
-        p0 = (*P2(xC + s*3, y0-3),  topz*0.78)   # raíz DENTRO de la cabeza
-        p1 = (*P2(xC + s*6, y0-12), topz*0.98)   # sale por la corona
-        p2 = (*P2(xC + s*8, y0-18), topz+0.35); p3 = (*P2(xC + s*6, y0-24), topz+0.7)
+        p0 = (*P2(xC + s*3, y0+1),  head_cz + hhz*0.2)   # raíz DENTRO de la cabeza
+        p1 = (*P2(xC + s*5, y0-7),  topz*0.98)           # sale por arriba
+        p2 = (*P2(xC + s*8, y0-16), topz+0.4); p3 = (*P2(xC + s*6, y0-24), topz+0.78)
         add_tube("ant%d" % s, [p0, p1, p2, p3], 0.035, chit)
         add_diamond("anttip%d" % s, p3, 0.06, glow)
 
-# ojos: sobre la cara FRONTAL de la corona, bien por DEBAJO del tope (las antenas salen de arriba, no de los ojos)
+# ojos: frente-superior de la cabeza orgánica
 eyeY = y0 - 7 if A.get("head") == 3 else y0 - 8
-eyexs = [xC-4.5, xC+4.5] + ([xC] if A.get("head") == 3 else [])
-eye_z = zg_head + (topz - zg_head) * 0.45   # mitad-baja de la corona
+eyexs = [xC-4.8, xC+4.8] + ([xC] if A.get("head") == 3 else [])
+eye_z = head_cz + hhz*0.32
 for j, ex in enumerate(eyexs):
     e = P2(ex, eyeY); add_sphere("eye%d" % j, (e[0], e[1], eye_z), 0.18, eye_mat)   # ojos ESFÉRICOS negros
 
 # ---------- DETALLADO mecánico (aditivo): acoples, remaches, tiritas iluminadas, placas, energía ----------
 def detail_segment(seg):
-    nm = seg["name"]
-    # ACOPLES: anillos en el girdle y a media altura arriba/abajo
-    for k, t in enumerate((0.0, 0.55, -0.45)):
-        cx, cy, z, rx, ry = ring_at(seg, t)
-        add_ring("acpl_%s_%d" % (nm, k), cx, cy, z, rx*1.015, ry*1.015, 0.045 if t == 0 else 0.03, plate)
-    # REMACHES alrededor del girdle
-    for i in range(RNG.randint(11, 16)):
-        loc, n = seg_surface(seg, 2*math.pi*i/14 + RNG.uniform(-0.08, 0.08), 0.04)
-        add_sphere("stud_%s_%d" % (nm, i), (loc.x, loc.y, loc.z), RNG.uniform(0.035, 0.06), plate)
-    # TIRITAS ILUMINADAS: meridianos brillantes que trepan la gema (muchas)
-    base = RNG.uniform(0, math.pi)
-    nstrip = RNG.randint(5, 8)
-    for i in range(nstrip):
-        th = base + (i/nstrip)*2*math.pi + RNG.uniform(-0.12, 0.12)
-        pts = []
-        for t in (0.06, 0.3, 0.55, 0.8):
-            loc, n = seg_surface(seg, th, t); pts.append((loc.x, loc.y, loc.z))
-        add_tube("lit_%s_%d" % (nm, i), pts, RNG.uniform(0.016, 0.03), glowB)
-    # PLACAS (greebles) CHICAS y GRANDES en la corona, orientadas a la superficie
-    for i in range(RNG.randint(7, 12)):
-        th = RNG.uniform(0, 2*math.pi); t = RNG.uniform(0.18, 0.72)
+    nm = seg["name"]; is_head = (nm == "head"); front = math.pi/2   # +Y = frente
+    # ===== GEOMETRÍA GRANDE: bandas de ARMADURA apiladas que envuelven el cuerpo =====
+    # (en la cabeza dejan libre el frente: cara/ojos/mandíbulas). Cada banda tiene labio saliente.
+    a0, a1 = (front+0.95, front+2*math.pi-0.95) if is_head else (front+0.45, front+2*math.pi-0.45)
+    nb = 3
+    for bi in range(nb):
+        t0 = -0.15 + bi*0.30; t1 = t0 + 0.34
+        lift = 0.05 + bi*0.022
+        add_shell_plate("arm_%s_%d" % (nm, bi), seg, a0, a1, t0, t1, lift, 0.055, 0.13, plate, nu=16, nv=4)
+        lip = []                                  # tirita glow en el labio inferior de la banda
+        for k in range(13):
+            th = a0 + (a1-a0)*k/12; loc, n = seg_surface(seg, th, t0); o = loc + n*(lift+0.13)
+            lip.append((o.x, o.y, o.z))
+        add_tube("armlip_%s_%d" % (nm, bi), lip, 0.02, glowB)
+    # ===== PLACAS DORSALES grandes e inclinadas: facetan el lomo (rompen el blob liso) =====
+    d0, d1 = (front+1.2, front+2*math.pi-1.2) if is_head else (0.0, 2*math.pi)
+    nbig = RNG.randint(4, 6)
+    for i in range(nbig):
+        th = d0 + (d1-d0)*(i+0.5)/nbig + RNG.uniform(-0.15, 0.15)
+        t = RNG.uniform(0.35, 0.62)
         loc, n = seg_surface(seg, th, t)
-        big = RNG.random() < 0.32
-        w = RNG.uniform(0.28, 0.44) if big else RNG.uniform(0.1, 0.2)
-        d = RNG.uniform(0.28, 0.44) if big else RNG.uniform(0.1, 0.2)
-        thick = RNG.uniform(0.03, 0.06)
-        rot = n.to_track_quat('Z', 'Y').to_euler()
-        c = loc - n*thick*0.35   # embeber un poco
-        mm = glowB if RNG.random() < 0.14 else plate
-        add_box("plate_%s_%d" % (nm, i), (c.x, c.y, c.z), (w, d, thick), mm, rot=rot)
-    # PIEZAS de energía sueltas (puntos iluminados)
-    for i in range(RNG.randint(3, 6)):
-        loc, n = seg_surface(seg, RNG.uniform(0, 2*math.pi), RNG.uniform(0.12, 0.74))
-        add_sphere("gpx_%s_%d" % (nm, i), (loc.x, loc.y, loc.z), RNG.uniform(0.03, 0.055), glowB)
+        # inclinar la placa: normal mezclada con una tangente → cara facetada que sobresale por un borde
+        tang = Vector((-math.sin(th), math.cos(th), 0))
+        d = n + tang*RNG.uniform(-0.5, 0.5) + Vector((0, 0, RNG.uniform(0.1, 0.4)))
+        rot = d.to_track_quat('Z', 'Y').to_euler()
+        w = RNG.uniform(0.34, 0.52); h = RNG.uniform(0.3, 0.5); thick = RNG.uniform(0.05, 0.09)
+        c = loc + n*RNG.uniform(0.03, 0.09)
+        add_box("big_%s_%d" % (nm, i), (c.x, c.y, c.z), (w, h, thick), plate, rot=rot, bevel=0.02)
+    # ===== CRESTA de PÚAS que se ABREN hacia afuera (frill) en la corona =====
+    c0, c1 = (front+1.5, front+2*math.pi-1.5) if is_head else (0.0, 2*math.pi)
+    ncrest = RNG.randint(5, 7)
+    for i in range(ncrest):
+        th = c0 + (c1-c0)*(i+0.5)/ncrest
+        loc, n = seg_surface(seg, th, 0.62)
+        d = n*1.4 + Vector((0, 0, 0.55))   # se abren hacia afuera → visibles en silueta
+        add_spike("crest_%s_%d" % (nm, i), (loc.x, loc.y, loc.z), (d.x, d.y, d.z),
+                  RNG.uniform(0.34, 0.58), RNG.uniform(0.07, 0.11), plate)
+    # ===== ACOPLES (anillos) en girdle y base =====
+    for k, t in enumerate((0.0, -0.45)):
+        cx, cy, z, rx, ry = ring_at(seg, t)
+        add_ring("acpl_%s_%d" % (nm, k), cx, cy, z, rx*1.02, ry*1.02, 0.045 if t == 0 else 0.03, plate)
+    # ===== DETALLE FINO: remaches + piezas de energía =====
+    for i in range(RNG.randint(6, 9)):
+        loc, n = seg_surface(seg, 2*math.pi*i/8 + RNG.uniform(-0.1, 0.1), 0.0)
+        add_sphere("stud_%s_%d" % (nm, i), (loc.x, loc.y, loc.z), RNG.uniform(0.035, 0.055), plate)
+    for i in range(RNG.randint(4, 7)):
+        loc, n = seg_surface(seg, RNG.uniform(0, 2*math.pi), RNG.uniform(0.1, 0.7))
+        add_sphere("gpx_%s_%d" % (nm, i), (loc.x, loc.y, loc.z), RNG.uniform(0.03, 0.05), glowB)
 
-for _seg in list(SEGS): detail_segment(_seg)
+DETAIL = False   # primero la FORMA orgánica limpia; el detallado se re-activa luego
+if DETAIL:
+    for _seg in list(SEGS): detail_segment(_seg)
 
 # ---------- escena ----------
 def add_area(name, loc, energy, size, color=(1, 1, 1), rot=None):
