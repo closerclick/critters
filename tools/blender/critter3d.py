@@ -172,11 +172,12 @@ if A.get("antennae"):
         add_tube("ant%d" % s, [p1, p2, p3], 0.035, chit)
         add_diamond("anttip%d" % s, p3, 0.06, glow)
 
-# ojos
+# ojos: sobre la cara FRONTAL de la corona, bien por DEBAJO del tope (las antenas salen de arriba, no de los ojos)
 eyeY = y0 - 7 if A.get("head") == 3 else y0 - 8
 eyexs = [xC-4.5, xC+4.5] + ([xC] if A.get("head") == 3 else [])
+eye_z = zg_head + (topz - zg_head) * 0.45   # mitad-baja de la corona
 for j, ex in enumerate(eyexs):
-    e = P2(ex, eyeY); add_sphere("eye%d" % j, (e[0], e[1], topz*0.98), 0.18, eye_mat)   # ojos ESFÉRICOS negros
+    e = P2(ex, eyeY); add_sphere("eye%d" % j, (e[0], e[1], eye_z), 0.18, eye_mat)   # ojos ESFÉRICOS negros
 
 # ---------- escena ----------
 def add_area(name, loc, energy, size, color=(1, 1, 1)):
