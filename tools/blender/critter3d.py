@@ -276,11 +276,50 @@ def add_organic(name, cx, cy, zmid, rx, ry, hz, mat, taper_y=0.0, drop=0.0, flat
         v.co = (cx+wx, cy+wy, zmid+wz)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:]); bm.to_mesh(me); bm.free()
     ob.data.materials.append(mat)
-    ss = ob.modifiers.new("subsurf", "SUBSURF"); ss.levels = 1; ss.render_levels = 1
-    shade_smooth(me)
-    SEGS.append({"name": name, "cx": cx, "cy": cy, "zg": zmid, "ztop": zmid+hz, "zbot": zmid-hz,
-                 "rx": rx, "ry": ry, "taper": 0.5})
+    SEGS.append({"name": name, "ob": ob, "cx": cx, "cy": cy, "zmid": zmid, "hz": hz,
+                 "zg": zmid, "ztop": zmid+hz, "zbot": zmid-hz, "rx": rx, "ry": ry, "taper": 0.5})
     return ob
+
+def make_cube_obj(name, loc, size, rot, mat=None):
+    me = bpy.data.meshes.new(name); ob = bpy.data.objects.new(name, me); bpy.context.collection.objects.link(ob)
+    bm = bmesh.new(); bmesh.ops.create_cube(bm, size=1.0)
+    for v in bm.verts: v.co.x *= size[0]; v.co.y *= size[1]; v.co.z *= size[2]
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:]); bm.to_mesh(me); bm.free()
+    ob.location = loc; ob.rotation_euler = rot
+    if mat: ob.data.materials.append(mat)
+    return ob
+
+def apply_boolean(target, cutter, op):   # aplica un booleano (UNION/DIFFERENCE) y consume el cutter
+    md = target.modifiers.new("bool", "BOOLEAN"); md.operation = op
+    try: md.solver = 'EXACT'
+    except Exception: pass
+    md.object = cutter
+    for o in list(bpy.context.selected_objects): o.select_set(False)
+    bpy.context.view_layer.objects.active = target
+    try: target.select_set(True)
+    except Exception: pass
+    try: bpy.ops.object.modifier_apply(modifier=md.name)
+    except Exception as e:
+        print("BOOL FAIL", op, e, flush=True)
+        if md.name in [m.name for m in target.modifiers]: target.modifiers.remove(md)
+    bpy.data.objects.remove(cutter, do_unlink=True)
+
+def shade_auto(ob, angle_deg=33):   # suave en lo curvo, FILOSO en los cortes de los bloques
+    me = ob.data
+    for p in me.polygons: p.use_smooth = True
+    if hasattr(me, "use_auto_smooth"):
+        me.use_auto_smooth = True
+        try: me.auto_smooth_angle = math.radians(angle_deg)
+        except Exception: pass
+        return
+    for o in list(bpy.context.selected_objects): o.select_set(False)
+    bpy.context.view_layer.objects.active = ob
+    try: ob.select_set(True)
+    except Exception: pass
+    for opn in ("shade_auto_smooth", "shade_smooth_by_angle"):
+        if hasattr(bpy.ops.object, opn):
+            try: getattr(bpy.ops.object, opn)(angle=math.radians(angle_deg)); return
+            except Exception: pass
 
 # ---------- construir el critter ----------
 chit = mat_chitin(); glow = mat_glow(9); eye_mat = mat_eye()
@@ -404,9 +443,34 @@ def detail_segment(seg):
         loc, n = seg_surface(seg, RNG.uniform(0, 2*math.pi), RNG.uniform(0.1, 0.7))
         add_sphere("gpx_%s_%d" % (nm, i), (loc.x, loc.y, loc.z), RNG.uniform(0.03, 0.05), glowB)
 
-DETAIL = False   # primero la FORMA orgánica limpia; el detallado se re-activa luego
-if DETAIL:
-    for _seg in list(SEGS): detail_segment(_seg)
+# ---------- KITBASH BOOLEANO: bloques grandes y chicos por todos lados (union/difference) ----------
+def kitbash(seg):
+    ob = seg["ob"]; cx, cy, zmid = seg["cx"], seg["cy"], seg["zmid"]
+    rx, ry, hz = seg["rx"], seg["ry"], seg["hz"]; is_head = (seg["name"] == "head")
+    for i in range(RNG.randint(14, 20)):
+        ux = uy = uz = 0.0                                   # dirección sobre el elipsoide
+        for _ in range(8):
+            x, y, z = RNG.uniform(-1, 1), RNG.uniform(-1, 1), RNG.uniform(-1, 1)
+            d = x*x + y*y + z*z
+            if 0.08 < d <= 1.0:
+                mm = d**0.5; ux, uy, uz = x/mm, y/mm, z/mm; break
+        if is_head and uy > 0.25 and uz < 0.35:             # no tapar cara/ojos/mandíbulas
+            continue
+        loc = Vector((cx + rx*ux, cy + ry*uy, zmid + hz*uz))
+        n = Vector((ux/max(rx, 1e-3), uy/max(ry, 1e-3), uz/max(hz, 1e-3))); n.normalize()
+        big = RNG.random() < 0.35
+        b = RNG.uniform(0.34, 0.55) if big else RNG.uniform(0.12, 0.24)
+        size = (b*RNG.uniform(0.6, 1.7), b*RNG.uniform(0.6, 1.7), b*RNG.uniform(0.5, 1.3))
+        q = n.to_track_quat('Z', 'Y').to_euler()            # Z hacia la normal + giro/inclinación
+        rot = (q.x + RNG.uniform(-0.5, 0.5), q.y + RNG.uniform(-0.5, 0.5), q.z + RNG.uniform(-math.pi, math.pi))
+        union = RNG.random() < 0.6
+        c = loc + n*(size[2]*0.15 if union else -size[2]*0.1)
+        cutter = make_cube_obj("cut%d" % i, (c.x, c.y, c.z), size, rot, mat=(chit if union else None))
+        apply_boolean(ob, cutter, 'UNION' if union else 'DIFFERENCE')
+    shade_auto(ob, 33)
+
+for _seg in list(SEGS):
+    if _seg["name"] in ("head", "thorax", "abdomen"): kitbash(_seg)
 
 # ---------- escena ----------
 def add_area(name, loc, energy, size, color=(1, 1, 1), rot=None):
