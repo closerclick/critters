@@ -56,17 +56,23 @@ def shade_smooth(me):
     if hasattr(me, "use_auto_smooth"):
         me.use_auto_smooth = True; me.auto_smooth_angle = math.radians(40)
 
-def add_prism(name, pts_sv, z0, height, taper, mat, bevel=0.02):
+def add_prism(name, pts_sv, z0, height, taper, mat, bevel=0.02, down=0.0):
     # GEMA simétrica en el plano horizontal: anillo medio ANCHO y anillos inf/sup ESTRECHOS
     # (espejo arriba/abajo) → sin base plana, lee como 3D desde cualquier ángulo.
+    # Si down>0 → gema vertical alta: girdle ANCHO en z0, punta ARRIBA (z0+height) y punta ABAJO (z0-down).
     P = [P2(x, y) for (x, y) in pts_sv]
     cx = sum(p[0] for p in P)/len(P); cy = sum(p[1] for p in P)/len(P)
     me = bpy.data.meshes.new(name); ob = bpy.data.objects.new(name, me); bpy.context.collection.objects.link(ob)
     bm = bmesh.new()
     def loop(scale, z): return [bm.verts.new((cx + (x-cx)*scale, cy + (y-cy)*scale, z)) for (x, y) in P]
-    bot = loop(taper, z0)                  # abajo (estrecho)
-    mid = loop(1.0, z0 + height/3)         # ancho; el tramo de ABAJO (height/3) es la MITAD del de ARRIBA (2*height/3)
-    top = loop(taper, z0 + height)         # arriba (estrecho)
+    if down > 0:                           # gema alta por arriba Y por abajo (girdle ancho en z0)
+        bot = loop(taper, z0 - down)       # punta de abajo (estrecha)
+        mid = loop(1.0, z0)                # girdle ancho a la altura del cuerpo
+        top = loop(taper, z0 + height)     # punta de arriba (estrecha)
+    else:
+        bot = loop(taper, z0)                  # abajo (estrecho)
+        mid = loop(1.0, z0 + height/3)         # ancho; el tramo de ABAJO (height/3) es la MITAD del de ARRIBA (2*height/3)
+        top = loop(taper, z0 + height)         # arriba (estrecho)
     bm.faces.new(bot)            # cara inferior (anillo estrecho)
     bm.faces.new(top[::-1])      # cara superior
     n = len(P)
@@ -118,13 +124,18 @@ hasAb = A.get("abdomen", -1) >= 0
 legs_n = max(0, min(6, int(A.get("legs", 0))))
 seg_z0 = 0.42 if legs_n > 0 else 0.14
 seg_h = 0.62
-topz = seg_z0 + seg_h * 2   # cabeza al doble de altura → antenas/ojos/mandíbulas se anclan a su tope
+# Gemas verticales: altura por ARRIBA y por ABAJO desde el girdle (parte ancha).
+head_up, head_dn = seg_h * 1.7, seg_h * 1.3     # cabeza ALTA por arriba y por abajo
+ab_up,  ab_dn   = head_up / 2, head_dn / 2      # abdomen la MITAD de alto que la cabeza
+zg_head = seg_z0 + seg_h * 0.55                  # girdle (parte ancha) cerca del centro del cuerpo
+zg_ab   = seg_z0 + seg_h * 0.35
+topz = zg_head + head_up   # tope REAL de la cabeza → antenas/ojos/mandíbulas se anclan ahí
 
 # cabeza
 if A.get("head") == 1:      headpts = [(xC, y0-15), (xC+11, y0+7), (xC-11, y0+7)]
 elif A.get("head") == 3:    headpts = [(xC-15, y0+8), (xC-10, y0-11), (xC+10, y0-11), (xC+15, y0+8)]
 else:                       headpts = hexpts(xC, y0, 12, 13)
-add_prism("head", headpts, seg_z0, seg_h * 2, 0.6, chit)   # cabeza el DOBLE de altura
+add_prism("head", headpts, zg_head, head_up, 0.6, chit, down=head_dn)   # cabeza: gema alta por arriba Y por abajo
 if A.get("head") == 2:      # mandíbulas
     for s in (-1, 1):
         a1 = P2(xC + s*5, y0-11); a2 = P2(xC + s*9, y0-19)
@@ -134,7 +145,7 @@ if hasTh: add_prism("thorax", hexpts(xC, y1, 12, 12), seg_z0, seg_h*0.92, 0.6, c
 if hasAb:
     if A.get("abdomen") == 1: abpts = [(xC, y2-13), (xC+13, y2-2), (xC, y2+15), (xC-13, y2-2)]
     else: abpts = hexpts(xC, y2, 15, 17)
-    add_prism("abdomen", abpts, seg_z0, seg_h*2.2, 0.62, chit)   # cola (abdomen) el DOBLE de altura
+    add_prism("abdomen", abpts, zg_ab, ab_up, 0.62, chit, down=ab_dn)   # cola (abdomen): la MITAD de alto que la cabeza
 
 # conectores (cintura)
 midz = seg_z0 + seg_h*0.5
