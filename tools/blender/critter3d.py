@@ -25,7 +25,7 @@ def mat_chitin():
     m = bpy.data.materials.new("chitin"); m.use_nodes = True
     b = m.node_tree.nodes["Principled BSDF"]
     b.inputs["Base Color"].default_value = (*CHITIN, 1)
-    for k, v in (("Metallic", 0.05), ("Roughness", 0.80)):   # más difuso/mate (menos brillo)
+    for k, v in (("Metallic", 0.0), ("Roughness", 0.97)):   # casi mate total (ajustado a mano en el blend)
         if k in b.inputs: b.inputs[k].default_value = v
     for k in ("Coat Weight", "Clearcoat", "Coat"):
         if k in b.inputs: b.inputs[k].default_value = 0.1; break
@@ -185,13 +185,17 @@ for j, ex in enumerate(eyexs):
     e = P2(ex, eyeY); add_sphere("eye%d" % j, (e[0], e[1], eye_z), 0.18, eye_mat)   # ojos ESFÉRICOS negros
 
 # ---------- escena ----------
-def add_area(name, loc, energy, size, color=(1, 1, 1)):
+def add_area(name, loc, energy, size, color=(1, 1, 1), rot=None):
     l = bpy.data.lights.new(name, 'AREA'); l.energy = energy; l.size = size; l.color = color
     o = bpy.data.objects.new(name, l); o.location = loc; bpy.context.collection.objects.link(o)
-    d = Vector((0, 0, 0.4)) - Vector(loc); o.rotation_euler = d.to_track_quat('-Z', 'Y').to_euler()
+    if rot is not None: o.rotation_euler = rot
+    else: o.rotation_euler = (Vector((0, 0, 0.4)) - Vector(loc)).to_track_quat('-Z', 'Y').to_euler()
 add_area("key", (3.5, 4.5, 5.5), 350, 4)        # frente (+Y, lado de la cara)
 add_area("fill", (-4.5, 3, 3), 110, 5)
 add_area("rim", (-2.5, -5.5, 3.5), 600, 4, (1.0, 0.55, 0.35))   # atrás (-Y), rim cálido
+# rim2: área cálido extra por DEBAJO y al FRENTE (ajustado a mano en el blend, rotación propia)
+add_area("rim2", (4.2555, 7.1332, -2.0159), 600, 4, (1.0, 0.55, 0.35),
+         rot=(math.radians(-35.37), math.radians(4.91), math.radians(-8.21)))
 
 # CÁMARA: posición fijada a mano en la GUI (registrada con dump_blend.py, 2026-06-06).
 cam_d = bpy.data.cameras.new("cam"); cam = bpy.data.objects.new("cam", cam_d); bpy.context.collection.objects.link(cam)
