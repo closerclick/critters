@@ -159,27 +159,36 @@ export function critterSvg (critter, size = 96, opts = {}) {
   const legOrder = [0, 1, 2, 3, 4, 5];
   for (let k = 5; k > 0; k--) { const m = (legRng() * (k + 1)) | 0; const t = legOrder[k]; legOrder[k] = legOrder[m]; legOrder[m] = t; }
   const legCells = legOrder.slice(0, L).sort((x, y) => x - y);
-  let legRowMax = -1; for (const ci of legCells) { if (LEG_CELLS[ci][0] > legRowMax) legRowMax = LEG_CELLS[ci][0]; }   // fila más baja con pata
+  const segYs = [y0]; if (hasTh) segYs.push(y1); if (hasAb) segYs.push(y2);   // segmentos REALES presentes (y de cada uno)
+  const nearestSeg = (yy) => { let best = segYs[0], bd = Infinity; for (const sy of segYs) { const d = Math.abs(sy - yy); if (d < bd) { bd = d; best = sy; } } return best; };
 
   // =========================================================================
   // PATAS — FÉMUR recto (cadera→rodilla) + TIBIA bézier (rodilla→pie), con TAPER (grueso en
   // la cadera, fino en el pie). La rodilla es el codo ANGULAR. legStyle marca la curvatura
   // (convexa ↔ inversa). Se dibuja UNA pata por cada celda elegida por el seed (arriba).
   // =========================================================================
-  const ROW_FOOT_DY = [-11, 2, 14];   // SPLAY radial: delanteras hacia adelante, traseras hacia atrás
+  const ROW_FOOT_DY = [-16, 1, 18];   // SPLAY radial del PIE: delanteras arriba, traseras abajo (abanico)
+  const HIP_DY = [-8, 0, 8];          // SPLAY de la CADERA a lo largo del segmento → patas que comparten
+                                       // segmento (p.ej. cabeza sola + 6 patas) NO se amontonan en un punto
   let legs = '';
+  let legMaxY = -Infinity, legMinY = Infinity, legMaxX = 0;   // extents REALES de las patas (para el encuadre)
   for (const ci of legCells) {
     const [r, side] = LEG_CELLS[ci]; const yy = rowY[r];
     const j = jit(0.8);
+    const attachY = nearestSeg(yy);                      // la pata NACE del segmento más próximo (no de una espina)
     const reach = 32 + (r === 2 ? 3 : r === 0 ? 1 : 0);  // tamaño parejo (traseras un poco más largas)
     const inverse = !articulated;                        // legStyle 0 = CURVATURA INVERSA (tibia hacia adentro)
     const bend = inverse ? 10 : 13;                      // altura del codo sobre la cuerda cadera-pie
-    // cadera en el BORDE del cuerpo (no adentro) → la pata entera se ve; pie afuera con splay
-    const hip = P(xC + side * 9, yy + j * 0.4);
-    const footX = xC + side * (reach + j), footY = yy + ROW_FOOT_DY[r] + j * 0.6;
+    // cadera en el BORDE del segmento más próximo, escalonada por fila → la pata sale del
+    // cuerpo real (no de una espina) y cada una en un punto distinto (no se superponen)
+    const hip = P(xC + side * 9, attachY + HIP_DY[r] + j * 0.4);
+    const footX = xC + side * (reach + j), footY = attachY + ROW_FOOT_DY[r] + j * 0.6;
     const foot = P(footX, footY);
-    // rodilla (codo) a ~52% del alcance, levantada — vértice angular del híbrido
-    const knee = P(xC + side * (reach * 0.52 + j * 0.5), Math.min(hip[1], footY) - bend);
+    if (footY > legMaxY) legMaxY = footY; if (footY < legMinY) legMinY = footY;
+    const axx = Math.abs(footX - xC); if (axx > legMaxX) legMaxX = axx;
+    // rodilla (codo) a ~52% del alcance, levantada sobre el PUNTO MEDIO cadera-pie (codo
+    // natural; no se dispara hacia arriba cuando el pie sube, p.ej. patas delanteras)
+    const knee = P(xC + side * (reach * 0.52 + j * 0.5), (hip[1] + footY) / 2 - bend);
     // TIBIA: 2.ª sección = CURVA. VARIANTE por legStyle: AFUERA (convexa) ↔ INVERSA (cóncava, hacia adentro)
     const mx = (knee[0] + footX) / 2, my = (knee[1] + footY) / 2;
     let cdx = footX - knee[0], cdy = footY - knee[1]; const cm = Math.hypot(cdx, cdy) || 1; cdx /= cm; cdy /= cm;
@@ -210,7 +219,7 @@ export function critterSvg (critter, size = 96, opts = {}) {
   // espina recta). Va de la cabeza al segmento más bajo presente.
   // =========================================================================
   const segBotY = hasAb ? y2 : (hasTh ? y1 : y0);
-  const bodyBotY = Math.max(segBotY, legRowMax >= 1 ? rowY[legRowMax] : y0);   // el cuerpo baja hasta la pata más baja
+  const bodyBotY = segBotY;   // el cuello SOLO une segmentos REALES (no se estira hacia patas sueltas)
   let neck = '';
   if (bodyBotY > y0 + 4) {
     const ntop = y0 + 3, nbot = bodyBotY;
@@ -332,11 +341,12 @@ export function critterSvg (critter, size = 96, opts = {}) {
   // ENCUADRE — bounding box (cabeza+antenas arriba, segmento/pata más bajo, medio
   // ancho según patas) y escalar/centrar para llenar ~80 del viewBox 100.
   // =========================================================================
-  const minY = Math.min(antTopY, headTopY) - 1;
+  const hasLegs = legCells.length > 0;
+  const minY = Math.min(antTopY, headTopY, hasLegs ? legMinY - 3 : Infinity) - 1;
   const segBottom = hasAb ? (a.abdomen === 1 ? y2 + 27 : y2 + 21) : (hasTh ? (y1 + 16) : (y0 + 15));
-  const legBottom = legRowMax === 2 ? (y2 + 18) : legRowMax === 1 ? (y1 + 6) : legRowMax === 0 ? (y0 + 4) : 0;
+  const legBottom = hasLegs ? legMaxY + 4 : 0;
   const maxY = Math.max(segBottom, legBottom);
-  const halfW = L > 0 ? 39 : 16;
+  const halfW = Math.max(hasLegs ? legMaxX + 3 : 0, 16);
   const cy = (minY + maxY) / 2;
   let s = 80 / Math.max(maxY - minY, 2 * halfW);
   s = Math.max(0.72, Math.min(1.7, s));
