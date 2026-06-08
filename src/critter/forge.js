@@ -6,7 +6,7 @@ import { hash32 } from '../lib/hash.js';
 import { ELEMENTS } from './types.js';
 import { ROLES, ROLE_WEIGHTS } from './roles.js';
 import { PASSIVES, ROLE_ACTIVE_POOL, ROLE_PASSIVE_POOL } from './abilities.js';
-import { makeName } from './names.js';
+import { raceName } from './names.js';
 
 // 9 rarezas = nº de partes (1 = solo cabeza … 9 = grilla llena). Presupuesto de stats
 // en rampa y color en degradé.
@@ -138,7 +138,7 @@ function buildBody (id, rng, element, role, appearance, nameTier) {
   const passive = pick(rng, ROLE_PASSIVE_POOL[role]);
   const active = pick(rng, ROLE_ACTIVE_POOL[role]);
   const flanks = rng() < (FLANK[role] ?? 0.5);
-  const name = makeName(rngFrom('race:' + formKey(appearance)), rarityIndex);   // RAZA determinística por la FORMA
+  const name = raceName(appearance.thorax >= 0, appearance.abdomen >= 0, appearance.legs);   // RAZA por el ESQUELETO (28)
   return { id, name, element, role, rarity: rarity.key, rarityIndex, base, passive, active, flanks, appearance };
 }
 
