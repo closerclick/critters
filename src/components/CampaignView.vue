@@ -128,7 +128,7 @@ const terrainGroups = computed(() => {
 <template>
   <p class="view-title">{{ t('campana') }}</p>
   <p class="hint" v-if="teamCount() === 0">{{ t('equipoVacio') }}</p>
-  <div class="webwrap">
+  <div class="webwrap" data-testid="campaign-map">
     <svg ref="svgEl" :viewBox="viewBox" class="web" preserveAspectRatio="xMidYMid meet"
          @wheel.prevent="onWheel" @pointerdown="onDown" @pointermove="onMove" @pointerup="onUp" @pointercancel="onUp">
       <!-- TERRENO: regiones de fondo (Voronoi) por elemento; opacidad en el grupo → mismo terreno sin costura -->
@@ -147,7 +147,7 @@ const terrainGroups = computed(() => {
         <text v-if="n.id === game.lastNode" :x="n.x" :y="n.y - nodeR(n) - 19" class="lastpin">⚑</text>
       </g>
     </svg>
-    <div class="map-ctrl">
+    <div class="map-ctrl" data-testid="map-ctrl">
       <button @click="setZoom(zoom * 1.25)" title="acercar">＋</button>
       <button @click="setZoom(zoom / 1.25)" title="alejar">－</button>
       <button @click="recenter" title="centrar">⊙</button>

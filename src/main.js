@@ -7,6 +7,7 @@ initAudio();   // desbloquea el audio en el primer toque (foley procedural)
 // Botón "Instalar App" (PWA) unificado y navegación "volver" del ecosistema.
 import '@closerclick/closer-click-install';
 import '@closerclick/closer-click-support';   // moneda de soporte (Ko-fi), UI compartida del ecosistema
+import '@closerclick/closer-click-tutorial';  // registra <closer-click-tutorial> (tutoriales guiados por sección)
 import './nav.js';   // registra <closer-click-back> (instancia compartida)
 
 createApp(App).mount('#app');

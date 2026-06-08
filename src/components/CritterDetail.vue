@@ -1,12 +1,12 @@
 <script setup>
-import { computed, ref, watch, onUnmounted } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { instanceByUid, critterById, game, displayName } from '../game/state.js';
 import { feed, FEED_COST, setRol, setTarget, adjustAlloc, resetAlloc, setNick } from '../game/actions.js';
 import { critterSvg } from '../critter/svg.js';
 import { statsAtLevel, STAT_KEYS, pointsFree, xpForNext, RARITY_BY_KEY } from '../critter/forge.js';
 import { ACTIVES, PASSIVES } from '../critter/abilities.js';
 import { elementInfo, ELEMENT_INFO, comps } from '../critter/types.js';
-import { ROL_INFO, ROL_KEYS, normalizeRol, normalizeTargets, TARGET_INFO, ALLY_INFO } from '../battle/policies.js';
+import { ROL_INFO, ROL_KEYS, rolPrimary, OBJ_INFO, OBJ_KEYS, objPrimary } from '../battle/policies.js';
 import { t, loc } from '../i18n.js';
 
 // Perfil + configuración de UNA criatura. Se abre tocando su avatar en cualquier
@@ -53,45 +53,19 @@ function decPt (s) { adjustAlloc(props.uid, s, -1); }
 function resetPts () { resetAlloc(props.uid); }
 function doFeed () { const r = feed(props.uid); err.value = (r && r.error === 'frags') ? t('sinFrags') : ''; }
 
-// Prioridad de ROL + 3 listas de OBJETIVO (una por rol), reordenables por drag & drop.
-const rolOrder = ref([]);     // prioridad de rol
-const targetsObj = ref({});   // { atacante:[...], defensa:[...], soporte:[...] }
-const tgtRol = ref('atacante');   // sub-tab de objetivo seleccionado
-const order = ref([]);        // objetivo del rol seleccionado (vista editable)
+// COMBATE: dos selecciones simples con NOMBRE.
+//  - rolSel: UN rol de acción (atacante/defensa/soporte) → secuencia fija en el motor.
+//  - objSel: UN adjetivo de objetivo (rematador/oportunista/...) → secuencia fija de criterios.
+const rolSel = ref('atacante');
+const objSel = ref('oportunista');
 watch(() => props.uid, () => {
-  rolOrder.value = normalizeRol(inst.value && (inst.value.rol || inst.value.policy), critter.value && critter.value.role);
-  targetsObj.value = normalizeTargets(inst.value && inst.value.target);
-  tgtRol.value = 'atacante';
-  order.value = targetsObj.value[tgtRol.value].slice();
+  const role = critter.value && critter.value.role;
+  rolSel.value = rolPrimary(inst.value && (inst.value.rol || inst.value.policy), role);
+  objSel.value = objPrimary(inst.value && inst.value.target, role);
   tab.value = 'stats';
 }, { immediate: true });
-function pickTgtRol (r) { if (r === tgtRol.value) return; tgtRol.value = r; order.value = targetsObj.value[r].slice(); }
-const tgtInfo = computed(() => tgtRol.value === 'soporte' ? ALLY_INFO : TARGET_INFO);   // soporte = criterios de ALIADOS
-const dragIdx = ref(-1);
-function tDown (e, i) { e.preventDefault(); dragIdx.value = i; window.addEventListener('pointermove', tMove, { passive: false }); window.addEventListener('pointerup', tUp); }
-function tMove (e) {
-  if (dragIdx.value < 0) return;
-  e.preventDefault();
-  const el = document.elementFromPoint(e.clientX, e.clientY);
-  const row = el && el.closest && el.closest('[data-tidx]');
-  if (!row) return;
-  const j = Number(row.dataset.tidx);
-  if (j !== dragIdx.value) { const arr = order.value.slice(); const [m] = arr.splice(dragIdx.value, 1); arr.splice(j, 0, m); order.value = arr; dragIdx.value = j; }
-}
-function tUp () { window.removeEventListener('pointermove', tMove); window.removeEventListener('pointerup', tUp); if (dragIdx.value >= 0) { targetsObj.value[tgtRol.value] = order.value.slice(); setTarget(props.uid, tgtRol.value, order.value.slice()); dragIdx.value = -1; } }
-const rolIdx = ref(-1);
-function rDown (e, i) { e.preventDefault(); rolIdx.value = i; window.addEventListener('pointermove', rMove, { passive: false }); window.addEventListener('pointerup', rUp); }
-function rMove (e) {
-  if (rolIdx.value < 0) return;
-  e.preventDefault();
-  const el = document.elementFromPoint(e.clientX, e.clientY);
-  const row = el && el.closest && el.closest('[data-ridx]');
-  if (!row) return;
-  const j = Number(row.dataset.ridx);
-  if (j !== rolIdx.value) { const arr = rolOrder.value.slice(); const [m] = arr.splice(rolIdx.value, 1); arr.splice(j, 0, m); rolOrder.value = arr; rolIdx.value = j; }
-}
-function rUp () { window.removeEventListener('pointermove', rMove); window.removeEventListener('pointerup', rUp); if (rolIdx.value >= 0) { setRol(props.uid, rolOrder.value.slice()); rolIdx.value = -1; } }
-onUnmounted(() => { window.removeEventListener('pointermove', tMove); window.removeEventListener('pointerup', tUp); });
+function pickRol (k) { if (k === rolSel.value) return; rolSel.value = k; setRol(props.uid, k); }
+function pickObj (k) { if (k === objSel.value) return; objSel.value = k; setTarget(props.uid, k); }
 </script>
 
 <template>
@@ -108,7 +82,7 @@ onUnmounted(() => { window.removeEventListener('pointermove', tMove); window.rem
         <span v-if="rar" class="chip" :style="{ color: rar.color, borderColor: rar.color }">{{ loc(rar) }}</span>
       </div>
 
-      <div class="dtabs">
+      <div class="dtabs" data-testid="detail-tabs">
         <button v-for="x in TABS" :key="x.k" class="dtab" :class="{ on: tab === x.k }" @click="tab = x.k">{{ x.i }} {{ t(x.l) }}</button>
       </div>
 
@@ -152,33 +126,28 @@ onUnmounted(() => { window.removeEventListener('pointermove', tMove); window.rem
         <p style="margin:8px 0"><b style="color:var(--accent)">{{ t('pasiva') }}:</b> {{ loc(passiveInfo) }}<br><span style="color:var(--muted)">{{ loc(passiveInfo?.d) }}</span></p>
       </div>
 
-      <!-- COMBATE: política + objetivo -->
+      <!-- COMBATE: rol de acción + objetivo (dos selecciones simples con nombre) -->
       <div v-show="tab === 'comb'" class="dpane">
-        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">{{ t('rol') }}</div>
-        <div class="tgt-list">
-          <div v-for="(k, i) in rolOrder" :key="k" class="tgt-row" :data-ridx="i" :class="{ drag: rolIdx === i }" @pointerdown="rDown($event, i)">
-            <span class="tgt-handle">⠿</span>
-            <span class="tgt-num">{{ i + 1 }}</span>
-            <span class="tgt-txt"><b>{{ loc(ROL_INFO[k]) }}</b><small>{{ loc(ROL_INFO[k].d) }}</small></span>
-          </div>
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">{{ t('rol') }}</div>
+        <div class="sel-list">
+          <button v-for="k in ROL_KEYS" :key="k" class="sel-row" :class="{ on: rolSel === k }" @click="pickRol(k)">
+            <span class="sel-mark"></span>
+            <span class="sel-txt"><b>{{ loc(ROL_INFO[k]) }}</b><small>{{ loc(ROL_INFO[k].d) }}</small></span>
+          </button>
         </div>
 
-        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:12px 0 6px">{{ t('objetivo') }} · {{ t('porRol') }}</div>
-        <div class="dtabs" style="margin:0 0 6px">
-          <button v-for="r in ROL_KEYS" :key="r" class="dtab" :class="{ on: tgtRol === r }" @click="pickTgtRol(r)">{{ loc(ROL_INFO[r]) }}</button>
-        </div>
-        <div class="tgt-list">
-          <div v-for="(k, i) in order" :key="k" class="tgt-row" :data-tidx="i" :class="{ drag: dragIdx === i }" @pointerdown="tDown($event, i)">
-            <span class="tgt-handle">⠿</span>
-            <span class="tgt-num">{{ i + 1 }}</span>
-            <span class="tgt-txt"><b>{{ loc(tgtInfo[k]) }}</b><small>{{ loc(tgtInfo[k].d) }}</small></span>
-          </div>
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:12px 0 6px">{{ t('objetivo') }}</div>
+        <div class="sel-list">
+          <button v-for="k in OBJ_KEYS" :key="k" class="sel-row" :class="{ on: objSel === k }" @click="pickObj(k)">
+            <span class="sel-mark"></span>
+            <span class="sel-txt"><b>{{ loc(OBJ_INFO[k]) }}</b><small>{{ loc(OBJ_INFO[k].d) }}</small></span>
+          </button>
         </div>
         <div class="hint" style="margin-top:6px;text-align:center">{{ t('objetivoHint') }}</div>
       </div>
 
-      <div class="row-btns" style="margin-top:12px">
-        <button class="btn" :disabled="game.wallet.frags < FEED_COST" @click="doFeed">{{ t('alimentar') }} · 🔹{{ FEED_COST }}</button>
+      <div class="row-btns" style="margin-top:12px" data-testid="detail-actions">
+        <button class="btn" :disabled="game.wallet.frags < FEED_COST" @click="doFeed" data-testid="detail-feed">{{ t('alimentar') }} · 🔹{{ FEED_COST }}</button>
         <button class="btn sec" @click="emit('close')">{{ t('cerrar') }}</button>
       </div>
       <p class="hint" v-if="tab === 'stats'">{{ t('alimentarHint') }}</p>
@@ -216,13 +185,14 @@ onUnmounted(() => { window.removeEventListener('pointermove', tMove); window.rem
 .comp-leg{display:inline-flex;align-items:center;gap:5px}
 .comp-dot{width:11px;height:11px;border-radius:50%;display:inline-block}
 
-.tgt-list{display:flex;flex-direction:column;gap:6px}
-.tgt-row{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:10px;border:1px solid var(--line2);
-  background:rgba(167,139,250,.06);cursor:grab;touch-action:none;text-align:left;transition:border-color .12s, box-shadow .12s}
-.tgt-row:active{cursor:grabbing}
-.tgt-row.drag{border-color:var(--cyan);box-shadow:0 0 0 2px var(--cyan);opacity:.92}
-.tgt-handle{color:var(--muted);font-size:13px}
-.tgt-num{font-family:var(--fmono);font-weight:800;color:var(--cyan);width:16px;text-align:center}
-.tgt-txt{display:flex;flex-direction:column;line-height:1.18;min-width:0}
-.tgt-txt small{color:var(--muted);font-size:10.5px}
+.sel-list{display:flex;flex-direction:column;gap:6px}
+.sel-row{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:10px;border:1px solid var(--line2);
+  background:rgba(167,139,250,.06);cursor:pointer;text-align:left;width:100%;font:inherit;color:var(--text);
+  transition:border-color .12s, box-shadow .12s, background .12s}
+.sel-row:hover{border-color:var(--line2);background:rgba(167,139,250,.1)}
+.sel-row.on{border-color:var(--accent);background:rgba(167,139,250,.16);box-shadow:0 0 0 1px var(--accent)}
+.sel-mark{flex:none;width:14px;height:14px;border-radius:50%;border:2px solid var(--line2);transition:border-color .12s, background .12s}
+.sel-row.on .sel-mark{border-color:var(--accent);background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.sel-txt{display:flex;flex-direction:column;line-height:1.18;min-width:0}
+.sel-txt small{color:var(--muted);font-size:10.5px}
 </style>

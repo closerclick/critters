@@ -45,14 +45,14 @@ const cycLimit = computed(() => node.value ? starCycleLimit(node.value) : 0);
         <p class="hint">{{ t('bossOculto') }}</p>
       </div>
 
-      <div class="enc-lineup">
+      <div class="enc-lineup" data-testid="enc-lineup">
         <span class="enc-sub2">{{ t('tuAlineacion') }}</span>
         <select class="lu-select" :value="game.activeLineup" @change="e => setActiveLineup(e.target.value)">
           <option v-for="l in game.lineups" :key="l.id" :value="l.id">{{ l.name }} ({{ l.team.filter(Boolean).length }}/5)</option>
         </select>
       </div>
 
-      <div class="enc-speed">
+      <div class="enc-speed" data-testid="enc-speed">
         <span class="enc-sub2">{{ t('velocidad') }}</span>
         <span class="speedbar">
           <button v-for="s in SPEEDS" :key="s" class="spd-btn" :class="{ on: speed === s }" @click="setSpeed(s)">{{ s }}×</button>

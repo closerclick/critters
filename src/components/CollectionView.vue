@@ -20,7 +20,7 @@ function doSummon () { const r = summon(); if (r && r.error === 'coins') { err.v
   <p class="hint">{{ t('invocarHint') }}</p>
 
   <p v-if="!game.collection.length" class="hint">{{ t('colVacia') }}</p>
-  <div class="grid-cards">
+  <div class="grid-cards" data-testid="collection-grid">
     <div v-for="i in game.collection" :key="i.uid" @click="openCritter(i.uid)" style="cursor:pointer">
       <CritterCard :instance="i" :size="84" />
     </div>

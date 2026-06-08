@@ -65,10 +65,10 @@ function doFuse () {
 </script>
 
 <template>
-  <p class="hint">{{ t('fusionHint') }}</p>
+  <p class="hint" data-testid="fusion-hint">{{ t('fusionHint') }}</p>
 
   <template v-if="game.collection.length >= 2">
-    <div class="fuse-bar">
+    <div class="fuse-bar" data-testid="fusion-bar">
       <div class="fslot" :class="{ on: selA }" @click="clearA">
         <template v-if="instA"><div class="fp" v-html="svgFor(instA)"></div><span class="fn">{{ nameOf(instA) }}</span>
           <div class="fing"><span v-for="g in ingA" :key="g.key" class="fdot" :style="{ '--c': g.info.color }">{{ g.n }}</span></div></template>
@@ -108,7 +108,7 @@ function doFuse () {
     </div>
 
     <div class="fsub" v-if="subLabel">{{ subLabel }}</div>
-    <div class="grid-cards" v-if="gridList.length">
+    <div class="grid-cards" v-if="gridList.length" data-testid="fusion-grid">
       <div v-for="i in gridList" :key="i.uid" @click="choose(i.uid)" class="fcell" :class="{ dim: selA && !selB && !compatOf(i.uid) }">
         <span v-if="selA && !selB && compatOf(i.uid)" class="ftag" :class="kindOf(i.uid)">{{ kindOf(i.uid) === 'degrade' ? '↓' : kindOf(i.uid) === 'merge' ? '−' : '↑' }}</span>
         <CritterCard :instance="i" :size="78" />

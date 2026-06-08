@@ -83,8 +83,8 @@ function applyDrop (targetLid, targetSlot) {
   <p class="hint">{{ t('teamHint') }}</p>
 
   <div class="team-layout">
-  <div class="lineups">
-    <button class="lu-new" @click="createLineup()">＋ {{ t('nueva') }}</button>
+  <div class="lineups" data-testid="team-lineups">
+    <button class="lu-new" @click="createLineup()" data-testid="team-new-lineup">＋ {{ t('nueva') }}</button>
     <div v-for="lu in game.lineups" :key="lu.id" class="lineup" :class="{ act: lu.id === game.activeLineup }">
       <div class="lu-row">
         <button class="lu-use" :class="{ on: lu.id === game.activeLineup }" @click="setActiveLineup(lu.id)">{{ lu.id === game.activeLineup ? '★ ' + t('enUso') : '☆ ' + t('usar') }}</button>
@@ -108,7 +108,7 @@ function applyDrop (targetLid, targetSlot) {
     </div>
   </div>
 
-  <div class="bench-zone" data-bench>
+  <div class="bench-zone" data-bench data-testid="team-bench">
     <div class="bench-title">{{ t('banquillo') }} · {{ bench.length }}</div>
     <div class="bench">
       <div v-for="i in bench" :key="i.uid" class="bench-item" :style="{ '--el': elColor(i.uid), opacity: drag.active && drag.uid === i.uid ? 0.4 : 1 }"

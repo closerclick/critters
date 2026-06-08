@@ -102,11 +102,14 @@ function purgeUid (uid) { for (const l of game.lineups) for (let i = 0; i < l.te
 
 /** Cambia la política de movimiento de una instancia. */
 export function setPolicy (uid, policy) { const i = instanceByUid(uid); if (i) { i.policy = policy; persist(); } }
-export function setRol (uid, rol) { const i = instanceByUid(uid); if (i) { i.rol = rol; persist(); } }
+/** Rol de ACCIÓN visible (string: 'atacante' | 'defensa' | 'soporte'). Se expande a su
+ *  secuencia fija en el motor (normalizeRol). */
+export function setRol (uid, rolKey) { const i = instanceByUid(uid); if (i) { i.rol = rolKey; persist(); } }
 /** Apodo personalizado (máx 16). Vacío = quita el apodo (vuelve a mostrar solo la raza). */
 export function setNick (uid, nick) { const i = instanceByUid(uid); if (!i) return; const n = String(nick || '').trim().slice(0, 16); if (n) i.nick = n; else delete i.nick; persist(); }
-/** Cambia la preferencia de objetivo de una instancia. */
-export function setTarget (uid, rol, list) { const i = instanceByUid(uid); if (!i) return; const cur = (i.target && !Array.isArray(i.target)) ? { ...i.target } : {}; cur[rol] = list; i.target = cur; persist(); }
+/** Objetivo con NOMBRE (string adjetivo: rematador/oportunista/cazador/verdugo/certero).
+ *  Mapea a su secuencia fija en el motor (normalizeTargets). */
+export function setTarget (uid, objKey) { const i = instanceByUid(uid); if (i) { i.target = objKey; persist(); } }
 
 // ---- puntos de stat (híbrido; respec libre en cualquier momento) ----
 export function adjustAlloc (uid, stat, delta) {

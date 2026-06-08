@@ -33,8 +33,8 @@ function buildUnits (team, side, terrain) {
       id: m.id, level: lvl, critter, name: critter.name, element: critter.element, role: critter.role, rarity: critter.rarity,
       maxHp: s.HP, hp: s.HP, ATK: s.ATK + (b.atk || 0), DEF: s.DEF + (b.def || 0), SPD: s.SPD,
       range: (ranged ? 2 : 1) + (b.range || 0),
-      rol: normalizeRol(m.rol || m.policy, critter.role),   // PRIORIDAD de rol (atacante/defensa/soporte)
-      targets: normalizeTargets(m.target),   // 3 listas de prioridad de objetivo (una por rol)
+      rol: normalizeRol(m.rol || m.policy, critter.role),   // secuencia fija del rol de acción elegido
+      targets: normalizeTargets(m.target, critter.role),   // adjetivo de objetivo → listas por rol
       flanks: !!critter.flanks,
       terrainFav: !!terrain && String(critter.element).split('+').includes(terrain),   // el terreno favorece su(s) elemento(s)
       energy: 0, charge: 0, stunTurns: 0, buffs: [], alive: true, healFactor: 1, passive: critter.passive, active: critter.active, lastTarget: null,

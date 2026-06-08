@@ -38,6 +38,20 @@ const svgFor = (u) => critterSvg(critterById(u.id), 40, { frame: false });
 const leftOf = (u) => (u.col / COLS * 100) + '%';
 const topOf = (u) => (u.row / ROWS * 100) + '%';
 
+// Tamaño POR RAREZA, SOLO en el campo: critterSvg auto-encaja todo al mismo tamaño,
+// así que acá escalamos el contenedor del critter (transform CSS, vía --rscale) según
+// su rarityIndex (0..8). Cría ~0.6 → Legendario ~1.8 (≈3×): el legendario desborda un
+// poco la celda; interpolación GEOMÉTRICA (cada tier ×1.147) para que el medio quede
+// proporcional. No toca las cartas/colección (eso usa critterSvg tal cual).
+const R_SCALE_MIN = 0.6, R_SCALE_MAX = 1.8;
+const rarityScale = (ri) => {
+  const i = Math.max(0, Math.min(8, ri | 0));
+  return +(R_SCALE_MIN * Math.pow(R_SCALE_MAX / R_SCALE_MIN, i / 8)).toFixed(3);
+};
+const scaleOf = (u) => rarityScale(critterById(u.id).rarityIndex);
+// Los más raros (más grandes) van por DELANTE para que su desborde tape, no quede tapado.
+const zOf = (u) => 1 + Math.max(0, Math.min(8, critterById(u.id).rarityIndex | 0));
+
 // Estela de golpe: línea atacante→objetivo en cada ataque básico.
 const trails = ref([]);
 let trailN = 0;
@@ -153,14 +167,14 @@ const summary = computed(() => {
     <closer-click-back class="battle-back" style="--cc-back-size:32px;color:var(--text)"></closer-click-back>
     <h2>{{ t('campana') }} · {{ payload.boss ? 'BOSS ★' : (t('nivel') + ' ' + payload.level) }}</h2>
     <div v-if="terrainInfo" class="bterrain" :style="{ color: terrainInfo.color }">🌍 {{ loc(terrainInfo) }} · {{ t('favorece') }}</div>
-    <div class="arena" @click="onArena">
+    <div class="arena" @click="onArena" data-testid="battle-arena">
       <div class="field" :style="terrainInfo ? { '--terr': terrainInfo.color } : {}">
         <div class="zone you"></div><div class="zone foe"></div>
         <svg class="trails" viewBox="0 0 100 100" preserveAspectRatio="none">
           <line v-for="tr in trails" :key="tr.k" :x1="tr.x1" :y1="tr.y1" :x2="tr.x2" :y2="tr.y2" class="trail" :class="{ crit: tr.crit }" />
         </svg>
         <div v-for="uid in list" :key="uid" class="fu" :class="{ dead: U[uid].dead, hit: U[uid].flash, foe: U[uid].side === 1, fav: U[uid].terrainFav, faceR: U[uid].face > 0, faceL: U[uid].face < 0 }"
-             :style="{ left: leftOf(U[uid]), top: topOf(U[uid]) }">
+             :style="{ left: leftOf(U[uid]), top: topOf(U[uid]), '--rscale': scaleOf(U[uid]), zIndex: zOf(U[uid]) }">
           <span v-if="U[uid].flash && U[uid].dmg != null" class="dmgnum" :class="U[uid].dmgClass">{{ U[uid].dmg }}</span>
           <span v-for="f in floatersFor(uid)" :key="f.k" class="floater" :class="f.cls" :style="{ '--off': f.off }">{{ f.text }}</span>
           <div class="fu-svg" v-html="svgFor(U[uid])"></div>
@@ -174,7 +188,7 @@ const summary = computed(() => {
       <div class="field-tags"><span>◀ {{ t('tuEquipo') }}</span><span>{{ t('rival') }} ▶</span></div>
     </div>
 
-    <div class="blog" v-if="!finished">
+    <div class="blog" v-if="!finished" data-testid="battle-speed">
       <span class="speedbar">
         <button v-for="s in SPEEDS" :key="s" class="spd-btn" :class="{ on: speed === s }" @click="setSpeed(s)">{{ s }}×</button>
       </span>
@@ -237,12 +251,15 @@ const summary = computed(() => {
   repeating-linear-gradient(0deg, transparent 0 calc(20% - 1px), rgba(167,139,250,.10) calc(20% - 1px) 20%)}
 .zone{position:absolute;top:0;bottom:0;width:37.5%;pointer-events:none}
 .fu{position:absolute;width:12.5%;height:20%;transition:left .28s ease, top .28s ease;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.fu-svg{width:84%;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 2px 5px rgba(0,0,0,.6))}
+/* --rscale: factor de tamaño POR RAREZA (lo fija BattleView por unidad). El svg se escala
+   desde su CENTRO sin mover el ancla de la celda → no rompe posiciones; los grandes (legendario)
+   desbordan la celda. La estela/golpe (scale 1.14) se COMPONE con el factor de rareza. */
+.fu-svg{width:84%;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 2px 5px rgba(0,0,0,.6));transform:scale(var(--rscale,1));transition:transform .2s;transform-origin:center}
 .fu-svg :deep(svg){width:100%;height:auto;transition:transform .2s}
 .fu.faceR .fu-svg :deep(svg){transform:rotate(90deg)}                   /* mira a la derecha */
 .fu.faceL .fu-svg :deep(svg){transform:rotate(-90deg)}                  /* mira a la izquierda */
 .fu.dead{opacity:.25;filter:grayscale(1)}
-.fu.hit .fu-svg{transform:scale(1.14)}
+.fu.hit .fu-svg{transform:scale(calc(var(--rscale,1) * 1.14))}
 .fu.fav .fu-svg{filter:drop-shadow(0 0 6px var(--terr,transparent)) drop-shadow(0 2px 5px rgba(0,0,0,.6))}
 .bterrain{font-family:var(--fmono);font-size:11.5px;text-align:center;margin:-2px 0 4px}
 .trails{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3;overflow:visible}

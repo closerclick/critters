@@ -6,6 +6,7 @@ import { i18n, t, toggleLang } from './i18n.js';
 import { nav } from './nav.js';
 import { ui, closeCritter } from './ui.js';
 import { isMuted as sfxIsMuted, toggleMuted as sfxToggle } from './sfx.js';
+import { onView as tutorialView, resetAllTutorials } from './tutorial.js';
 import CampaignView from './components/CampaignView.vue';
 import CollectionView from './components/CollectionView.vue';
 import TeamView from './components/TeamView.vue';
@@ -73,6 +74,24 @@ let detailNav = null;
 function closeDetailUI () { closeCritter(); detailNav = null; }
 function onDetailClose () { if (detailNav) nav.back(); else closeDetailUI(); }
 watch(() => ui.detailUid, (v) => { if (v && !detailNav) detailNav = nav.open(() => closeDetailUI()); });
+
+// ─── Tutoriales guiados POR SECCIÓN (paquete compartido @closerclick/closer-click-tutorial) ───
+// Cada vista lanza su PROPIO tutorial la PRIMERA VEZ que se ve (una sola vez,
+// persistido por la librería). Declarados al final: dependen de refs de arriba.
+// Pantalla inicial (elegir criatura).
+watch(needsStarter, (need) => { if (need) tutorialView('starter'); }, { immediate: true });
+// Pestañas: el valor de `tab` coincide con la clave de sección (campana/equipo/
+// coleccion/fusion). Dispara al montar (campaña) y en cada cambio, con el juego
+// listo y fuera de la pantalla inicial.
+watch(
+  [tab, () => game.ready, needsStarter],
+  ([tb, ready, need]) => { if (ready && !need) tutorialView(tb); },
+  { immediate: true },
+);
+// Vistas modales/superpuestas: encuentro, batalla y detalle de criatura.
+watch(encounter, (n) => { if (n && !battle.value) tutorialView('encounter'); });
+watch(battle, (b) => { if (b) tutorialView('battle'); });
+watch(() => ui.detailUid, (v) => { if (v) tutorialView('detail'); });
 </script>
 
 <template>

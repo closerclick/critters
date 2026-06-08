@@ -4,29 +4,40 @@
 //    primero de la lista que tenga un objetivo válido (p. ej. "soporte → a distancia
 //    → débil": si no hay soporte enemigo, prueba a distancia, y si no, remata al débil).
 
-// ROL: lista de PRIORIDAD ordenable (atacante/defensa/soporte). Cada turno el critter usa
-// el PRIMER rol aplicable: soporte solo si puede curar y NO lo están atacando; defensa si lo
-// atacan o está herido; atacante siempre (fallback). Reemplaza a la vieja "política".
+// ROL DE ACCIÓN: el jugador elige UNO (atacante/defensa/soporte) — es el rol VISIBLE.
+// Por detrás cada rol primario se expande a una SECUENCIA FIJA de fallback (nada de
+// ordenar permutaciones): el critter usa el PRIMER rol aplicable de la secuencia. Soporte
+// solo si puede curar y NO lo están atacando; defensa si lo atacan o está herido; atacante
+// siempre (fallback). El role de stats (tanque/dps/...) queda interno y solo da el default.
 export const ROL_KEYS = ['atacante', 'defensa', 'soporte'];
 export const ROL_INFO = {
   atacante: { es: 'Atacante', en: 'Attacker', d: { es: 'Avanza y ataca al enemigo.', en: 'Advances and attacks.' } },
   defensa:  { es: 'Defensa',  en: 'Defense',  d: { es: 'Aguanta; se defiende cuando lo atacan o está herido.', en: 'Holds; defends when attacked or hurt.' } },
-  soporte:  { es: 'Soporte',  en: 'Support',  d: { es: 'Cura/buffa si hay a quién y no lo atacan; si no, pasa al siguiente rol.', en: 'Heals/buffs when possible and safe; else next role.' } },
+  soporte:  { es: 'Soporte',  en: 'Support',  d: { es: 'Cura/buffa si hay a quién y no lo atacan; si no, ataca.', en: 'Heals/buffs when possible and safe; else attacks.' } },
 };
+// Secuencia FIJA de fallback de cada rol primario (clave→permutación de ROL_KEYS).
+const ROL_SEQ = {
+  atacante: ['atacante', 'defensa', 'soporte'],
+  defensa:  ['defensa', 'atacante', 'soporte'],
+  soporte:  ['soporte', 'defensa', 'atacante'],
+};
+// Rol de acción por defecto según el role INTERNO de stats.
 export function defaultRol (role) {
-  if (role === 'soporte') return ['soporte', 'defensa', 'atacante'];
-  if (role === 'tanque') return ['defensa', 'atacante', 'soporte'];
-  return ['atacante', 'defensa', 'soporte'];
+  if (role === 'soporte') return 'soporte';
+  if (role === 'tanque') return 'defensa';
+  return 'atacante';
 }
-// Permutación completa y válida de ROL_KEYS (tolera legacy/parcial/vacío).
+// Expande el rol primario (string) a su secuencia FIJA. Tolera legacy (array → toma el
+// primero), parcial/vacío/desconocido → cae al default por role interno.
 export function normalizeRol (rol, role) {
-  const base = defaultRol(role);
-  if (typeof rol === 'string') rol = [rol];
-  if (!Array.isArray(rol) || !rol.length) return base.slice();
-  const seen = new Set(), out = [];
-  for (const k of rol) if (ROL_KEYS.includes(k) && !seen.has(k)) { seen.add(k); out.push(k); }
-  for (const k of base) if (!seen.has(k)) out.push(k);
-  return out;
+  if (Array.isArray(rol)) rol = rol[0];   // legacy: era una permutación; quedate con el primario
+  if (typeof rol !== 'string' || !ROL_SEQ[rol]) rol = defaultRol(role);
+  return ROL_SEQ[rol].slice();
+}
+// Rol primario (string) elegido — para que la UI marque el botón activo.
+export function rolPrimary (rol, role) {
+  if (Array.isArray(rol)) rol = rol[0];
+  return (typeof rol === 'string' && ROL_SEQ[rol]) ? rol : defaultRol(role);
 }
 
 export const POLICIES = ['agresiva', 'defensiva'];
@@ -84,19 +95,48 @@ export const ALLY_INFO = {
 };
 export const defaultAlly = () => ['herido', 'vida', 'frente', 'mismo'];
 
-// PRIORIDAD de objetivo POR ROL. atacante/defensa = ENEMIGOS; soporte = ALIADOS (ayuda).
-export function defaultTargetForRol (rolKey) {
-  if (rolKey === 'defensa') return ['cercano', 'fuerte', 'debil', 'rango', 'soporte'];
-  return ['debil', 'cercano', 'fuerte', 'rango', 'soporte'];   // atacante
+// OBJETIVO con NOMBRE (adjetivo): el jugador elige UNO; cada adjetivo mapea a una
+// SECUENCIA FIJA de criterios de enemigo (nada de ordenar). `seq` es la prioridad: el
+// critter ataca al primero de la lista con candidato válido. Aplica a los roles que
+// atacan ENEMIGOS (atacante/defensa); el soporte usa siempre su prioridad de ALIADOS.
+export const OBJ_KEYS = ['rematador', 'oportunista', 'cazador', 'verdugo', 'certero'];
+export const OBJ_INFO = {
+  rematador:   { es: 'Rematador',   en: 'Finisher',     d: { es: 'Va por el más débil para rematar.', en: 'Goes for the weakest to finish it off.' }, seq: ['debil', 'cercano', 'fuerte', 'rango', 'soporte'] },
+  oportunista: { es: 'Oportunista', en: 'Opportunist',  d: { es: 'Golpea al enemigo más cercano.', en: 'Hits the nearest enemy.' }, seq: ['cercano', 'debil', 'fuerte', 'rango', 'soporte'] },
+  cazador:     { es: 'Cazador',     en: 'Hunter',       d: { es: 'Caza al más fuerte (más poder).', en: 'Hunts the strongest (most power).' }, seq: ['fuerte', 'cercano', 'debil', 'rango', 'soporte'] },
+  verdugo:     { es: 'Verdugo',     en: 'Executioner',  d: { es: 'Va primero por sanadores y soportes.', en: 'Targets healers/support first.' }, seq: ['soporte', 'rango', 'debil', 'cercano', 'fuerte'] },
+  certero:     { es: 'Certero',     en: 'Marksman',     d: { es: 'Prioriza a los enemigos a distancia.', en: 'Prioritizes ranged enemies.' }, seq: ['rango', 'soporte', 'debil', 'cercano', 'fuerte'] },
+};
+// Secuencia FIJA de criterios de un adjetivo (clave→[criterios]). Default si no existe.
+export function objSeq (key) {
+  return (OBJ_INFO[key] ? OBJ_INFO[key].seq : OBJ_INFO[defaultObj()].seq).slice();
 }
-// Claves válidas según el rol (soporte → aliados).
-export const keysForRol = (rolKey) => (rolKey === 'soporte' ? ALLY_KEYS : TARGET_KEYS);
-// Devuelve { atacante:[enemigos], defensa:[enemigos], soporte:[ALIADOS] }.
-export function normalizeTargets (target) {
+// Adjetivo por defecto según el role INTERNO de stats.
+export function defaultObj (role) {
+  if (role === 'dps') return 'rematador';
+  if (role === 'distancia' || role === 'control') return 'certero';
+  return 'oportunista';   // tanque / peleador / soporte / desconocido
+}
+// Adjetivo elegido (string) — para que la UI marque el botón activo. Tolera legacy.
+export function objPrimary (target, role) {
+  if (typeof target === 'string' && OBJ_INFO[target]) return target;
+  return defaultObj(role);
+}
+// PRIORIDAD de objetivo POR ROL. atacante/defensa = ENEMIGOS; soporte = ALIADOS (ayuda).
+// Construido desde el ADJETIVO elegido (string). Tolera legacy: string adjetivo, o el
+// viejo objeto/array de permutaciones por rol (normalizado por compat).
+export function normalizeTargets (target, role) {
+  // Adjetivo nuevo (string con nombre conocido) → secuencia FIJA para los dos roles que atacan.
+  if (typeof target === 'string') {
+    const seq = OBJ_INFO[target] ? objSeq(target) : objSeq(defaultObj(role));
+    return { atacante: seq.slice(), defensa: seq.slice(), soporte: defaultAlly() };
+  }
+  // Legacy: array (una sola lista) u objeto { atacante, defensa, soporte } de permutaciones.
   const legacy = Array.isArray(target) ? target : null;
+  const def = objSeq(defaultObj(role));
   return {
-    atacante: normPerm(legacy || (target && target.atacante), defaultTargetForRol('atacante')),
-    defensa: normPerm(legacy || (target && target.defensa), defaultTargetForRol('defensa')),
+    atacante: normPerm(legacy || (target && target.atacante), def),
+    defensa: normPerm(legacy || (target && target.defensa), def),
     soporte: normPerm(target && target.soporte, defaultAlly(), ALLY_KEYS),
   };
 }
