@@ -32,9 +32,10 @@ una API Gateway que sólo encola en SQS; SQS dispara la Lambda. El navegador no 
 navegador (miss) ──POST {id}──▶ API Gateway ──SendMessage──▶ SQS FIFO ──▶ Lambda ──▶ S3
 ```
 
-- **Endpoint:** `POST https://naxyvfx1db.execute-api.us-east-1.amazonaws.com/prod/render`
-  body `{"id":"g:...","views":["top"]}` → responde `{"queued":true}`. Throttling 5 req/s
-  (burst 10), CORS abierto.
+- **Endpoint:** `POST https://render.closer.click/` (Cloudflare Worker que reenvía a la
+  API Gateway `naxyvfx1db.execute-api.us-east-1.amazonaws.com/prod/render`). Body
+  `{"id":"g:...","views":["top"]}` → `{"queued":true}`. Throttling 5 req/s (burst 10),
+  CORS abierto, validación de genoma en la puerta (400 si es basura).
 - **Validación en la puerta:** un request-validator + modelo JSON-Schema (`GenomeReq`,
   con `pattern` de genoma y rangos de samples/res) rechaza la basura con **400 ANTES de
   encolar** — no gasta SQS ni Lambda. (SQS no puede validar contenido; API Gateway sí.)
@@ -47,7 +48,7 @@ Lado del juego (detectar miss → encolar; la imagen llega sola en la próxima c
 ```js
 const KEY = (id) => sha256Hex(id).slice(0, 32);   // sha256 → primeros 32 hex
 const IMG = (id) => `https://s3.closer.click/critters/${KEY(id)}/top.webp`;
-const INTAKE = "https://naxyvfx1db.execute-api.us-east-1.amazonaws.com/prod/render";
+const INTAKE = "https://render.closer.click/";   // Worker → API Gateway → SQS
 
 async function critterImg(id) {
   const r = await fetch(IMG(id), { method: "GET" });
