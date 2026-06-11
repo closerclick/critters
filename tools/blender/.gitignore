@@ -3,3 +3,4 @@
 *.blend1
 *.png
 *.json
+__pycache__/
