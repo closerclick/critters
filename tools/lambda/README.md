@@ -56,31 +56,29 @@ sólo con un build oficial que traiga el denoiser.
 > ni CORS en `critters/*` (cambio de exposición pública: requiere visto bueno
 > explícito). Hasta entonces los objetos están subidos pero no son legibles anónimos.
 
-## Despliegue del contenedor (necesita una clave con ECR + IAM)
+## Despliegue del contenedor (YA DESPLEGADO)
+
+Función `critters-render` en `us-east-1`: imagen 2.14 GB en ECR, 10 GB RAM,
+/tmp 2 GB, timeout 900 s, rol `LambdaS3ExecutionRole`. La clave `fable` tiene S3 + ECR
+(push + lifecycle); el rol de ejecución es uno existente (no se crean roles IAM).
 
 ```bash
-AWS_PROFILE=closerclick; REGION=us-east-1; ACC=$(aws sts get-caller-identity --query Account --output text)
-aws ecr create-repository --repository-name critters-render --region $REGION
+ACC=147464502454; REGION=us-east-1; REPO=$ACC.dkr.ecr.$REGION.amazonaws.com/critters-render
+# build desde la RAIZ del repo
+docker build -f tools/lambda/Dockerfile -t critters-render .
 aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ACC.dkr.ecr.$REGION.amazonaws.com
-docker tag critters-render $ACC.dkr.ecr.$REGION.amazonaws.com/critters-render:latest
-docker push $ACC.dkr.ecr.$REGION.amazonaws.com/critters-render:latest
+docker tag critters-render:latest $REPO:latest && docker push $REPO:latest
 
-aws lambda create-function --function-name critters-render \
-  --package-type Image --code ImageUri=$ACC.dkr.ecr.$REGION.amazonaws.com/critters-render:latest \
-  --memory-size 10240 --timeout 900 --region $REGION \
-  --role arn:aws:iam::$ACC:role/critters-render-role
+# primera vez: create-function (ya hecho). Re-deploy de código nuevo:
+aws lambda update-function-code --function-name critters-render --region $REGION --image-uri $REPO:latest
 ```
 
-Política mínima del rol (además de `AWSLambdaBasicExecutionRole`):
+`create-function` original (referencia): `--package-type Image --code ImageUri=$REPO:latest
+--role arn:aws:iam::$ACC:role/LambdaS3ExecutionRole --memory-size 10240 --timeout 900
+--ephemeral-storage Size=2048`. El repo tiene policy que deja a `lambda.amazonaws.com`
+leer la imagen, y lifecycle que expira imágenes untagged > 7 días.
 
-```json
-{ "Version": "2012-10-17", "Statement": [{
-    "Effect": "Allow",
-    "Action": ["s3:PutObject", "s3:GetObject"],
-    "Resource": "arn:aws:s3:::s3.closer.click/critters/*" }] }
-```
-
-Lectura pública del bucket (solo el prefijo de imágenes):
+Lectura pública del bucket (solo el prefijo de imágenes) — PENDIENTE de aplicar:
 
 ```json
 { "Version": "2012-10-17", "Statement": [{
@@ -88,12 +86,12 @@ Lectura pública del bucket (solo el prefijo de imágenes):
     "Resource": "arn:aws:s3:::s3.closer.click/critters/*" }] }
 ```
 
-Invocar:
+Invocar (awscli v1 → payload por archivo, sin `--cli-binary-format`):
 
 ```bash
-aws lambda invoke --function-name critters-render --region $REGION \
-  --cli-binary-format raw-in-base64-out \
-  --payload '{"id":"g:demo:fuego:dps:2:0:0:6:1:1:0:1","views":["top"]}' /dev/stdout
+printf '%s' '{"id":"g:demo:fuego:dps:2:0:0:6:1:1:0:1","views":["top"]}' > /tmp/p.json
+aws lambda invoke --function-name critters-render --region us-east-1 \
+  --payload file:///tmp/p.json /tmp/out.json && cat /tmp/out.json
 ```
 
 ## Parámetros recomendados
