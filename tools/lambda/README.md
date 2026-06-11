@@ -35,6 +35,10 @@ navegador (miss) ──POST {id}──▶ API Gateway ──SendMessage──▶
 - **Endpoint:** `POST https://naxyvfx1db.execute-api.us-east-1.amazonaws.com/prod/render`
   body `{"id":"g:...","views":["top"]}` → responde `{"queued":true}`. Throttling 5 req/s
   (burst 10), CORS abierto.
+- **Validación en la puerta:** un request-validator + modelo JSON-Schema (`GenomeReq`,
+  con `pattern` de genoma y rangos de samples/res) rechaza la basura con **400 ANTES de
+  encolar** — no gasta SQS ni Lambda. (SQS no puede validar contenido; API Gateway sí.)
+  La validación de la Lambda queda como defensa en profundidad.
 - **Cola** `critters-render.fifo` con dedup por contenido (50 jugadores, mismo critter = 1
   render). Lambda idempotente (HEAD a S3) y valida el formato de genoma antes de Blender.
 
