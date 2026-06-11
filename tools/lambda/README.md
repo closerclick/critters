@@ -22,6 +22,38 @@ s3://s3.closer.click/critters/<sha256(genomeId)[:32]>/top.webp     ← la vista 
 El juego calcula la key con `sha256(id)` y pide la URL; si 404/403 → muestra el SVG
 y pide el render (la mejora llega sola en la siguiente carga).
 
+## Disparo on-demand (DESPLEGADO): API Gateway → SQS → Lambda → S3
+
+La invocación pública directa de la Lambda (Function URL `auth NONE`) está **bloqueada por
+un guardrail/SCP de la organización** (da 403). La salida serverless y sin VPS es exponer
+una API Gateway que sólo encola en SQS; SQS dispara la Lambda. El navegador no toca AWS.
+
+```
+navegador (miss) ──POST {id}──▶ API Gateway ──SendMessage──▶ SQS FIFO ──▶ Lambda ──▶ S3
+```
+
+- **Endpoint:** `POST https://naxyvfx1db.execute-api.us-east-1.amazonaws.com/prod/render`
+  body `{"id":"g:...","views":["top"]}` → responde `{"queued":true}`. Throttling 5 req/s
+  (burst 10), CORS abierto.
+- **Cola** `critters-render.fifo` con dedup por contenido (50 jugadores, mismo critter = 1
+  render). Lambda idempotente (HEAD a S3) y valida el formato de genoma antes de Blender.
+
+Lado del juego (detectar miss → encolar; la imagen llega sola en la próxima carga):
+
+```js
+const KEY = (id) => sha256Hex(id).slice(0, 32);   // sha256 → primeros 32 hex
+const IMG = (id) => `https://s3.closer.click/critters/${KEY(id)}/top.webp`;
+const INTAKE = "https://naxyvfx1db.execute-api.us-east-1.amazonaws.com/prod/render";
+
+async function critterImg(id) {
+  const r = await fetch(IMG(id), { method: "GET" });
+  if (r.ok) return IMG(id);                         // 200 → cacheada, listo
+  fetch(INTAKE, { method: "POST", headers: { "content-type": "application/json" },
+                  body: JSON.stringify({ id, views: ["top"] }) });  // 403 → encolar (fire-and-forget)
+  return null;                                       // mostrar el SVG mientras tanto
+}
+```
+
 ## Build y prueba local (sin AWS)
 
 ```bash

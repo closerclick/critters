@@ -25,18 +25,50 @@ def _s3():
     import boto3
     return boto3.client("s3")
 
+# La Function URL es PÚBLICA: cualquiera puede postear. Para que no se pueda usar de
+# cost-bomb (renders de basura), sólo aceptamos ids con FORMA de genoma real y acotamos
+# los parámetros caros (samples/res/vistas). La idempotencia (HEAD a S3) hace el resto:
+# pedir mil veces el mismo id no re-renderiza.
+_GENOME_RE = re.compile(r"^g(:[A-Za-z0-9._+\-]{0,24}){4,11}$")
+
+def _valid_genome(gid):
+    return isinstance(gid, str) and len(gid) <= 160 and bool(_GENOME_RE.match(gid))
+
 def lambda_handler(event, context=None):
+    """Router: invoke directo, Function URL, o batch de SQS.
+    - SQS: event = {"Records":[{"body": "<json>", ...}, ...]} → procesa cada uno;
+      una excepción en un record no tira el batch entero (lo deja para reintento).
+    - Function URL: event tiene body string (JSON) → un render.
+    - Invoke directo: event ya es el dict de pedido.
+    """
+    if isinstance(event, dict) and isinstance(event.get("Records"), list):   # SQS
+        results = []
+        for rec in event["Records"]:
+            try:
+                payload = json.loads(rec.get("body") or "{}")
+                results.append(_render(payload, public=True))
+            except Exception as e:   # noqa: BLE001 — un id malo no debe frenar el resto
+                results.append({"error": str(e), "messageId": rec.get("messageId")})
+        return {"batch": results}
+    # Function URL (body string) = público; invoke directo = confiable
+    is_url = isinstance(event, dict) and isinstance(event.get("body"), str)
+    return _render(event, public=is_url)
+
+def _render(event, public=False):
     if isinstance(event, dict) and isinstance(event.get("body"), str):   # Function URL
         body = event["body"]
         if event.get("isBase64Encoded"): body = base64.b64decode(body).decode()
-        event = json.loads(body)
+        event = json.loads(body or "{}")
     gid = event.get("id")
-    spec = event.get("spec") or spec_derive.spec_from_id(gid)
+    if not _valid_genome(gid):                       # rechazo barato ANTES de tocar Blender
+        raise ValueError("genome id invalido: %r" % gid)
+    # desde la URL pública no se aceptan specs arbitrarios ni overrides caros
+    spec = (event.get("spec") if not public else None) or spec_derive.spec_from_id(gid)
     gid = gid or spec["id"]
     views = [v for v in (event.get("views") or list(VIEW_FILES)) if v in VIEW_FILES]
     formats = [f for f in (event.get("formats") or ["webp"]) if f in ("webp", "png")]
-    samples = int(event.get("samples", 160))
-    res = int(event.get("res", 1024))
+    samples = max(16, min(int(event.get("samples", 160)), 320))
+    res = max(128, min(int(event.get("res", 1024)), 1024))
     key_id = hashlib.sha256(gid.encode()).hexdigest()[:32]
 
     s3 = None if DRY_RUN else _s3()
