@@ -528,7 +528,7 @@ if "scene" in PARTS:
     sc = bpy.context.scene
     sc.render.engine = 'CYCLES'
     sc.cycles.samples = opt_samples
-    try: sc.cycles.use_denoising = False
+    try: sc.cycles.use_denoising = bool(os.environ.get("CRITTER_DENOISE"))   # local sin OIDN: apagado; la Lambda lo enciende
     except Exception: pass
     try:
         prefs = bpy.context.preferences.addons['cycles'].preferences

@@ -41,6 +41,12 @@ arriba, fondo transparente — la vista del juego)** y `<out>_side.png` (perfil)
   `blender --background tools/blender/critter3d_fire.blend --python tools/blender/dump_blend.py`
   (vuelca cámara, luces, materiales, transforms y modificadores en JSON).
 
+## Render bajo demanda (Lambda → S3)
+
+Para servir imágenes al juego sin pre-generar millones: **[`../lambda/`](../lambda/)**
+(contenedor Blender CPU + handler que deriva el spec del genoma-id en Python y sube
+webp inmutables a `s3://s3.closer.click/critters/<hash>/`).
+
 ## Archivos
 - `critter_spec.mjs` — vuelca el spec (apariencia + colores) del critter.
 - `critter3d.py` — construye la malla 3D y renderiza (Cycles GPU, fondo negro).
