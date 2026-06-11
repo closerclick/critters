@@ -6,7 +6,7 @@ import { COLS, ROWS } from '../battle/engine.js';
 import { BAL } from '../battle/balance.js';
 import { ACTIVES } from '../critter/abilities.js';
 import * as sfx from '../sfx.js';
-import { SPEEDS, speed, setSpeed } from '../speed.js';
+import { SPEEDS, speed, setSpeed, PLAYBACK } from '../speed.js';
 import { elementInfo } from '../critter/types.js';
 import { t, loc } from '../i18n.js';
 
@@ -110,7 +110,7 @@ function frame (ts) {
   if (!alive) return;
   if (!lastTs) lastTs = ts;
   const dt = Math.min(120, ts - lastTs); lastTs = ts;
-  clock += (dt / CYCLE_MS) * speed.value;
+  clock += (dt / CYCLE_MS) * speed.value * PLAYBACK;
   const log = res().log;
   while (idx < log.length && (log[idx].cyc == null ? 0 : log[idx].cyc) <= clock) applyEv(log[idx++]);
   updateCharge();
@@ -324,9 +324,9 @@ const summary = computed(() => {
 .rt-total b{color:var(--bad)}
 .rc-btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 
-.speedbar{display:inline-flex;gap:6px}
-.spd-btn{font-family:var(--fmono);font-weight:800;font-size:12px;padding:5px 11px;border-radius:9px;border:1px solid var(--line2);
-  background:rgba(167,139,250,.08);color:var(--muted);min-width:40px}
+.speedbar{display:inline-flex;flex-wrap:wrap;gap:5px;justify-content:center}
+.spd-btn{font-family:var(--fmono);font-weight:800;font-size:12px;padding:5px 9px;border-radius:9px;border:1px solid var(--line2);
+  background:rgba(167,139,250,.08);color:var(--muted);min-width:36px}
 .spd-btn.on{background:var(--accent2);border-color:var(--accent);color:#fff;box-shadow:0 0 10px color-mix(in srgb,var(--accent) 55%,transparent)}
 .show-modal{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 16px);transform:translateX(-50%);z-index:36;
   font-family:var(--fdisplay);font-weight:800;font-size:13px;padding:9px 18px;border-radius:12px;border:1px solid var(--accent);

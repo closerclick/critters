@@ -87,8 +87,8 @@ const cycLimit = computed(() => node.value ? starCycleLimit(node.value) : 0);
 .enc-lineup .lu-select{flex:1 1 auto;max-width:240px;background:var(--panel);color:var(--text);border:1px solid var(--line2);border-radius:9px;padding:7px 9px;font-size:13px}
 .enc-speed{display:flex;align-items:center;justify-content:center;gap:10px;margin:10px 0 12px}
 .enc-sub2{font-family:var(--fdisplay);font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
-.speedbar{display:inline-flex;gap:6px}
-.spd-btn{font-family:var(--fmono);font-weight:800;font-size:12px;padding:5px 11px;border-radius:9px;border:1px solid var(--line2);
+.speedbar{display:inline-flex;flex-wrap:wrap;gap:5px;justify-content:center}
+.spd-btn{font-family:var(--fmono);font-weight:800;font-size:12px;padding:5px 9px;border-radius:9px;border:1px solid var(--line2);
   background:rgba(167,139,250,.08);color:var(--muted);min-width:40px}
 .spd-btn.on{background:var(--accent2);border-color:var(--accent);color:#fff;box-shadow:0 0 10px color-mix(in srgb,var(--accent) 55%,transparent)}
 </style>

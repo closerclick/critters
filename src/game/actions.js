@@ -195,15 +195,21 @@ export function fightCampaign (nodeId) {
     const perf = Math.min(1, dealt / enemyMax);   // fracción de la vida enemiga que removiste
     gain = Math.max(1, Math.round(22 * perf));
   }
+  // REPARTO de XP: el combate da una bolsa de XP que se DIVIDE entre las hormigas que
+  // pelean (más hormigas → menos XP c/u; así la XP depende de cuántas juegan). Y repetir
+  // un nivel YA finalizado NO da XP (anti-farm; las monedas ya se reducen aparte).
+  const already = game.cleared.includes(node.id);
+  const team = ti.length || 1;
+  const per = already ? 0 : Math.max(1, Math.round(gain / team));
   const payload = { result, win, node: node.id, level: node.diff, boss: node.boss, terrain: node.terrain || null, xp: {} };
   // Aplica XP a cada miembro y registra lo ganado por SLOT (para el resumen).
   for (const x of ti) {
     const before = x.instance.level;
-    awardXp(x.instance, gain);
-    payload.xp['0:' + x.slot] = { gained: gain, level: x.instance.level, up: x.instance.level > before, xp: x.instance.xp, need: xpForNext(x.instance.level) };
+    awardXp(x.instance, per);
+    payload.xp['0:' + x.slot] = { gained: per, level: x.instance.level, up: x.instance.level > before, xp: x.instance.xp, need: xpForNext(x.instance.level) };
   }
   if (win) {
-    const firstClear = !game.cleared.includes(node.id);
+    const firstClear = !already;
     // ESTRELLAS: 1 ganar · 2 ganar rápido (≤ límite de ciclos) · 3 sin bajas propias.
     const limit = starCycleLimit(node);
     const fast = result.cycles <= limit;
