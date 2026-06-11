@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { instanceByUid, critterById, game, displayName } from '../game/state.js';
 import { feed, FEED_COST, setRol, setTarget, adjustAlloc, resetAlloc, setNick } from '../game/actions.js';
 import { critterSvg } from '../critter/svg.js';
+import { use3dRender } from '../critter/render3d.js';
 import { statsAtLevel, STAT_KEYS, pointsFree, xpForNext, RARITY_BY_KEY } from '../critter/forge.js';
 import { ACTIVES, PASSIVES } from '../critter/abilities.js';
 import { elementInfo, ELEMENT_INFO, comps } from '../critter/types.js';
@@ -17,6 +18,8 @@ const emit = defineEmits(['close']);
 const inst = computed(() => instanceByUid(props.uid));
 const critter = computed(() => { const i = inst.value; return i ? critterById(i.id) : null; });
 const svgBig = computed(() => critter.value ? critterSvg(critter.value, 110) : '');
+// Render 3D en perspectiva (vista "beauty"), bajo demanda; el SVG queda de fallback.
+const { src: art3d, ready: art3dReady, onError: art3dError } = use3dRender(() => inst.value && inst.value.id);
 const stats = computed(() => critter.value ? statsAtLevel(critter.value, inst.value.level, inst.value.alloc) : null);
 const free = computed(() => inst.value ? pointsFree(inst.value.level, inst.value.alloc) : 0);
 const activeInfo = computed(() => critter.value ? ACTIVES[critter.value.active] : null);
@@ -72,7 +75,11 @@ function pickObj (k) { if (k === objSel.value) return; objSel.value = k; setTarg
   <div class="detail-modal" @click.self="emit('close')">
     <div class="detail-card" v-if="critter">
       <div class="d-portrait">
-        <div v-html="svgBig" style="display:flex;justify-content:center"></div>
+        <div class="d-art">
+          <div v-html="svgBig" style="display:flex;justify-content:center"></div>
+          <img v-show="art3dReady" class="d-3d" :src="art3d" alt="" loading="lazy"
+               @load="art3dReady = true" @error="art3dError" />
+        </div>
         <span v-if="free > 0" class="d-pts" :title="t('lblLibres')">✦{{ free }}</span>
       </div>
       <h2 style="margin-top:4px">{{ displayName(inst, critter) }}</h2>
@@ -163,6 +170,10 @@ function pickObj (k) { if (k === objSel.value) return; objSel.value = k; setTarg
 .nick-in{display:block;margin:2px auto 0;max-width:240px;width:100%;text-align:center;background:var(--panel);color:var(--text);border:1px solid var(--line2);border-radius:8px;padding:4px 8px;font-size:12px}
 .nick-in::placeholder{color:var(--muted)}
 .d-portrait{position:relative;width:max-content;margin:0 auto}
+.d-art{display:flex;align-items:center;justify-content:center;gap:10px}
+.d-3d{width:120px;height:120px;object-fit:contain;border-radius:12px;border:1px solid var(--line2);
+  background:radial-gradient(circle at 50% 38%,rgba(167,139,250,.12),rgba(7,6,17,.5));
+  animation:dfade .3s ease-out}
 .d-pts{position:absolute;top:2px;right:-6px;font-family:var(--fmono);font-size:12px;font-weight:800;color:var(--ink);background:var(--cyan);border-radius:9px;padding:1px 7px;box-shadow:0 0 8px var(--cyan)}
 .detail-card{width:100%;max-width:360px;max-height:90vh;overflow-y:auto;background:var(--panel2);border:1px solid var(--line2);
   border-radius:16px;padding:18px;text-align:center;box-shadow:0 22px 60px rgba(0,0,0,.6);animation:dpop .3s cubic-bezier(.2,1.25,.4,1)}
