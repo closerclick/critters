@@ -24,7 +24,7 @@ const { src, ready, pending } = use3dRender(() => genomeOf(props.instance), { vi
 </script>
 
 <template>
-  <div class="ci" :class="{ loading: spinner && pending && !ready }" :style="{ width: size + 'px', height: size + 'px' }">
+  <div class="ci" :class="{ ring: spinner, loading: spinner && pending && !ready }" :style="{ width: size + 'px', height: size + 'px' }">
     <div v-show="!ready" class="ci-svg" v-html="svg"></div>
     <img v-show="ready" class="ci-img" :src="src" alt="" :style="imgStyle" />
   </div>
@@ -35,8 +35,10 @@ const { src, ready, pending } = use3dRender(() => genomeOf(props.instance), { vi
 .ci-svg{display:flex;align-items:center;justify-content:center}
 .ci-img{width:100%;height:100%;object-fit:contain;animation:cifade .3s ease-out}
 @keyframes cifade{from{opacity:0}to{opacity:1}}
-.ci.loading::after{content:'';position:absolute;inset:-3px;border-radius:50%;box-sizing:border-box;
-  border:2px solid transparent;border-top-color:var(--el,var(--accent));border-right-color:var(--el,var(--accent));
+/* Anillo SIEMPRE presente (queda cuando está el 3D); solo gira mientras carga. */
+.ci.ring::after{content:'';position:absolute;inset:-3px;border-radius:50%;box-sizing:border-box;
+  border:2px solid color-mix(in srgb,var(--el,var(--accent)) 45%,transparent)}
+.ci.ring.loading::after{border-top-color:var(--el,var(--accent));border-right-color:var(--el,var(--accent));
   animation:cispin .85s linear infinite}
 @keyframes cispin{to{transform:rotate(360deg)}}
 </style>

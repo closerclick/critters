@@ -40,8 +40,12 @@ navegador (miss) ──POST {id}──▶ API Gateway ──SendMessage──▶
   con `pattern` de genoma y rangos de samples/res) rechaza la basura con **400 ANTES de
   encolar** — no gasta SQS ni Lambda. (SQS no puede validar contenido; API Gateway sí.)
   La validación de la Lambda queda como defensa en profundidad.
-- **Cola** `critters-render.fifo` con dedup por contenido (50 jugadores, mismo critter = 1
-  render). Lambda idempotente (HEAD a S3) y valida el formato de genoma antes de Blender.
+- **Cola** `critters-render` (estándar) + event source mapping con `MaximumConcurrency=10`
+  → hasta 10 renders en paralelo (SQS escala la función sola; sin patrón madre/hijas). La
+  Lambda es idempotente (HEAD a S3), así que ids repetidos salen baratos (cached). Valida
+  el formato de genoma antes de Blender.
+- **Caché versionado:** las imágenes viven en `critters/v2/<hash>/<view>.webp` (env Lambda
+  `PREFIX`); bumpear la versión al cambiar params de Blender invalida sin huérfanos.
 
 Lado del juego (detectar miss → encolar; la imagen llega sola en la próxima carga):
 

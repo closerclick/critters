@@ -53,7 +53,9 @@ const w = (k) => Math.max(6, Math.min(100, Math.round(100 * st.value[k] / CAP[k]
 /* Icono 3D que reemplaza al SVG cuando el render existe + spinner en la circunferencia. */
 .cs3d{position:relative;z-index:2;width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 4px 10px rgba(0,0,0,.5));animation:csfade .3s ease-out}
 @keyframes csfade{from{opacity:0}to{opacity:1}}
-.portrait.loading::after{content:'';position:absolute;inset:-4px;border-radius:50%;box-sizing:border-box;
-  border:2px solid transparent;border-top-color:var(--el);border-right-color:var(--el);animation:csspin .85s linear infinite;z-index:3}
+/* Anillo SIEMPRE presente (queda cuando está el 3D); solo gira mientras carga. */
+.portrait::after{content:'';position:absolute;inset:-4px;border-radius:50%;box-sizing:border-box;z-index:3;
+  border:2px solid color-mix(in srgb,var(--el) 45%,transparent)}
+.portrait.loading::after{border-top-color:var(--el);border-right-color:var(--el);animation:csspin .85s linear infinite}
 @keyframes csspin{to{transform:rotate(360deg)}}
 </style>

@@ -91,13 +91,13 @@ def render_views(out_path, name, lens=60.0, views=None):
     # Catalogo de vistas: clave -> (camara, fondo_transparente, archivo, angulo_de_patas).
     # Las "1"/"2" son los dos frames de la animacion (patas adelante/atras intercaladas).
     JOBS = {
-        'beauty':  (beauty, False, out_path,            0.0),
+        'beauty':  (beauty, True,  out_path,            0.0),
         'top':     (top,    True,  base + '_top.png',   0.0),
         'side':    (side,   False, base + '_side.png',  0.0),
         'top1':    (top,    True,  base + '_top1.png',  +SWING),
         'top2':    (top,    True,  base + '_top2.png',  -SWING),
-        'beauty1': (beauty, False, base + '_b1.png',    +SWING),
-        'beauty2': (beauty, False, base + '_b2.png',    -SWING),
+        'beauty1': (beauty, True,  base + '_b1.png',    +SWING),
+        'beauty2': (beauty, True,  base + '_b2.png',    -SWING),
     }
     if views is None:
         views = (os.environ.get("CRITTER_VIEWS", "").split(",") if os.environ.get("CRITTER_VIEWS")
