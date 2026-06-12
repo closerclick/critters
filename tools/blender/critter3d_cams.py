@@ -48,7 +48,7 @@ def _fit(cam, coords, margin):
 # se mueven los objetos taggeados con ["leg"] por cada estilo (NO la hombrera/faldon del
 # panzer, que estan anclados al cuerpo). El framerate (cada cuanto alterna 1<->2) lo decide
 # el juego segun la velocidad de batalla.
-SWING = math.radians(8.0)
+SWING = math.radians(18.0)
 
 def _leg_objs():
     return [o for o in bpy.context.scene.objects if o.type in ('MESH', 'CURVE') and o.get("leg")]

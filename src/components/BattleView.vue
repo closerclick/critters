@@ -2,6 +2,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import { critterById } from '../game/state.js';
 import { critterSvg } from '../critter/svg.js';
+import CritterIcon from './CritterIcon.vue';
 import { COLS, ROWS } from '../battle/engine.js';
 import { BAL } from '../battle/balance.js';
 import { ACTIVES } from '../critter/abilities.js';
@@ -177,7 +178,7 @@ const summary = computed(() => {
              :style="{ left: leftOf(U[uid]), top: topOf(U[uid]), '--rscale': scaleOf(U[uid]), zIndex: zOf(U[uid]) }">
           <span v-if="U[uid].flash && U[uid].dmg != null" class="dmgnum" :class="U[uid].dmgClass">{{ U[uid].dmg }}</span>
           <span v-for="f in floatersFor(uid)" :key="f.k" class="floater" :class="f.cls" :style="{ '--off': f.off }">{{ f.text }}</span>
-          <div class="fu-svg" v-html="svgFor(U[uid])"></div>
+          <CritterIcon class="fu-svg" :instance="{ id: U[uid].id }" :size="40" :frame="false" :spinner="false" />
           <div class="bars">
             <div class="hpbar" :class="{ low: U[uid].hp / U[uid].maxHp < 0.35 }"><i :style="{ width: (100 * U[uid].hp / U[uid].maxHp) + '%' }"></i></div>
             <div class="enbar"><i :style="{ width: (100 * U[uid].energy / U[uid].cost) + '%' }"></i></div>
