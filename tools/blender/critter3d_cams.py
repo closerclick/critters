@@ -61,6 +61,19 @@ def _pose_legs(legs, base_mw, pivot, theta):
         for o in legs: o.matrix_world = M @ base_mw[o.name]
     bpy.context.view_layer.update()
 
+def _fit_top(cam, coords, margin):
+    # VISTA SUPERIOR: centrar SOLO en vertical (centro del bbox en Y); en horizontal se
+    # fija al eje del cuerpo (X=0, la línea de simetría) en vez del centro del bbox. Así el
+    # cuerpo no se corre de lado por asimetrías (antenas/mandíbulas) ni "salta" entre los
+    # frames de la animación: solo se mueven las patas.
+    xs = [c.x for c in coords]; ys = [c.y for c in coords]
+    halfx = max(abs(min(xs)), abs(max(xs)))      # medio ancho simétrico respecto a X=0
+    ymin, ymax = min(ys), max(ys)
+    cy = (ymin + ymax) / 2.0
+    zmax = max(c.z for c in coords)
+    cam.location = Vector((0.0, cy, zmax + 50.0))
+    cam.data.ortho_scale = max(2.0 * halfx, ymax - ymin) * margin
+
 def render_views(out_path, name, lens=60.0, views=None):
     import os
     sc = bpy.context.scene
@@ -69,7 +82,7 @@ def render_views(out_path, name, lens=60.0, views=None):
     beauty = _make_cam("cam", (math.radians(77.36), 0.0, math.radians(152.54)), lens=lens)
     top    = _make_cam("camTop", (0.0, 0.0, 0.0), ortho=True)            # cenital exacta, +Y arriba
     side   = _make_cam("camSide", (math.radians(82.0), 0.0, math.radians(90.0)), lens=lens)
-    _fit(beauty, coords, 1.09); _fit(top, coords, 1.06); _fit(side, coords, 1.09)
+    _fit(beauty, coords, 1.09); _fit_top(top, coords, 1.12); _fit(side, coords, 1.09)
     sc.camera = beauty
     blend_path = base + '.blend'
     bpy.ops.wm.save_as_mainfile(filepath=blend_path)
