@@ -9,7 +9,10 @@ import { speed } from '../speed.js';
 import { critterById } from '../game/state.js';
 import { genomeId } from './forge.js';
 
-const IMG_BASE = 'https://s3.closer.click/critters';
+// Versión del render: bumpear (v2→v3…) cuando cambian los parámetros de Blender (swing,
+// encuadre, estilo) para invalidar el caché inmutable sin huérfanos. Debe coincidir con
+// el PREFIX de la Lambda (env PREFIX=critters/v2/).
+const IMG_BASE = 'https://s3.closer.click/critters/v2';
 const INTAKE = 'https://render.closer.click/';
 const RETRY_MS = 60000;    // reintenta encolar/cargar ~cada minuto
 const STEP_MS = 360;       // ms por frame a speed 1 (la cadencia escala con speed)
