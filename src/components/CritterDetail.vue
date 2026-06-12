@@ -30,7 +30,7 @@ const renderId = computed(() => {
   const seed = String(id).replace(/[^A-Za-z0-9._+-]/g, '').slice(0, 24) || 'x';
   return genomeId({ ...c, seed });
 });
-const { src: art3d, ready: art3dReady, pending: art3dPending, onLoad: art3dLoad, onError: art3dError } = use3dRender(() => renderId.value);
+const { src: art3d, ready: art3dReady, pending: art3dPending } = use3dRender(() => renderId.value);
 const stats = computed(() => critter.value ? statsAtLevel(critter.value, inst.value.level, inst.value.alloc) : null);
 const free = computed(() => inst.value ? pointsFree(inst.value.level, inst.value.alloc) : 0);
 const activeInfo = computed(() => critter.value ? ACTIVES[critter.value.active] : null);
@@ -90,8 +90,7 @@ function pickObj (k) { if (k === objSel.value) return; objSel.value = k; setTarg
              la circunferencia gira como spinner; reintenta solo ~cada minuto. -->
         <div class="d-ring" :class="{ spin: art3dPending && !art3dReady }">
           <div v-show="!art3dReady" v-html="svgBig" class="d-svg"></div>
-          <img v-show="art3dReady" class="d-icon" :src="art3d" alt=""
-               @load="art3dLoad" @error="art3dError" />
+          <img v-show="art3dReady" class="d-icon" :src="art3d" alt="" />
         </div>
         <span v-if="free > 0" class="d-pts" :title="t('lblLibres')">✦{{ free }}</span>
       </div>

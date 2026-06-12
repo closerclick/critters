@@ -1,16 +1,17 @@
-// Render 3D del critter servido BAJO DEMANDA desde su genoma-id, para usarlo COMO ICONO.
-// - GET a S3 (Cloudflare): https://s3.closer.click/critters/<sha256(id)[:32]>/<view>.webp
-// - si falta (403/404), encola el render en https://render.closer.click/ (API Gateway →
-//   SQS → Lambda → Blender) y REINTENTA cada ~1 min hasta que exista. Mientras tanto el
-//   icono muestra el SVG y la circunferencia gira como spinner (estado `pending`).
-// Pipeline e infra: tools/lambda/README.md. La key es DETERMINISTA por genoma.
+// Render 3D del critter como ICONO ANIMADO (marcha de 2 frames), bajo demanda desde el genoma.
+// - frames en S3 (Cloudflare): https://s3.closer.click/critters/<sha256(id)[:32]>/<view>.webp
+//   (top1/top2 = patas adelante/atrás intercaladas; ver tools/blender + tools/lambda).
+// - si faltan (403), encola el render en https://render.closer.click/ y REINTENTA ~cada
+//   minuto. Mientras tanto el icono muestra el SVG y la circunferencia gira (pending).
+// - el icono alterna top1<->top2; la CADENCIA depende de la velocidad de batalla (speed).
 import { ref, watch, onUnmounted } from 'vue';
+import { speed } from '../speed.js';
 
 const IMG_BASE = 'https://s3.closer.click/critters';
 const INTAKE = 'https://render.closer.click/';
-const RETRY_MS = 60000;   // reintenta recargar el icono ~cada minuto
+const RETRY_MS = 60000;    // reintenta encolar/cargar ~cada minuto
+const STEP_MS = 360;       // ms por frame a speed 1 (la cadencia escala con speed)
 
-// sha256(id) hex, primeros 32 — igual que handler.py / spec_derive (Web Crypto, async).
 async function keyOf (id) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(id));
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
@@ -18,51 +19,55 @@ async function keyOf (id) {
 
 const queued = new Set();   // no reencolar el mismo id dentro de la sesión
 function requestRender (id, views) {
-  if (queued.has(id)) return;
-  queued.add(id);
+  const k = id + ':' + views.join(',');
+  if (queued.has(k)) return;
+  queued.add(k);
   fetch(INTAKE, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ id, views }),
-  }).catch(() => {});   // fire-and-forget: el SVG ya está a la vista
+  }).catch(() => {});
 }
 
-// Composable para un <img> que reemplaza al icono cuando el render existe.
-// Devuelve { src, ready, pending, onLoad, onError }:
-//   <img v-show="ready" :src="src" @load="onLoad" @error="onError">
-//   girá la circunferencia mientras `pending && !ready`.
-// `view` por defecto "top" (vista cenital, fondo transparente — ideal como icono).
-export function use3dRender (idGetter, { view = 'top', retryMs = RETRY_MS } = {}) {
+const preload = (u) => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(u); im.onerror = rej; im.src = u; });
+
+// Icono animado: alterna `views` (por defecto los 2 frames top) a una cadencia ~STEP_MS/speed.
+// Devuelve { src, ready, pending }: <img v-show="ready" :src="src">; gira mientras pending && !ready.
+export function use3dRender (idGetter, { views = ['top1', 'top2'] } = {}) {
   const src = ref('');
   const ready = ref(false);
-  const pending = ref(false);   // esperando a que el render exista (spinner)
-  let curId = '', baseUrl = '', timer = null, attempt = 0;
+  const pending = ref(false);
+  let curId = '', urls = [], frame = 0, timer = null;
 
-  const clear = () => { if (timer) { clearTimeout(timer); timer = null; } };
+  const stop = () => { if (timer) { clearTimeout(timer); timer = null; } };
 
-  async function begin (id) {
-    clear(); ready.value = false; pending.value = false; src.value = ''; baseUrl = ''; attempt = 0;
-    curId = id || '';
-    if (!id || !String(id).startsWith('g:')) return;   // sin genoma válido: solo SVG
-    const url = `${IMG_BASE}/${await keyOf(id)}/${view}.webp`;
-    if (curId !== id) return;                            // cambió mientras hasheaba
-    baseUrl = url; pending.value = true; src.value = url;   // 1er intento
+  function animate () {
+    stop(); frame = 0; src.value = urls[0];
+    const loop = () => {
+      frame = (frame + 1) % urls.length; src.value = urls[frame];
+      timer = setTimeout(loop, Math.max(60, STEP_MS / (speed.value || 1)));   // cadencia por speed
+    };
+    if (urls.length > 1) timer = setTimeout(loop, Math.max(60, STEP_MS / (speed.value || 1)));
   }
 
-  function onLoad () { ready.value = true; pending.value = false; clear(); }
-
-  function onError () {
-    if (!curId || !baseUrl) return;
-    ready.value = false; pending.value = true;
-    requestRender(curId, [view]);   // encola (idempotente; solo 1 POST por id/sesión)
-    clear();
-    timer = setTimeout(() => {       // reintenta ~cada minuto (cache-buster por las dudas)
-      attempt++;
-      src.value = `${baseUrl}?r=${attempt}`;
-    }, retryMs);
+  async function begin (id) {
+    stop(); ready.value = false; pending.value = false; src.value = ''; curId = id || '';
+    if (!id || !String(id).startsWith('g:')) return;
+    const key = await keyOf(id);
+    if (curId !== id) return;
+    urls = views.map(v => `${IMG_BASE}/${key}/${v}.webp`);
+    pending.value = true;
+    Promise.all(urls.map(preload)).then(() => {           // todos los frames listos → animar
+      if (curId !== id) return;
+      ready.value = true; pending.value = false; animate();
+    }).catch(() => {                                       // falta alguno → encolar + reintentar
+      if (curId !== id) return;
+      requestRender(curId, views);
+      pending.value = true;
+      timer = setTimeout(() => begin(id), RETRY_MS);
+    });
   }
 
   watch(idGetter, begin, { immediate: true });
-  onUnmounted(clear);
-  return { src, ready, pending, onLoad, onError };
+  onUnmounted(stop);
+  return { src, ready, pending };
 }
