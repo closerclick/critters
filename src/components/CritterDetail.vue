@@ -18,8 +18,9 @@ const emit = defineEmits(['close']);
 const inst = computed(() => instanceByUid(props.uid));
 const critter = computed(() => { const i = inst.value; return i ? critterById(i.id) : null; });
 const svgBig = computed(() => critter.value ? critterSvg(critter.value, 110) : '');
-// Icono 3D animado (marcha top1/top2) bajo demanda; el SVG queda de fallback.
-const { src: art3d, ready: art3dReady, pending: art3dPending } = use3dRender(() => genomeOf(inst.value));
+// En el PERFIL el 3D es la PERSPECTIVA animada (beauty1/beauty2), al lado del círculo;
+// el círculo conserva el esquema SVG y la circunferencia gira mientras se genera.
+const { src: art3d, ready: art3dReady, pending: art3dPending } = use3dRender(() => genomeOf(inst.value), { views: ['beauty1', 'beauty2'] });
 const stats = computed(() => critter.value ? statsAtLevel(critter.value, inst.value.level, inst.value.alloc) : null);
 const free = computed(() => inst.value ? pointsFree(inst.value.level, inst.value.alloc) : 0);
 const activeInfo = computed(() => critter.value ? ACTIVES[critter.value.active] : null);
@@ -75,11 +76,13 @@ function pickObj (k) { if (k === objSel.value) return; objSel.value = k; setTarg
   <div class="detail-modal" @click.self="emit('close')">
     <div class="detail-card" v-if="critter">
       <div class="d-portrait">
-        <!-- El icono: SVG de fallback hasta que el render top exista; mientras se genera,
-             la circunferencia gira como spinner; reintenta solo ~cada minuto. -->
-        <div class="d-ring" :class="{ spin: art3dPending && !art3dReady }">
-          <div v-show="!art3dReady" v-html="svgBig" class="d-svg"></div>
-          <img v-show="art3dReady" class="d-icon" :src="art3d" alt="" />
+        <!-- Círculo con el esquema SVG (gira como spinner mientras se genera el render);
+             a la DERECHA, la perspectiva 3D animada (patas en movimiento) cuando existe. -->
+        <div class="d-stage">
+          <div class="d-ring" :class="{ spin: art3dPending && !art3dReady }">
+            <div v-html="svgBig" class="d-svg"></div>
+          </div>
+          <img v-show="art3dReady" class="d-persp" :src="art3d" alt="" />
         </div>
         <span v-if="free > 0" class="d-pts" :title="t('lblLibres')">✦{{ free }}</span>
       </div>
@@ -171,15 +174,18 @@ function pickObj (k) { if (k === objSel.value) return; objSel.value = k; setTarg
 .nick-in{display:block;margin:2px auto 0;max-width:240px;width:100%;text-align:center;background:var(--panel);color:var(--text);border:1px solid var(--line2);border-radius:8px;padding:4px 8px;font-size:12px}
 .nick-in::placeholder{color:var(--muted)}
 .d-portrait{position:relative;width:max-content;margin:0 auto}
-/* Circunferencia que enmarca el icono y, mientras se genera el render, gira como spinner. */
-.d-ring{position:relative;width:128px;height:128px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.d-stage{display:flex;align-items:center;justify-content:center;gap:14px}
+/* Circunferencia que enmarca el esquema SVG y, mientras se genera el render, gira como spinner. */
+.d-ring{position:relative;width:128px;height:128px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none}
 .d-ring::before{content:'';position:absolute;inset:0;border-radius:50%;box-sizing:border-box;
   border:3px solid var(--line2)}
 .d-ring.spin::before{border-top-color:var(--accent);border-right-color:var(--accent);
   animation:dspin .9s linear infinite}
 @keyframes dspin{to{transform:rotate(360deg)}}
 .d-svg{display:flex;align-items:center;justify-content:center}
-.d-icon{width:116px;height:116px;object-fit:contain;border-radius:50%;animation:dfade .3s ease-out}
+/* Perspectiva 3D animada (moviendo las patas) a la derecha del círculo. */
+.d-persp{width:128px;height:128px;object-fit:contain;border-radius:14px;border:1px solid var(--line2);
+  background:radial-gradient(circle at 50% 40%,rgba(167,139,250,.10),rgba(7,6,17,.55));animation:dfade .3s ease-out}
 .d-pts{position:absolute;top:2px;right:-6px;font-family:var(--fmono);font-size:12px;font-weight:800;color:var(--ink);background:var(--cyan);border-radius:9px;padding:1px 7px;box-shadow:0 0 8px var(--cyan)}
 .detail-card{width:100%;max-width:360px;max-height:90vh;overflow-y:auto;background:var(--panel2);border:1px solid var(--line2);
   border-radius:16px;padding:18px;text-align:center;box-shadow:0 22px 60px rgba(0,0,0,.6);animation:dpop .3s cubic-bezier(.2,1.25,.4,1)}
