@@ -6,6 +6,8 @@
 // - el icono alterna top1<->top2; la CADENCIA depende de la velocidad de batalla (speed).
 import { ref, watch, onUnmounted } from 'vue';
 import { speed } from '../speed.js';
+import { critterById } from '../game/state.js';
+import { genomeId } from './forge.js';
 
 const IMG_BASE = 'https://s3.closer.click/critters';
 const INTAKE = 'https://render.closer.click/';
@@ -17,15 +19,27 @@ async function keyOf (id) {
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
 }
 
+// Genoma CANÓNICO de una instancia (misma apariencia que el SVG): para que TODA hormiga
+// pueda renderizar, no solo las de fusión (g:...). El seed va saneado al formato del genoma.
+export function genomeOf (inst) {
+  const id = inst && inst.id;
+  if (!id) return '';
+  if (String(id).startsWith('g:')) return id;
+  const c = critterById(id);
+  const seed = String(id).replace(/[^A-Za-z0-9._+-]/g, '').slice(0, 24) || 'x';
+  return genomeId({ ...c, seed });
+}
+
 const queued = new Set();   // no reencolar el mismo id dentro de la sesión
 function requestRender (id, views) {
   const k = id + ':' + views.join(',');
   if (queued.has(k)) return;
   queued.add(k);
+  // si el POST falla o lo throttlean (no-2xx), liberamos la clave para reintentar luego
   fetch(INTAKE, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ id, views }),
-  }).catch(() => {});
+  }).then(r => { if (!r.ok) queued.delete(k); }).catch(() => queued.delete(k));
 }
 
 const preload = (u) => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(u); im.onerror = rej; im.src = u; });

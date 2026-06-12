@@ -3,8 +3,8 @@ import { computed, ref, watch } from 'vue';
 import { instanceByUid, critterById, game, displayName } from '../game/state.js';
 import { feed, FEED_COST, setRol, setTarget, adjustAlloc, resetAlloc, setNick } from '../game/actions.js';
 import { critterSvg } from '../critter/svg.js';
-import { use3dRender } from '../critter/render3d.js';
-import { statsAtLevel, STAT_KEYS, pointsFree, xpForNext, RARITY_BY_KEY, genomeId } from '../critter/forge.js';
+import { use3dRender, genomeOf } from '../critter/render3d.js';
+import { statsAtLevel, STAT_KEYS, pointsFree, xpForNext, RARITY_BY_KEY } from '../critter/forge.js';
 import { ACTIVES, PASSIVES } from '../critter/abilities.js';
 import { elementInfo, ELEMENT_INFO, comps } from '../critter/types.js';
 import { ROL_INFO, ROL_KEYS, rolPrimary, OBJ_INFO, OBJ_KEYS, objPrimary } from '../battle/policies.js';
@@ -18,19 +18,8 @@ const emit = defineEmits(['close']);
 const inst = computed(() => instanceByUid(props.uid));
 const critter = computed(() => { const i = inst.value; return i ? critterById(i.id) : null; });
 const svgBig = computed(() => critter.value ? critterSvg(critter.value, 110) : '');
-// Render 3D en perspectiva (vista "beauty"), bajo demanda; el SVG queda de fallback.
-// La mayoría de las hormigas NO tienen id "g:" (starters start-…, invocadas sm-…,
-// capturadas e:…); solo las de fusión. Derivamos el GENOMA CANÓNICO (misma apariencia
-// que el SVG) para que TODA hormiga pueda renderizar. El seed va saneado al formato del
-// genoma (sin ':' ni caracteres raros, ≤24) porque define el estilo 3D determinista.
-const renderId = computed(() => {
-  const c = critter.value, id = inst.value && inst.value.id;
-  if (!c || !id) return '';
-  if (String(id).startsWith('g:')) return id;
-  const seed = String(id).replace(/[^A-Za-z0-9._+-]/g, '').slice(0, 24) || 'x';
-  return genomeId({ ...c, seed });
-});
-const { src: art3d, ready: art3dReady, pending: art3dPending } = use3dRender(() => renderId.value);
+// Icono 3D animado (marcha top1/top2) bajo demanda; el SVG queda de fallback.
+const { src: art3d, ready: art3dReady, pending: art3dPending } = use3dRender(() => genomeOf(inst.value));
 const stats = computed(() => critter.value ? statsAtLevel(critter.value, inst.value.level, inst.value.alloc) : null);
 const free = computed(() => inst.value ? pointsFree(inst.value.level, inst.value.alloc) : 0);
 const activeInfo = computed(() => critter.value ? ACTIVES[critter.value.active] : null);
