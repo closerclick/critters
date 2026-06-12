@@ -19,7 +19,10 @@ SCRIPTS = os.environ.get("SCRIPTS_DIR", os.path.join(os.environ.get("LAMBDA_TASK
 BUCKET = os.environ.get("BUCKET", "s3.closer.click")
 PREFIX = os.environ.get("PREFIX", "critters/")
 DRY_RUN = bool(os.environ.get("DRY_RUN"))
-VIEW_FILES = {"beauty": "r.png", "top": "r_top.png", "side": "r_side.png"}
+# Vistas: base + frames de animación de patas (top1/top2 y beauty1/beauty2).
+VIEW_FILES = {"beauty": "r.png", "top": "r_top.png", "side": "r_side.png",
+              "top1": "r_top1.png", "top2": "r_top2.png",
+              "beauty1": "r_b1.png", "beauty2": "r_b2.png"}
 
 def _s3():
     import boto3
@@ -86,8 +89,12 @@ def _render(event, public=False):
     t0 = time.time()
     cmd = [BLENDER, "--background", "--python", os.path.join(SCRIPTS, "critter3d.py"),
            "--", str(spec_path), str(out / "r.png"), str(samples), str(res)]
-    run = subprocess.run(cmd, capture_output=True, text=True, timeout=840)
-    if run.returncode != 0 or not (out / "r.png").exists():
+    # CRITTER_VIEWS: rinde SOLO las vistas pedidas (los frames de animación son caros).
+    env = dict(os.environ, CRITTER_VIEWS=",".join(views))
+    run = subprocess.run(cmd, capture_output=True, text=True, timeout=840, env=env)
+    # éxito = existe el archivo de la PRIMERA vista pedida (con CRITTER_VIEWS la base
+    # r.png puede no generarse; verificar r.png daría falso negativo).
+    if run.returncode != 0 or not (out / VIEW_FILES[views[0]]).exists():
         raise RuntimeError("blender fallo (%d): %s" % (run.returncode, run.stdout[-1500:] + run.stderr[-500:]))
     m = re.search(r"^STYLE (\w+)", run.stdout, re.M)
     style = m.group(1) if m else "?"

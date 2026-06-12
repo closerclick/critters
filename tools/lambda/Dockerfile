@@ -1,5 +1,7 @@
 # Imagen Lambda de render de critters: Blender headless (CPU) + handler Python.
-# BUILD desde la RAIZ del repo:  docker build -f tools/lambda/Dockerfile -t critters-render .
+# BUILD desde la RAIZ del repo:  docker build --network=host -f tools/lambda/Dockerfile -t critters-render .
+#   (--network=host hace falta si el build no resuelve DNS al re-ejecutar la capa dnf —
+#    pasa cuando la imagen base se actualiza e invalida el cache.)
 # Prueba local (RIE incluido en la base):
 #   docker run --rm -p 9000:8080 -e DRY_RUN=1 critters-render
 #   curl -s http://localhost:9000/2015-03-31/functions/function/invocations \
