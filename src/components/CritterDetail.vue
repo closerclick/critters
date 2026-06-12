@@ -30,7 +30,7 @@ const renderId = computed(() => {
   const seed = String(id).replace(/[^A-Za-z0-9._+-]/g, '').slice(0, 24) || 'x';
   return genomeId({ ...c, seed });
 });
-const { src: art3d, ready: art3dReady, onError: art3dError } = use3dRender(() => renderId.value);
+const { src: art3d, ready: art3dReady, pending: art3dPending, onLoad: art3dLoad, onError: art3dError } = use3dRender(() => renderId.value);
 const stats = computed(() => critter.value ? statsAtLevel(critter.value, inst.value.level, inst.value.alloc) : null);
 const free = computed(() => inst.value ? pointsFree(inst.value.level, inst.value.alloc) : 0);
 const activeInfo = computed(() => critter.value ? ACTIVES[critter.value.active] : null);
@@ -86,10 +86,12 @@ function pickObj (k) { if (k === objSel.value) return; objSel.value = k; setTarg
   <div class="detail-modal" @click.self="emit('close')">
     <div class="detail-card" v-if="critter">
       <div class="d-portrait">
-        <div class="d-art">
-          <div v-html="svgBig" style="display:flex;justify-content:center"></div>
-          <img v-show="art3dReady" class="d-3d" :src="art3d" alt="" loading="lazy"
-               @load="art3dReady = true" @error="art3dError" />
+        <!-- El icono: SVG de fallback hasta que el render top exista; mientras se genera,
+             la circunferencia gira como spinner; reintenta solo ~cada minuto. -->
+        <div class="d-ring" :class="{ spin: art3dPending && !art3dReady }">
+          <div v-show="!art3dReady" v-html="svgBig" class="d-svg"></div>
+          <img v-show="art3dReady" class="d-icon" :src="art3d" alt=""
+               @load="art3dLoad" @error="art3dError" />
         </div>
         <span v-if="free > 0" class="d-pts" :title="t('lblLibres')">✦{{ free }}</span>
       </div>
@@ -181,10 +183,15 @@ function pickObj (k) { if (k === objSel.value) return; objSel.value = k; setTarg
 .nick-in{display:block;margin:2px auto 0;max-width:240px;width:100%;text-align:center;background:var(--panel);color:var(--text);border:1px solid var(--line2);border-radius:8px;padding:4px 8px;font-size:12px}
 .nick-in::placeholder{color:var(--muted)}
 .d-portrait{position:relative;width:max-content;margin:0 auto}
-.d-art{display:flex;align-items:center;justify-content:center;gap:10px}
-.d-3d{width:120px;height:120px;object-fit:contain;border-radius:12px;border:1px solid var(--line2);
-  background:radial-gradient(circle at 50% 38%,rgba(167,139,250,.12),rgba(7,6,17,.5));
-  animation:dfade .3s ease-out}
+/* Circunferencia que enmarca el icono y, mientras se genera el render, gira como spinner. */
+.d-ring{position:relative;width:128px;height:128px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.d-ring::before{content:'';position:absolute;inset:0;border-radius:50%;box-sizing:border-box;
+  border:3px solid var(--line2)}
+.d-ring.spin::before{border-top-color:var(--accent);border-right-color:var(--accent);
+  animation:dspin .9s linear infinite}
+@keyframes dspin{to{transform:rotate(360deg)}}
+.d-svg{display:flex;align-items:center;justify-content:center}
+.d-icon{width:116px;height:116px;object-fit:contain;border-radius:50%;animation:dfade .3s ease-out}
 .d-pts{position:absolute;top:2px;right:-6px;font-family:var(--fmono);font-size:12px;font-weight:800;color:var(--ink);background:var(--cyan);border-radius:9px;padding:1px 7px;box-shadow:0 0 8px var(--cyan)}
 .detail-card{width:100%;max-width:360px;max-height:90vh;overflow-y:auto;background:var(--panel2);border:1px solid var(--line2);
   border-radius:16px;padding:18px;text-align:center;box-shadow:0 22px 60px rgba(0,0,0,.6);animation:dpop .3s cubic-bezier(.2,1.25,.4,1)}

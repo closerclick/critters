@@ -1,13 +1,14 @@
-// Render 3D del critter servido BAJO DEMANDA desde su genoma-id.
+// Render 3D del critter servido BAJO DEMANDA desde su genoma-id, para usarlo COMO ICONO.
 // - GET a S3 (Cloudflare): https://s3.closer.click/critters/<sha256(id)[:32]>/<view>.webp
 // - si falta (403/404), encola el render en https://render.closer.click/ (API Gateway →
-//   SQS → Lambda → Blender) y la imagen aparece sola en una próxima visita.
-// Pipeline e infra: tools/lambda/README.md. La key es DETERMINISTA por genoma, así que
-// la imagen de un critter siempre es la misma y se cachea inmutable en el edge.
-import { ref, watch } from 'vue';
+//   SQS → Lambda → Blender) y REINTENTA cada ~1 min hasta que exista. Mientras tanto el
+//   icono muestra el SVG y la circunferencia gira como spinner (estado `pending`).
+// Pipeline e infra: tools/lambda/README.md. La key es DETERMINISTA por genoma.
+import { ref, watch, onUnmounted } from 'vue';
 
 const IMG_BASE = 'https://s3.closer.click/critters';
 const INTAKE = 'https://render.closer.click/';
+const RETRY_MS = 60000;   // reintenta recargar el icono ~cada minuto
 
 // sha256(id) hex, primeros 32 — igual que handler.py / spec_derive (Web Crypto, async).
 async function keyOf (id) {
@@ -23,26 +24,45 @@ function requestRender (id, views) {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ id, views }),
-  }).catch(() => {});   // fire-and-forget: el fallback SVG ya está a la vista
+  }).catch(() => {});   // fire-and-forget: el SVG ya está a la vista
 }
 
-// Composable para un <img> que muestra el render en perspectiva ("beauty").
-// Devuelve { src, ready, onError }: pintás <img :src="src" v-show="ready"
-// @load="ready=true" @error="onError">. Solo aplica a genomas (ids "g:...").
-export function use3dRender (idGetter, view = 'beauty') {
+// Composable para un <img> que reemplaza al icono cuando el render existe.
+// Devuelve { src, ready, pending, onLoad, onError }:
+//   <img v-show="ready" :src="src" @load="onLoad" @error="onError">
+//   girá la circunferencia mientras `pending && !ready`.
+// `view` por defecto "top" (vista cenital, fondo transparente — ideal como icono).
+export function use3dRender (idGetter, { view = 'top', retryMs = RETRY_MS } = {}) {
   const src = ref('');
   const ready = ref(false);
-  let curId = '';
+  const pending = ref(false);   // esperando a que el render exista (spinner)
+  let curId = '', baseUrl = '', timer = null, attempt = 0;
 
-  watch(idGetter, async (id) => {
-    ready.value = false; src.value = ''; curId = id || '';
-    if (!id || !String(id).startsWith('g:')) return;   // wild/no-genoma: sin render 3D
-    src.value = `${IMG_BASE}/${await keyOf(id)}/${view}.webp`;
-  }, { immediate: true });
+  const clear = () => { if (timer) { clearTimeout(timer); timer = null; } };
+
+  async function begin (id) {
+    clear(); ready.value = false; pending.value = false; src.value = ''; baseUrl = ''; attempt = 0;
+    curId = id || '';
+    if (!id || !String(id).startsWith('g:')) return;   // sin genoma válido: solo SVG
+    const url = `${IMG_BASE}/${await keyOf(id)}/${view}.webp`;
+    if (curId !== id) return;                            // cambió mientras hasheaba
+    baseUrl = url; pending.value = true; src.value = url;   // 1er intento
+  }
+
+  function onLoad () { ready.value = true; pending.value = false; clear(); }
 
   function onError () {
-    ready.value = false;
-    if (curId) requestRender(curId, [view]);   // miss → pedir el render
+    if (!curId || !baseUrl) return;
+    ready.value = false; pending.value = true;
+    requestRender(curId, [view]);   // encola (idempotente; solo 1 POST por id/sesión)
+    clear();
+    timer = setTimeout(() => {       // reintenta ~cada minuto (cache-buster por las dudas)
+      attempt++;
+      src.value = `${baseUrl}?r=${attempt}`;
+    }, retryMs);
   }
-  return { src, ready, onError };
+
+  watch(idGetter, begin, { immediate: true });
+  onUnmounted(clear);
+  return { src, ready, pending, onLoad, onError };
 }
