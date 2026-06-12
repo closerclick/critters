@@ -49,7 +49,9 @@ const preload = (u) => new Promise((res, rej) => { const im = new Image(); im.on
 
 // Icono animado: alterna `views` (por defecto los 2 frames top) a una cadencia ~STEP_MS/speed.
 // Devuelve { src, ready, pending }: <img v-show="ready" :src="src">; gira mientras pending && !ready.
-export function use3dRender (idGetter, { views = ['top1', 'top2'] } = {}) {
+// animate=false: precarga TODOS los frames (los deja cacheados para la animación de la
+// batalla) pero muestra solo el 1º fijo (círculos). animate=true: alterna los frames.
+export function use3dRender (idGetter, { views = ['top1', 'top2'], animate: doAnimate = true } = {}) {
   const src = ref('');
   const ready = ref(false);
   const pending = ref(false);
@@ -79,7 +81,8 @@ export function use3dRender (idGetter, { views = ['top1', 'top2'] } = {}) {
     pending.value = true;
     Promise.all(urls.map(preload)).then(() => {           // todos los frames listos
       if (curId !== id) return;
-      ready.value = true; pending.value = false; animate();
+      ready.value = true; pending.value = false;
+      if (doAnimate) animate(); else src.value = urls[0];   // anima, o muestra el 1º fijo
     }).catch(() => {                                       // falta alguno → encolar + reintentar
       if (curId !== id) return;
       requestRender(curId, views);

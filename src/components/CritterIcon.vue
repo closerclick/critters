@@ -13,14 +13,18 @@ const props = defineProps({
   frame: { type: Boolean, default: true },       // se pasa a critterSvg
   spinner: { type: Boolean, default: true },     // anillo de carga
   rotate: { type: Number, default: 0 },          // grados a rotar SOLO la imagen 3D (campo)
-  // Vistas a cargar: por defecto la TOP ESTÁTICA (1 frame = sin animación de patas).
-  views: { type: Array, default: () => ['top'] },
+  // Vistas: por defecto los 2 frames top (se renderizan ambos → quedan cacheados para la
+  // animación de la batalla); con animate=false el círculo muestra solo el 1º fijo.
+  views: { type: Array, default: () => ['top1', 'top2'] },
+  animate: { type: Boolean, default: false },
 });
 
 const critter = computed(() => critterById(props.instance.id));
-const svg = computed(() => critter.value ? critterSvg(critter.value, props.size, { frame: props.frame }) : '');
+// En modo animado (batalla) el SVG de fallback TAMBIÉN mueve las patas (2 frames nativos),
+// así hay movimiento aunque el render 3D aún no exista.
+const svg = computed(() => critter.value ? critterSvg(critter.value, props.size, { frame: props.frame, walk: props.animate }) : '');
 const imgStyle = computed(() => props.rotate ? { transform: `rotate(${props.rotate}deg)` } : null);
-const { src, ready, pending } = use3dRender(() => genomeOf(props.instance), { views: props.views });
+const { src, ready, pending } = use3dRender(() => genomeOf(props.instance), { views: props.views, animate: props.animate });
 </script>
 
 <template>

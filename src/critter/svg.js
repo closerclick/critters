@@ -352,6 +352,14 @@ export function critterSvg (critter, size = 96, opts = {}) {
   s = Math.max(0.72, Math.min(1.7, s));
   const tf = 'translate(50 50) scale(' + s.toFixed(3) + ') translate(' + (-xC) + ' ' + (-cy).toFixed(2) + ')';
 
+  // CAMINAR (opts.walk): patas en marcha INTERCALADA de 2 frames, igual concepto que el 3D
+  // (gira el grupo de patas sobre el centro del cuerpo: lado +X adelante / -X atrás, alterna).
+  // Animación SVG nativa (animateTransform discreto), para el campo de batalla.
+  const legsG = (opts.walk === true && hasLegs)
+    ? '<g>' + legs + '<animateTransform attributeName=\"transform\" type=\"rotate\" calcMode=\"discrete\"' +
+      ' values=\"13 ' + xC + ' ' + y1 + ';-13 ' + xC + ' ' + y1 + '\" dur=\"0.6s\" repeatCount=\"indefinite\"/></g>'
+    : legs;
+
   return '<svg viewBox=\"0 0 100 100\" width=\"' + size + '\" height=\"' + size + '\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"' + (critter.name || 'critter') + '\">\n' +
     '  <defs>\n' +
     '    <linearGradient id=\"' + uid + '\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0\" stop-color=\"' + cTop + '\"/><stop offset=\"1\" stop-color=\"' + cBot + '\"/></linearGradient>\n' +
@@ -359,6 +367,6 @@ export function critterSvg (critter, size = 96, opts = {}) {
     '    <radialGradient id=\"' + uid + 's\" cx=\"0.4\" cy=\"0.3\" r=\"0.7\"><stop offset=\"0\" stop-color=\"' + sheen + '\" stop-opacity=\"0.28\"/><stop offset=\"0.6\" stop-color=\"' + sheen + '\" stop-opacity=\"0\"/></radialGradient>\n' +
     '  </defs>\n' +
     '  ' + (opts.frame === false ? '' : '<circle cx=\"50\" cy=\"50\" r=\"48\" fill=\"none\" stroke=\"' + ri.color + '\" stroke-width=\"3\" opacity=\".8\"/>') + '\n' +
-    '  <g transform=\"' + tf + '\">' + legs + neck + abdomen + thorax + head + chel + marks + ant + eyes + '</g>\n' +
+    '  <g transform=\"' + tf + '\">' + legsG + neck + abdomen + thorax + head + chel + marks + ant + eyes + '</g>\n' +
     '</svg>';
 }
