@@ -363,6 +363,14 @@ if "thorax" in PARTS and hasTh:
                                    (s*0.28, tcy + 0.55, zb + 0.62)], 0.042, hose)
         add_tube("hoseN2%+d" % s, [(s*0.52, hcy - 0.65, zb + 0.06), (s*1.02, y_n, zb - 0.30),
                                    (s*0.54, tcy + 0.78, zb + 0.02)], 0.040, hose)
+if "thorax" in PARTS and (not hasTh) and hasAb:
+    # SIN TORAX pero CON abdomen: puente DIRECTO cabeza->abdomen (si no, flotan separados).
+    y_m = (hcy + acy) / 2
+    add_servo("midbridge", (0, y_m, zb + 0.08), (1, 0, 0), 0.28, 0.78)
+    add_tube("midspine", [(0, hcy - 0.80, zb - 0.10), (0, y_m, zb - 0.22), (0, acy + 1.05, zb - 0.14)], 0.14, frame)
+    for s in (-1, 1):
+        add_tube("hoseM1%+d" % s, [(s*0.27, hcy - 0.55, zb + 0.58), (s*0.46, y_m, zb + 0.86), (s*0.29, acy + 0.95, zb + 0.62)], 0.044, hose)
+        add_tube("hoseM2%+d" % s, [(s*0.55, hcy - 0.70, zb + 0.04), (s*1.08, y_m, zb - 0.32), (s*0.57, acy + 1.05, zb + 0.00)], 0.040, hose)
 if "thorax" in PARTS and hasTh and hasAb:
     y_w = (tcy - 1.05 + acy + 1.35) / 2
     add_servo("waist", (0, y_w, zb + 0.06), (1, 0, 0), 0.27, 0.76)

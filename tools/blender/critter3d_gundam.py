@@ -430,6 +430,8 @@ midz = zb
 if "thorax" in PARTS:
     if hasTh: connector("neck", (*P2(xC, y0+9), midz), (*P2(xC, y1-9), midz), 0.09)
     if hasTh and hasAb: connector("waist", (*P2(xC, y1+9), midz), (*P2(xC, y2-13), midz), 0.10)
+    # SIN TORAX pero CON abdomen: puente DIRECTO cabeza->abdomen (si no, flotan separados).
+    if (not hasTh) and hasAb: connector("midbridge", (*P2(xC, y0+9), midz), (*P2(xC, y2-13), midz), 0.12)
 
 # === PATAS: frame + servos cilindricos + pistones hidraulicos + placas + garras ===
 LEG_CELLS = [(0, -1), (0, 1), (1, -1), (1, 1), (2, -1), (2, 1)]

@@ -297,6 +297,8 @@ midz = zb
 if "thorax" in PARTS:
     if hasTh: add_tube("neck", [(*P2(xC, y0+9), midz), (*P2(xC, y1-9), midz)], 0.13, frame, caps=True)
     if hasTh and hasAb: add_tube("waist", [(*P2(xC, y1+9), midz), (*P2(xC, y2-13), midz)], 0.15, frame, caps=True)
+    # SIN TORAX pero CON abdomen: puente DIRECTO cabeza->abdomen (si no, flotan separados).
+    if (not hasTh) and hasAb: add_tube("midbridge", [(*P2(xC, y0+9), midz), (*P2(xC, y2-13), midz)], 0.16, frame, caps=True)
 
 # ================= CABEZA: casco blindado + sensores =================
 def detail_head(seg):
