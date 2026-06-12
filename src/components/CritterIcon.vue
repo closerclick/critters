@@ -12,17 +12,21 @@ const props = defineProps({
   size: { type: Number, default: 64 },
   frame: { type: Boolean, default: true },       // se pasa a critterSvg
   spinner: { type: Boolean, default: true },     // anillo de carga
+  rotate: { type: Number, default: 0 },          // grados a rotar SOLO la imagen 3D (campo)
+  // Vistas a cargar: por defecto la TOP ESTÁTICA (1 frame = sin animación de patas).
+  views: { type: Array, default: () => ['top'] },
 });
 
 const critter = computed(() => critterById(props.instance.id));
 const svg = computed(() => critter.value ? critterSvg(critter.value, props.size, { frame: props.frame }) : '');
-const { src, ready, pending } = use3dRender(() => genomeOf(props.instance));
+const imgStyle = computed(() => props.rotate ? { transform: `rotate(${props.rotate}deg)` } : null);
+const { src, ready, pending } = use3dRender(() => genomeOf(props.instance), { views: props.views });
 </script>
 
 <template>
   <div class="ci" :class="{ loading: spinner && pending && !ready }" :style="{ width: size + 'px', height: size + 'px' }">
     <div v-show="!ready" class="ci-svg" v-html="svg"></div>
-    <img v-show="ready" class="ci-img" :src="src" alt="" />
+    <img v-show="ready" class="ci-img" :src="src" alt="" :style="imgStyle" />
   </div>
 </template>
 

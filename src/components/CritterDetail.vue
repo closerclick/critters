@@ -4,6 +4,7 @@ import { instanceByUid, critterById, game, displayName } from '../game/state.js'
 import { feed, FEED_COST, setRol, setTarget, adjustAlloc, resetAlloc, setNick } from '../game/actions.js';
 import { critterSvg } from '../critter/svg.js';
 import { use3dRender, genomeOf } from '../critter/render3d.js';
+import CritterIcon from './CritterIcon.vue';
 import { statsAtLevel, STAT_KEYS, pointsFree, xpForNext, RARITY_BY_KEY } from '../critter/forge.js';
 import { ACTIVES, PASSIVES } from '../critter/abilities.js';
 import { elementInfo, ELEMENT_INFO, comps } from '../critter/types.js';
@@ -76,12 +77,10 @@ function pickObj (k) { if (k === objSel.value) return; objSel.value = k; setTarg
   <div class="detail-modal" @click.self="emit('close')">
     <div class="detail-card" v-if="critter">
       <div class="d-portrait">
-        <!-- Círculo con el esquema SVG (gira como spinner mientras se genera el render);
-             a la DERECHA, la perspectiva 3D animada (patas en movimiento) cuando existe. -->
+        <!-- Círculo = vista TOP estática (SVG de fallback + spinner). A la DERECHA, la
+             perspectiva 3D ANIMADA (patas en movimiento) en cuanto existe. -->
         <div class="d-stage">
-          <div class="d-ring" :class="{ spin: art3dPending && !art3dReady }">
-            <div v-html="svgBig" class="d-svg"></div>
-          </div>
+          <CritterIcon class="d-circle" :instance="inst" :size="120" />
           <img v-show="art3dReady" class="d-persp" :src="art3d" alt="" />
         </div>
         <span v-if="free > 0" class="d-pts" :title="t('lblLibres')">✦{{ free }}</span>
@@ -175,14 +174,7 @@ function pickObj (k) { if (k === objSel.value) return; objSel.value = k; setTarg
 .nick-in::placeholder{color:var(--muted)}
 .d-portrait{position:relative;width:max-content;margin:0 auto}
 .d-stage{display:flex;align-items:center;justify-content:center;gap:14px}
-/* Circunferencia que enmarca el esquema SVG y, mientras se genera el render, gira como spinner. */
-.d-ring{position:relative;width:128px;height:128px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none}
-.d-ring::before{content:'';position:absolute;inset:0;border-radius:50%;box-sizing:border-box;
-  border:3px solid var(--line2)}
-.d-ring.spin::before{border-top-color:var(--accent);border-right-color:var(--accent);
-  animation:dspin .9s linear infinite}
-@keyframes dspin{to{transform:rotate(360deg)}}
-.d-svg{display:flex;align-items:center;justify-content:center}
+.d-circle{flex:none}
 /* Perspectiva 3D animada (moviendo las patas) a la derecha del círculo. */
 .d-persp{width:128px;height:128px;object-fit:contain;border-radius:14px;border:1px solid var(--line2);
   background:radial-gradient(circle at 50% 40%,rgba(167,139,250,.10),rgba(7,6,17,.55));animation:dfade .3s ease-out}

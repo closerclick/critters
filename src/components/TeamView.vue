@@ -104,7 +104,7 @@ function applyDrop (targetLid, targetSlot) {
           </template>
           <span v-else-if="!lu.team[s - 1]" class="mini-plus">+</span>
         </div>
-        <span class="front-tag">{{ t('rival') }} ▶</span>
+        <span class="front-tag">▲ {{ t('rival') }}</span>
       </div>
     </div>
   </div>
@@ -154,7 +154,7 @@ function applyDrop (targetLid, targetSlot) {
 .mini-plus{font-family:var(--fdisplay);font-size:18px;color:var(--muted);opacity:.45}
 .mini-lv{position:absolute;bottom:2px;right:4px;font-family:var(--fmono);font-size:8px;font-weight:700;color:var(--gold)}
 .mini-pts{position:absolute;top:2px;left:50%;transform:translateX(-50%);font-family:var(--fmono);font-size:8px;font-weight:800;color:var(--ink);background:var(--cyan);border-radius:5px;padding:0 3px}
-.front-tag{position:absolute;right:-2px;top:50%;transform:translateY(-50%) rotate(90deg);transform-origin:right center;font-family:var(--fdisplay);font-size:9px;color:var(--muted);letter-spacing:.1em;white-space:nowrap;opacity:.6;pointer-events:none}
+.front-tag{position:absolute;left:50%;top:-15px;transform:translateX(-50%);font-family:var(--fdisplay);font-size:9px;color:var(--muted);letter-spacing:.1em;white-space:nowrap;opacity:.6;pointer-events:none}
 .lu-new{align-self:center;font-family:var(--fdisplay);font-weight:800;font-size:13px;padding:8px 16px;border-radius:10px;border:1px dashed var(--line2);background:rgba(167,139,250,.06);color:var(--text)}
 
 .bench-zone{border-top:1px solid var(--line);padding-top:10px}
