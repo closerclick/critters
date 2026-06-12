@@ -6,7 +6,7 @@
 #   <out>_side.png   perfil lateral, cabeza hacia la derecha (fondo negro)
 # El .blend editable se guarda con las 3 camaras (la activa es la beauty).
 import bpy, math
-from mathutils import Vector
+from mathutils import Vector, Matrix
 
 def _coords():
     # esquinas de bbox por objeto, EVALUADAS (con bevel/subsurf aplicados) y en mundo
@@ -41,7 +41,28 @@ def _fit(cam, coords, margin):
         ctr = sum(coords, Vector()) / len(coords)
         cam.location = ctr + (loc - ctr) * margin
 
-def render_views(out_path, name, lens=60.0):
+# --- Animacion de patas (2 frames) -------------------------------------------------
+# Marcha INTERCALADA: las patas se posan girando como bloque sobre el eje Z en el centro
+# del cuerpo; por geometria las del lado +X van hacia +Y (adelante) y las del lado -X hacia
+# atras, asi que alternar el signo del angulo entre el frame "1" y el "2" da el paso. Solo
+# se mueven los objetos taggeados con ["leg"] por cada estilo (NO la hombrera/faldon del
+# panzer, que estan anclados al cuerpo). El framerate (cada cuanto alterna 1<->2) lo decide
+# el juego segun la velocidad de batalla.
+SWING = math.radians(8.0)
+
+def _leg_objs():
+    return [o for o in bpy.context.scene.objects if o.type in ('MESH', 'CURVE') and o.get("leg")]
+
+def _pose_legs(legs, base_mw, pivot, theta):
+    if theta == 0.0:
+        for o in legs: o.matrix_world = base_mw[o.name]
+    else:
+        M = Matrix.Translation(pivot) @ Matrix.Rotation(theta, 4, 'Z') @ Matrix.Translation(-pivot)
+        for o in legs: o.matrix_world = M @ base_mw[o.name]
+    bpy.context.view_layer.update()
+
+def render_views(out_path, name, lens=60.0, views=None):
+    import os
     sc = bpy.context.scene
     coords = _coords()
     base = out_path.rsplit('.', 1)[0]
@@ -53,10 +74,37 @@ def render_views(out_path, name, lens=60.0):
     blend_path = base + '.blend'
     bpy.ops.wm.save_as_mainfile(filepath=blend_path)
     print("SAVED BLEND", blend_path, flush=True)
-    for cam, path, transparent in ((beauty, out_path, False),
-                                   (top, base + '_top.png', True),
-                                   (side, base + '_side.png', False)):
+
+    # Catalogo de vistas: clave -> (camara, fondo_transparente, archivo, angulo_de_patas).
+    # Las "1"/"2" son los dos frames de la animacion (patas adelante/atras intercaladas).
+    JOBS = {
+        'beauty':  (beauty, False, out_path,            0.0),
+        'top':     (top,    True,  base + '_top.png',   0.0),
+        'side':    (side,   False, base + '_side.png',  0.0),
+        'top1':    (top,    True,  base + '_top1.png',  +SWING),
+        'top2':    (top,    True,  base + '_top2.png',  -SWING),
+        'beauty1': (beauty, False, base + '_b1.png',    +SWING),
+        'beauty2': (beauty, False, base + '_b2.png',    -SWING),
+    }
+    if views is None:
+        views = (os.environ.get("CRITTER_VIEWS", "").split(",") if os.environ.get("CRITTER_VIEWS")
+                 else ['beauty', 'top', 'side'])
+    views = [v for v in views if v in JOBS]
+    if not views: views = ['beauty', 'top', 'side']
+
+    legs = _leg_objs()
+    base_mw = {o.name: o.matrix_world.copy() for o in legs}
+    ctr = sum(coords, Vector()) / len(coords)
+    pivot = Vector((ctr.x, ctr.y, 0.0))   # eje vertical por el centro del cuerpo
+    print("LEGS", len(legs), "pivot", tuple(round(v, 2) for v in pivot), flush=True)
+
+    cur = None
+    for v in views:
+        cam, transparent, path, theta = JOBS[v]
+        if legs and theta != cur:
+            _pose_legs(legs, base_mw, pivot, theta); cur = theta
         sc.camera = cam; sc.render.film_transparent = transparent; sc.render.filepath = path
-        print("RENDERING", name, cam.name, "->", path, flush=True)
+        print("RENDERING", name, v, cam.name, "theta", round(math.degrees(theta), 1), "->", path, flush=True)
         bpy.ops.render.render(write_still=True)
+    if legs and cur != 0.0: _pose_legs(legs, base_mw, pivot, 0.0)
     print("DONE", flush=True)

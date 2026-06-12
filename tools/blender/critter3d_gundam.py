@@ -444,6 +444,7 @@ def piston(nm, a, b, f0, f1, rbody, rrod):
     add_tube(nm + "_c", [(*a.lerp(b, f0),), (*a.lerp(b, fm),)], rbody, frame)
     add_tube(nm + "_r", [(*a.lerp(b, fm-0.04),), (*a.lerp(b, f1),)], rrod, rodm)
 
+_LSNAP = set(bpy.data.objects)   # para taggear las patas (animacion de 2 frames en cams)
 if "legs" in PARTS:
     for i in range(legs_n):
         r, side = LEG_CELLS[i]; yy = rowY[r]
@@ -485,6 +486,7 @@ if "legs" in PARTS:
         add_blade("claw%d" % i, tuple(foot + Vector((0, 0, 0.10)) - dh*0.05), tuple(foot + dh*0.30 + Vector((0, 0, -0.01))), 0.075, 0.028, trim, up=upc)
         add_blade("spur%d" % i, tuple(foot + Vector((0, 0, 0.09))), tuple(foot - dh*0.17 + Vector((0, 0, 0.01))), 0.055, 0.022, trim, up=upc)
         add_diamond("ftip%d" % i, tuple(foot + Vector((0, 0, 0.04))), 0.05, glow)
+    for _o in (set(bpy.data.objects) - _LSNAP): _o["leg"] = 1   # patas: se animan en cams
 
 # === ANTENAS: mastiles sensores segmentados con punta glow ===
 if "antennae" in PARTS and A.get("antennae"):

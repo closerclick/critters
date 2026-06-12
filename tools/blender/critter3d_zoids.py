@@ -380,6 +380,7 @@ ROW_POSE = {  # postura AGRESIVA: delanteras estiradas al frente, traseras hacia
     1: {"knee":  0, "ank":  1, "foot":  2, "spread": 35},
     2: {"knee":  5, "ank":  8, "foot": 11, "spread": 34}}
 knee_up = 0.92 if A.get("legStyle") == 1 else 0.62
+_LSNAP = set(bpy.data.objects)   # para taggear las patas (animacion de 2 frames en cams)
 if "legs" in PARTS:
     for i in range(legs_n):
         r, side = LEG_CELLS[i]; yy = rowY[r]; pose = ROW_POSE[r]
@@ -404,6 +405,7 @@ if "legs" in PARTS:
         add_spike("claw%d" % i, foot, (cd.x, cd.y, -0.75), 0.20, 0.055, panel2)      # garra principal
         add_spike("dew%d" % i, foot + Vector((0, 0, 0.05)), (-cd.x*0.5, -cd.y*0.5, -0.95), 0.13, 0.042, panel2)
         add_diamond("ftip%d" % i, (foot.x, foot.y, 0.04), 0.055, glow9)
+    for _o in (set(bpy.data.objects) - _LSNAP): _o["leg"] = 1   # patas: se animan en cams
 
 # === ANTENAS: mastiles sensores articulados (servo base + codo + punta glow) ===
 if "antennae" in PARTS and A.get("antennae"):
