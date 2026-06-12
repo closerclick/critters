@@ -14,7 +14,7 @@ import { genomeId } from './forge.js';
 // el PREFIX de la Lambda (env PREFIX=critters/v2/).
 const IMG_BASE = 'https://s3.closer.click/critters/v2';
 const INTAKE = 'https://render.closer.click/';
-const RETRY_MS = 60000;    // reintenta encolar/cargar ~cada minuto
+const RETRY_MS = 12000;    // re-chequea si la imagen ya existe cada ~12s (el render tarda ~60-90s)
 const STEP_MS = 360;       // ms por frame a speed 1 (la cadencia escala con speed)
 
 async function keyOf (id) {
@@ -53,7 +53,7 @@ export function use3dRender (idGetter, { views = ['top1', 'top2'] } = {}) {
   const src = ref('');
   const ready = ref(false);
   const pending = ref(false);
-  let curId = '', urls = [], frame = 0, timer = null;
+  let curId = '', urls = [], frame = 0, timer = null, attempt = 0;
 
   const stop = () => { if (timer) { clearTimeout(timer); timer = null; } };
 
@@ -66,25 +66,29 @@ export function use3dRender (idGetter, { views = ['top1', 'top2'] } = {}) {
     if (urls.length > 1) timer = setTimeout(loop, Math.max(60, STEP_MS / (speed.value || 1)));
   }
 
-  async function begin (id) {
-    stop(); ready.value = false; pending.value = false; src.value = ''; curId = id || '';
+  async function begin (id, first) {
+    stop(); ready.value = false; pending.value = false; src.value = '';
+    if (first) { curId = id || ''; attempt = 0; }
     if (!id || !String(id).startsWith('g:')) return;
     const key = await keyOf(id);
     if (curId !== id) return;
-    urls = views.map(v => `${IMG_BASE}/${key}/${v}.webp`);
+    // cache-buster en reintentos: si Cloudflare cacheó el 403 del miss, sin esto nunca
+    // veríamos el 200 aunque el render ya exista.
+    const q = attempt ? `?r=${attempt}` : '';
+    urls = views.map(v => `${IMG_BASE}/${key}/${v}.webp${q}`);
     pending.value = true;
-    Promise.all(urls.map(preload)).then(() => {           // todos los frames listos → animar
+    Promise.all(urls.map(preload)).then(() => {           // todos los frames listos
       if (curId !== id) return;
       ready.value = true; pending.value = false; animate();
     }).catch(() => {                                       // falta alguno → encolar + reintentar
       if (curId !== id) return;
       requestRender(curId, views);
-      pending.value = true;
+      pending.value = true; attempt++;
       timer = setTimeout(() => begin(id), RETRY_MS);
     });
   }
 
-  watch(idGetter, begin, { immediate: true });
+  watch(idGetter, (id) => begin(id, true), { immediate: true });
   onUnmounted(stop);
   return { src, ready, pending };
 }
