@@ -1,11 +1,12 @@
-// FUSIÓN unificada (determinista). El tipo lo decide la CANTIDAD de PARTES en que DIFIEREN
-// las dos arañas (NO la rareza; la rareza es solo el nº de partes que tiene cada una):
+// FUSIÓN unificada (determinista). El tipo lo decide en qué PARTES DIFIEREN las dos arañas
+// (NO la rareza). Clave: EVOLUCIONAR exige que CADA UNA aporte una parte que la otra no tiene
+// (si no, la unión sería = la más grande, inútil). Con onlyA/onlyB = partes exclusivas:
 //  - 0 diferencias → REFUERZO (idénticas): misma araña + ingredientes acumulados.
-//    · EXTREMO piso: dos CABEZAS (1 parte) → EVOLUCIÓN a cabeza+tórax (+tórax).
-//    · EXTREMO techo: dos LEGENDARIAS completas (9 partes) → DEVOLUCIÓN sin tórax (−tórax).
-//  - 1 diferencia  → EVOLUCIÓN: la chica se completa hacia la grande → UNIÓN de partes.
-//  - 2 diferencias → DEVOLUCIÓN: se pierden las partes distintas → INTERSECCIÓN.
-//  - 3+ diferencias→ INCOMPATIBLES (no fusiona).
+//    · EXTREMO piso: dos CABEZAS (1 parte) → cabeza+tórax (+tórax).
+//    · EXTREMO techo: dos LEGENDARIAS completas (9) → sin tórax (−tórax).
+//  - cada una aporta ≥1 (onlyA≥1 y onlyB≥1, total 2) → EVOLUCIÓN: UNIÓN (crece sobre ambas).
+//  - una contiene a la otra (1 ó 2 de diferencia, una aporta 0) → DEVOLUCIÓN: INTERSECCIÓN (la chica).
+//  - 3+ diferencias en total → INCOMPATIBLES (no fusiona).
 // Elemento (ingredientes): al evolucionar/reforzar ACUMULA (foldElement); al devolucionar
 // descarta lo que no cabe (clampElement, destructivo).
 import { partsOf, genomeId, makeCritter, MAX_PARTS, clampElement, foldElement, rarityIndexFromParts, seedOfId, legCount } from '../critter/forge.js';
@@ -35,15 +36,15 @@ const fuseSeed = (cA, cB) => 's' + ((hash32(cA.id + '|' + cB.id) >>> 0).toString
 export function fuseKind (cA, cB) {
   if (!cA || !cB || cA.id === cB.id) return null;
   const { onlyA, onlyB } = pieceDiff(cA.appearance, cB.appearance);
-  const diff = onlyA + onlyB;
-  if (diff >= 3) return null;
-  if (diff === 1) return 'evolve';
-  if (diff === 2) return 'degrade';
-  // diff === 0 (idénticas): refuerzo, salvo los dos extremos
-  const pa = partsOf(cA.appearance);
-  if (pa === 1) return 'evolve';            // dos cabezas → +tórax
-  if (pa >= MAX_PARTS) return 'degrade';    // dos legendarias completas → −tórax
-  return 'merge';
+  if (onlyA + onlyB >= 3) return null;                     // 3+ diferencias → incompatibles
+  if (onlyA === 0 && onlyB === 0) {                        // idénticas (extremos)
+    const pa = partsOf(cA.appearance);
+    if (pa === 1) return 'evolve';                         // dos cabezas → +tórax
+    if (pa >= MAX_PARTS) return 'degrade';                 // dos legendarias completas → −tórax
+    return 'merge';                                        // resto → refuerzo
+  }
+  if (onlyA >= 1 && onlyB >= 1) return 'evolve';           // cada una aporta una parte → UNIÓN (crece)
+  return 'degrade';                                        // una contiene a la otra → INTERSECCIÓN (la chica)
 }
 export const canFuse = (cA, cB) => fuseKind(cA, cB) !== null;
 
