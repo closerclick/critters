@@ -355,9 +355,10 @@ export function critterSvg (critter, size = 96, opts = {}) {
   // CAMINAR (opts.walk): patas en marcha INTERCALADA de 2 frames, igual concepto que el 3D
   // (gira el grupo de patas sobre el centro del cuerpo: lado +X adelante / -X atrás, alterna).
   // Animación SVG nativa (animateTransform discreto), para el campo de batalla.
+  const _o = xC + ' ' + y1;   // pivote ~centro del cuerpo
   const legsG = (opts.walk === true && hasLegs)
     ? '<g>' + legs + '<animateTransform attributeName=\"transform\" type=\"rotate\" calcMode=\"discrete\"' +
-      ' values=\"13 ' + xC + ' ' + y1 + ';-13 ' + xC + ' ' + y1 + '\" dur=\"0.6s\" repeatCount=\"indefinite\"/></g>'
+      ' values=\"13 ' + _o + ';0 ' + _o + ';-13 ' + _o + ';0 ' + _o + '\" dur=\"0.8s\" repeatCount=\"indefinite\"/></g>'
     : legs;
 
   return '<svg viewBox=\"0 0 100 100\" width=\"' + size + '\" height=\"' + size + '\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"' + (critter.name || 'critter') + '\">\n' +

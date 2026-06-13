@@ -12,7 +12,8 @@ import { genomeId } from './forge.js';
 // Versión del render: bumpear (v2→v3…) cuando cambian los parámetros de Blender (swing,
 // encuadre, estilo) para invalidar el caché inmutable sin huérfanos. Debe coincidir con
 // el PREFIX de la Lambda (env PREFIX=critters/v2/).
-const IMG_BASE = 'https://s3.closer.click/critters/v4';
+const IMG_BASE = 'https://s3.closer.click/critters/v5';
+const RES = 384, SAMPLES = 96;   // imágenes chicas (iconos 40-128px) → render rápido y liviano
 const INTAKE = 'https://render.closer.click/';
 const RETRY_MS = 12000;    // re-chequea si la imagen ya existe cada ~12s (el render tarda ~60-90s)
 const STEP_MS = 360;       // ms por frame a speed 1 (la cadencia escala con speed)
@@ -41,7 +42,7 @@ function requestRender (id, views) {
   // si el POST falla o lo throttlean (no-2xx), liberamos la clave para reintentar luego
   fetch(INTAKE, {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ id, views }),
+    body: JSON.stringify({ id, views, res: RES, samples: SAMPLES }),
   }).then(r => { if (!r.ok) queued.delete(k); }).catch(() => queued.delete(k));
 }
 
@@ -60,12 +61,17 @@ export function use3dRender (idGetter, { views = ['top1', 'top2'], animate: doAn
   const stop = () => { if (timer) { clearTimeout(timer); timer = null; } };
 
   function animate () {
-    stop(); frame = 0; src.value = urls[0];
+    stop();
+    // PING-PONG: con 3 frames [+, 0, -] la secuencia es 0,1,2,1 (de +x/2 a -x/2 pasando por
+    // el centro y volviendo); con 2 frames es 0,1. La cadencia escala con la velocidad.
+    const order = urls.length >= 3 ? [...urls.keys(), ...Array.from({ length: urls.length - 2 }, (_, i) => urls.length - 2 - i)]
+                                   : urls.map((_, i) => i);
+    let p = 0; src.value = urls[order[0]];
     const loop = () => {
-      frame = (frame + 1) % urls.length; src.value = urls[frame];
-      timer = setTimeout(loop, Math.max(60, STEP_MS / (speed.value || 1)));   // cadencia por speed
+      p = (p + 1) % order.length; src.value = urls[order[p]];
+      timer = setTimeout(loop, Math.max(60, STEP_MS / (speed.value || 1)));
     };
-    if (urls.length > 1) timer = setTimeout(loop, Math.max(60, STEP_MS / (speed.value || 1)));
+    if (order.length > 1) timer = setTimeout(loop, Math.max(60, STEP_MS / (speed.value || 1)));
   }
 
   async function begin (id, first) {

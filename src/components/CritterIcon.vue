@@ -13,9 +13,9 @@ const props = defineProps({
   frame: { type: Boolean, default: true },       // se pasa a critterSvg
   spinner: { type: Boolean, default: true },     // anillo de carga
   rotate: { type: Number, default: 0 },          // grados a rotar SOLO la imagen 3D (campo)
-  // Vistas: por defecto los 2 frames top (se renderizan ambos → quedan cacheados para la
-  // animación de la batalla); con animate=false el círculo muestra solo el 1º fijo.
-  views: { type: Array, default: () => ['top1', 'top2'] },
+  // Vistas: por defecto la TOP neutra (1 frame estático para los círculos). La batalla pasa
+  // los 3 frames ['top1','top','top2'] + animate=true para la marcha trípode.
+  views: { type: Array, default: () => ['top'] },
   animate: { type: Boolean, default: false },
 });
 

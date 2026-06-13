@@ -41,24 +41,37 @@ def _fit(cam, coords, margin):
         ctr = sum(coords, Vector()) / len(coords)
         cam.location = ctr + (loc - ctr) * margin
 
-# --- Animacion de patas (2 frames) -------------------------------------------------
-# Marcha INTERCALADA: las patas se posan girando como bloque sobre el eje Z en el centro
-# del cuerpo; por geometria las del lado +X van hacia +Y (adelante) y las del lado -X hacia
-# atras, asi que alternar el signo del angulo entre el frame "1" y el "2" da el paso. Solo
-# se mueven los objetos taggeados con ["leg"] por cada estilo (NO la hombrera/faldon del
-# panzer, que estan anclados al cuerpo). El framerate (cada cuanto alterna 1<->2) lo decide
-# el juego segun la velocidad de batalla.
-SWING = math.radians(18.0)
+# --- Animacion de patas (3 frames: -SWING, 0, +SWING) ------------------------------
+# Cada pata gira sobre SU PROPIA cadera (no el cuerpo en bloque), un yaw que en vista top
+# mece el pie adelante/atras. Los signos van en patron TRIPODE (intercalado) para conservar
+# el equilibrio: patas vecinas van en sentidos opuestos. Tag ["leg"]=i+1 (1-based: el 0 es
+# falsy) lo pone cada estilo en sus objetos de pata; la cadera se infiere como el objeto del
+# grupo mas cercano al centro del cuerpo. El framerate lo decide el juego (3 frames ping-pong).
+SWING = math.radians(14.0)
 
 def _leg_objs():
     return [o for o in bpy.context.scene.objects if o.type in ('MESH', 'CURVE') and o.get("leg")]
 
-def _pose_legs(legs, base_mw, pivot, theta):
-    if theta == 0.0:
-        for o in legs: o.matrix_world = base_mw[o.name]
-    else:
-        M = Matrix.Translation(pivot) @ Matrix.Rotation(theta, 4, 'Z') @ Matrix.Translation(-pivot)
-        for o in legs: o.matrix_world = M @ base_mw[o.name]
+def _leg_groups(legs, ctr):
+    # agrupa por indice de pata y calcula el pivote (cadera = objeto mas cercano al centro).
+    groups = {}
+    for o in legs:
+        groups.setdefault(int(o["leg"]) - 1, []).append(o)
+    out = []
+    for idx, objs in groups.items():
+        hip = min(objs, key=lambda o: (o.matrix_world.translation.xy - ctr.xy).length)
+        p = hip.matrix_world.translation
+        # signo TRIPODE: fila = idx//2, lado = idx%2 -> (fila+lado) par/impar alterna en cruz.
+        sign = 1.0 if ((idx // 2 + idx % 2) % 2 == 0) else -1.0
+        out.append((objs, Vector((p.x, p.y, 0.0)), sign))
+    return out
+
+def _pose_legs(groups, base_mw, theta):
+    for objs, pivot, sign in groups:
+        ang = theta * sign
+        M = Matrix.Translation(pivot) @ Matrix.Rotation(ang, 4, 'Z') @ Matrix.Translation(-pivot)
+        for o in objs:
+            o.matrix_world = (base_mw[o.name] if ang == 0.0 else M @ base_mw[o.name])
     bpy.context.view_layer.update()
 
 def _fit_top(cam, coords, margin):
@@ -89,7 +102,8 @@ def render_views(out_path, name, lens=60.0, views=None):
     print("SAVED BLEND", blend_path, flush=True)
 
     # Catalogo de vistas: clave -> (camara, fondo_transparente, archivo, angulo_de_patas).
-    # Las "1"/"2" son los dos frames de la animacion (patas adelante/atras intercaladas).
+    # 3 frames de animacion por vista: "1" = +SWING, base = 0 (neutro), "2" = -SWING. El
+    # juego hace ping-pong 1->base->2->base (de -x/2 a x/2 pasando por el centro).
     JOBS = {
         'beauty':  (beauty, True,  out_path,            0.0),
         'top':     (top,    True,  base + '_top.png',   0.0),
@@ -108,16 +122,16 @@ def render_views(out_path, name, lens=60.0, views=None):
     legs = _leg_objs()
     base_mw = {o.name: o.matrix_world.copy() for o in legs}
     ctr = sum(coords, Vector()) / len(coords)
-    pivot = Vector((ctr.x, ctr.y, 0.0))   # eje vertical por el centro del cuerpo
-    print("LEGS", len(legs), "pivot", tuple(round(v, 2) for v in pivot), flush=True)
+    groups = _leg_groups(legs, ctr) if legs else []
+    print("LEGS", len(legs), "groups", len(groups), flush=True)
 
     cur = None
     for v in views:
         cam, transparent, path, theta = JOBS[v]
-        if legs and theta != cur:
-            _pose_legs(legs, base_mw, pivot, theta); cur = theta
+        if groups and theta != cur:
+            _pose_legs(groups, base_mw, theta); cur = theta
         sc.camera = cam; sc.render.film_transparent = transparent; sc.render.filepath = path
         print("RENDERING", name, v, cam.name, "theta", round(math.degrees(theta), 1), "->", path, flush=True)
         bpy.ops.render.render(write_still=True)
-    if legs and cur != 0.0: _pose_legs(legs, base_mw, pivot, 0.0)
+    if groups and cur not in (None, 0.0): _pose_legs(groups, base_mw, 0.0)
     print("DONE", flush=True)

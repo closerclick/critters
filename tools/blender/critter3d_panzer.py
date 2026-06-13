@@ -427,8 +427,8 @@ for i in range(legs_n):
     add_tube("skirtg%d" % i, [(ps.x + side*0.05, ps.y - 0.18, ps.z - 0.38),
                               (ps.x + side*0.05, ps.y + 0.18, ps.z - 0.38)], 0.020, glowS)
 
-_LSNAP = set(bpy.data.objects)   # taggear SOLO las patas móviles (NO hombreras/faldones de arriba)
 for i in range(legs_n if "legs" in PARTS else 0):
+    _lb = set(bpy.data.objects)   # taggear SOLO esta pata móvil (NO hombreras/faldones) con su indice
     r, side = LEG_CELLS[i]; yy = rowY[r]
     rw = (50 - yy) * 0.1                       # y del mundo de la fila
     dyn = (0.45, 0.0, -0.45)[r]                # postura dinámica: delanteras adelante, traseras atrás
@@ -463,7 +463,7 @@ for i in range(legs_n if "legs" in PARTS else 0):
     g0 = foot + d*0.16 + perp*0.08 + Vector((0, 0, 0.035))
     g1 = foot + d*0.16 - perp*0.08 + Vector((0, 0, 0.035))
     add_tube("footg%d" % i, [tuple(g0), tuple(g1)], 0.018, glowS)
-for _o in (set(bpy.data.objects) - _LSNAP): _o["leg"] = 1   # patas: se animan en cams
+    for _o in (set(bpy.data.objects) - _lb): _o["leg"] = i + 1   # idx 1-based (0 es falsy)
 
 # ---------- escena ----------
 def add_area(name, loc, energy, size, color=(1, 1, 1), rot=None):
