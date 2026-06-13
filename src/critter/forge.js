@@ -72,7 +72,7 @@ const canonEl = (counts) => { const a = []; for (const k in counts) for (let i =
  *  acumulados (multiplicidad desc, luego orden canónico). Determinista. */
 export function clampElement (element, rarityIndex) {
   const cap = capacityFor(rarityIndex);
-  const counts = {}; for (const c of String(element).split('+')) if (ELEMENTS.includes(c)) counts[c] = (counts[c] || 0) + 1;
+  const counts = {}; for (const c of String(element).split(/[+.]/)) if (ELEMENTS.includes(c)) counts[c] = (counts[c] || 0) + 1;
   const distinct = Object.keys(counts);
   if (!distinct.length) return 'fuego';
   if (distinct.length <= cap) return canonEl(counts);
@@ -85,7 +85,7 @@ export function clampElement (element, rarityIndex) {
  *  pierden. (El degradado, en cambio, sí descarta: usa clampElement.) */
 export function foldElement (element, rarityIndex) {
   const cap = capacityFor(rarityIndex);
-  const counts = {}; for (const c of String(element).split('+')) if (ELEMENTS.includes(c)) counts[c] = (counts[c] || 0) + 1;
+  const counts = {}; for (const c of String(element).split(/[+.]/)) if (ELEMENTS.includes(c)) counts[c] = (counts[c] || 0) + 1;
   const distinct = Object.keys(counts);
   if (!distinct.length) return 'fuego';
   if (distinct.length <= cap) return canonEl(counts);
@@ -105,7 +105,7 @@ export function foldElement (element, rarityIndex) {
 //    tiempo); TRIPLE (sub-sub) = LINEAL sin tope → vale la pena farmear leyendas
 //    (monstruos enormes del endgame).
 export function elementMult (element, rarityIndex = 0) {
-  const all = String(element).split('+').filter(e => ELEMENTS.includes(e));
+  const all = String(element).split(/[+.]/).filter(e => ELEMENTS.includes(e));
   const distinct = new Set(all).size || 1;
   const extra = Math.max(0, all.length - distinct);   // ingredientes duplicados acumulados
   const mat = Math.max(0, Math.min(8, rarityIndex)) / 8;   // 0 = mínima · 1 = legendaria (índice 8)

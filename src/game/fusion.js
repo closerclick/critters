@@ -10,8 +10,8 @@
 //  - 3+ diferencias en total → INCOMPATIBLES (no fusiona).
 // Elemento (ingredientes): al evolucionar/reforzar ACUMULA (foldElement); al devolucionar
 // descarta lo que no cabe (clampElement, destructivo).
-import { partsOf, genomeId, makeCritter, MAX_PARTS, clampElement, foldElement, rarityIndexFromParts, seedOfId, legCount } from '../critter/forge.js';
-import { mixElements } from '../critter/types.js';
+import { partsOf, genomeId, makeCritter, MAX_PARTS, capacityFor, rarityIndexFromParts, seedOfId, legCount } from '../critter/forge.js';
+import { fuseIngredients, degradeIngredients } from '../critter/types.js';
 import { hash32 } from '../lib/hash.js';
 
 // Piezas que cada apariencia tiene y la otra NO (patas anidadas + tórax + abdomen).
@@ -59,17 +59,19 @@ export function fuse (cA, cB) {
   const { onlyA, onlyB } = pieceDiff(cA.appearance, cB.appearance);
   const diff = onlyA + onlyB;
   let app, element, seed;
-  if (kind === 'merge') {                                                  // idénticas → MISMA araña + ingredientes (+ XP en la acción)
+  // capacidad (nivel máx de ingrediente) según la rareza de la araña RESULTANTE.
+  const cap = (a) => capacityFor(rarityIndexFromParts(partsOf(a)));
+  if (kind === 'merge') {                                                  // idénticas → MISMA araña + ingredientes mezclados (+ XP)
     app = { ...big.appearance };
-    element = foldElement(mixElements(cA.element, cB.element), rarityIndexFromParts(partsOf(app)));
+    element = fuseIngredients(cA.element, cB.element, cap(app));
     seed = seedOfId(big.id);
   } else if (kind === 'evolve') {                                          // 1 dif → UNIÓN; o dos CABEZAS idénticas → +tórax
     app = (diff === 0) ? { ...big.appearance, thorax: 0 } : unionApp(cA.appearance, cB.appearance);
-    element = foldElement(mixElements(cA.element, cB.element), rarityIndexFromParts(partsOf(app)));
+    element = fuseIngredients(cA.element, cB.element, cap(app));           // empareja por niveles (sub/sub-sub si la rareza da)
     seed = fuseSeed(cA, cB);
   } else {                                                                 // 2 dif → INTERSECCIÓN; o dos LEGENDARIAS idénticas → −tórax
     app = (diff === 0) ? { ...big.appearance, thorax: -1 } : interApp(cA.appearance, cB.appearance);
-    element = clampElement(mixElements(cA.element, cB.element), rarityIndexFromParts(partsOf(app)));
+    element = degradeIngredients(cA.element, cB.element, cap(app));        // DEVOLUCIÓN: descarta lo que ya no cabe
     seed = fuseSeed(cA, cB);
   }
   return makeCritter(genomeId({ seed, element, role: big.role, appearance: app }));

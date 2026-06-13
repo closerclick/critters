@@ -3,7 +3,7 @@
 # (elementInfo). La Lambda lo usa para NO depender de Node: el render solo necesita
 # appearance + colors (el nombre/rareza del juego no afectan al modelo).
 # DEBE producir exactamente los mismos numeros que el pipeline JS (ver test_spec_derive.sh).
-import math
+import math, re
 
 ELEMENT_INFO = {
     "fuego":  ("#f97316", "#7c2d12"),
@@ -32,8 +32,9 @@ def _rgb_hex(r, g, b):
     return "#" + "".join("%02x" % _clamp(v) for v in (r, g, b))
 
 def element_colors(el):
-    # types.js elementInfo: promedia color/color2 de TODOS los componentes (con multiplicidad)
-    comps = [c for c in str(el).split("+") if c in ELEMENT_INFO]
+    # types.js elementInfo: promedia color/color2 de TODAS las bases (con multiplicidad). El
+    # elemento puede traer ingredientes con nivel ("fuego.fuego" = un sub) → se aplana por "+" y ".".
+    comps = [c for c in re.split(r"[+.]", str(el)) if c in ELEMENT_INFO]
     if not comps: comps = ["fuego"]
     n = len(comps)
     c1 = [_hx(ELEMENT_INFO[c][0]) for c in comps]

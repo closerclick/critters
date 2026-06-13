@@ -1,14 +1,13 @@
-// Test Node (sin navegador) del núcleo determinista: forge, svg y motor de batalla.
+// Tests Vitest del núcleo determinista: forge, svg y motor de batalla.
+//   npm run test:unit        (la FUSIÓN/ingredientes están en fusion.test.js)
+import { it as ok } from 'vitest';
 import assert from 'node:assert';
 import { makeCritter, statsAtLevel, power, pointsTotal, pointsFree, partsOf, rarityIndexFromParts, genomeId, elementMult, clampElement, capacityFor } from '../src/critter/forge.js';
 import { critterSvg } from '../src/critter/svg.js';
 import { typeMultiplier, mixElements, elementInfo, ADV, DIS } from '../src/critter/types.js';
 import { simulate, battleSeed } from '../src/battle/engine.js';
 import { normalizeTarget } from '../src/battle/policies.js';
-import { canFuse, fuse, fuseKind } from '../src/game/fusion.js';
 
-let failed = 0;
-const ok = (name, fn) => { try { fn(); console.log('  ✓', name); } catch (e) { failed++; console.error('  ✗', name, '\n   ', e.message); } };
 
 ok('makeCritter es determinista por id', () => {
   const a = makeCritter('alpha'), b = makeCritter('alpha'), c = makeCritter('beta');
@@ -103,46 +102,13 @@ ok('rareza por partes: 9 rarezas (1 parte=índice 0 … 9=8); invocadas rareza 0
 });
 
 ok('genoma-id: makeCritter reconstruye exacto y determinista', () => {
-  const id = genomeId({ seed: 'sx', element: 'fuego', role: 'dps', appearance: { head: 1, thorax: 0, abdomen: 2, legs: 3, legStyle: 1, antennae: true, hue: 5, pattern: 1 } });
+  // legs = MÁSCARA de bits: 7 = 0b111 = 3 patas (celdas 0,1,2)
+  const id = genomeId({ seed: 'sx', element: 'fuego', role: 'dps', appearance: { head: 1, thorax: 0, abdomen: 2, legs: 7, legStyle: 1, antennae: true, hue: 5, pattern: 1 } });
   const c1 = makeCritter(id), c2 = makeCritter(id);
   assert.deepEqual(c1, c2);
   assert.equal(c1.element, 'fuego'); assert.equal(c1.role, 'dps');
-  assert.equal(partsOf(c1.appearance), 6);   // 1+1+1+3
+  assert.equal(partsOf(c1.appearance), 6);   // 1(cabeza)+1(tórax)+1(abdomen)+3(patas)
   assert.equal(c1.rarityIndex, 5);           // 6 partes → índice 5 (Notable)
-});
-
-ok('evolución: dos del MISMO nº de piezas con un swap → +1 pieza; cabeza+cabeza → tórax', () => {
-  const base = { head: 0, legStyle: 0, antennae: false, hue: 0, pattern: 0 };
-  // swap tórax↔abdomen, ambas de 3 piezas (cabeza + 1 pata + (tórax|abdomen))
-  const A = makeCritter(genomeId({ seed: 'sa', element: 'fuego', role: 'dps', appearance: { ...base, thorax: 0, abdomen: -1, legs: 1 } }));   // 3
-  const B = makeCritter(genomeId({ seed: 'sb', element: 'agua', role: 'dps', appearance: { ...base, thorax: -1, abdomen: 0, legs: 1 } }));    // 3
-  assert.ok(canFuse(A, B));
-  const child = fuse(A, B);
-  assert.equal(partsOf(child.appearance), 4);                          // unión = +1 pieza sobre cada padre
-  assert.ok(child.rarityIndex > A.rarityIndex);
-  assert.equal(child.element, 'agua+fuego');                           // subelemento (4 partes, cap 2)
-  assert.deepEqual(fuse(A, B), child);                                 // determinista
-  // subconjunto: cabeza sola vs cabeza+pata → NO fusiona (la cabeza no aporta pieza nueva)
-  const head1 = makeCritter(genomeId({ seed: 'h1', element: 'fuego', role: 'dps', appearance: { ...base, thorax: -1, abdomen: -1, legs: 0 } }));  // 1
-  const headLeg = makeCritter(genomeId({ seed: 'hl', element: 'agua', role: 'dps', appearance: { ...base, thorax: -1, abdomen: -1, legs: 1 } }));  // 2
-  assert.ok(!canFuse(head1, headLeg)); assert.equal(fuse(head1, headLeg), null);
-  // CABEZA + CABEZA → tórax (única combinación posible de la cabeza-sola)
-  const head2 = makeCritter(genomeId({ seed: 'h2', element: 'agua', role: 'dps', appearance: { ...base, thorax: -1, abdomen: -1, legs: 0 } }));  // 1
-  assert.ok(canFuse(head1, head2));
-  const torso = fuse(head1, head2);
-  assert.equal(partsOf(torso.appearance), 2);
-  assert.ok(torso.appearance.thorax >= 0 && torso.appearance.legs === 0 && torso.appearance.abdomen < 0);   // tórax, nada más
-  assert.equal(head1.rarityIndex, 0); assert.equal(torso.rarityIndex, 1);
-  // distinto nº de piezas (subconjunto) → NO
-  const big = makeCritter(genomeId({ seed: 'bg', element: 'planta', role: 'dps', appearance: { ...base, thorax: 0, abdomen: 0, legs: 1 } }));  // 4
-  assert.ok(!canFuse(A, big));
-  // Si la rareza no permite un ingrediente nuevo, los ingredientes se ACUMULAN (no se pierden).
-  const P = makeCritter(genomeId({ seed: 'sp', element: 'fuego', role: 'dps', appearance: { ...base, thorax: 0, abdomen: -1, legs: 0 } }));   // 2
-  const Q = makeCritter(genomeId({ seed: 'sq', element: 'agua', role: 'dps', appearance: { ...base, thorax: -1, abdomen: 0, legs: 0 } }));    // 2
-  const ch0 = fuse(P, Q);                                              // 3 partes → rareza 2 (cap 1)
-  assert.equal(partsOf(ch0.appearance), 3);
-  assert.equal(new Set(ch0.element.split('+')).size, 1);              // no cabe el subelemento (cap 1)
-  assert.equal(ch0.element.split('+').length, 2);                     // pero ACUMULA
 });
 
 ok('subelemento: ventajas de ambos, sin sumar debilidades', () => {
@@ -176,36 +142,6 @@ ok('capacidad por rareza (de 3 en 3) + recorte determinista (degradado)', () => 
   assert.equal(clampElement('agua+fuego+planta', 2), 'fuego');       // cap 1 (rareza 3) → recorta a 1
 });
 
-ok('reforzar (idénticas) · devolución (≥2 dif, misma rareza) · leyenda+leyenda → -tórax; nombre por FORMA', () => {
-  const base = { head: 0, legStyle: 0, antennae: false, hue: 0, pattern: 0 };
-  // REFORZAR: dos idénticas (misma forma) de rareza media → MISMA araña + ingredientes
-  const M1 = makeCritter(genomeId({ seed: 'm1', element: 'fuego', role: 'dps', appearance: { ...base, thorax: 0, abdomen: 0, legs: 0 } }));  // head+tórax+abd = 3
-  const M2 = makeCritter(genomeId({ seed: 'm2', element: 'agua', role: 'dps', appearance: { ...base, thorax: 0, abdomen: 0, legs: 0 } }));   // misma FORMA, otro elemento/seed
-  assert.equal(M1.name, M2.name);                                      // misma forma → misma raza (nombre determinístico por forma)
-  assert.equal(fuseKind(M1, M2), 'merge');
-  const merged = fuse(M1, M2);
-  assert.equal(partsOf(merged.appearance), 3);                         // misma rareza
-  assert.equal(merged.element.split('+').length, 2);                   // acumuló ingredientes
-  assert.equal(merged.name, M1.name);                                  // sigue siendo la misma araña
-  // DEVOLUCIÓN: misma rareza, ≥2 diferencias → intersección (pierde lo diferente)
-  const A = makeCritter(genomeId({ seed: 'da', element: 'fuego', role: 'dps', appearance: { ...base, thorax: 0, abdomen: 0, legs: 1 } }));   // head+tórax+abd+1pata = 4
-  const B = makeCritter(genomeId({ seed: 'db', element: 'agua', role: 'dps', appearance: { ...base, thorax: -1, abdomen: -1, legs: 3 } }));  // head+3patas = 4
-  assert.equal(fuseKind(A, B), 'degrade');                             // onlyA=2 (tórax,abd) · onlyB=2 (2 patas)
-  const inter = fuse(A, B);
-  assert.equal(partsOf(inter.appearance), 2);                          // intersección = head+1pata
-  assert.ok(inter.appearance.thorax < 0 && inter.appearance.abdomen < 0 && inter.appearance.legs === 1);
-  // distinta rareza → NO fusiona
-  const small = makeCritter(genomeId({ seed: 'sm', element: 'agua', role: 'dps', appearance: { ...base, thorax: -1, abdomen: -1, legs: 1 } })); // 2
-  assert.equal(fuseKind(A, small), null);
-  // TECHO: dos legendarias (9) → -tórax (8)
-  const L1 = makeCritter(genomeId({ seed: 'L1', element: 'fuego', role: 'dps', appearance: { head: 0, thorax: 0, abdomen: 0, legs: 6, legStyle: 0, antennae: false, hue: 0, pattern: 0 } }));
-  const L2 = makeCritter(genomeId({ seed: 'L2', element: 'agua', role: 'dps', appearance: { head: 0, thorax: 0, abdomen: 0, legs: 6, legStyle: 0, antennae: false, hue: 0, pattern: 0 } }));
-  assert.equal(partsOf(L1.appearance), 9); assert.equal(fuseKind(L1, L2), 'degrade');
-  const demoted = fuse(L1, L2);
-  assert.equal(partsOf(demoted.appearance), 8); assert.ok(demoted.appearance.thorax < 0);   // -tórax
-  assert.equal(demoted.rarityIndex, 7);
-});
-
 ok('catálogo de 36 nombres: combinación + intensidad por acumulación', () => {
   assert.equal(elementInfo('fuego').es, 'Brasa');                    // base, intensidad 0
   assert.equal(elementInfo('fuego+fuego').es, 'Llama');             // fuego acumulado
@@ -215,10 +151,3 @@ ok('catálogo de 36 nombres: combinación + intensidad por acumulación', () => 
   assert.equal(elementInfo('agua+agua+fuego+planta').es, 'Quimera'); // triple acumulado
   assert.equal(typeMultiplier('agua+agua+fuego+planta', 'planta'), ADV); // combate por ingredientes (no por nombre)
 });
-
-// Muestra: imprime un resumen de una batalla para inspección manual.
-const demo = simulate(teamA, teamB, seed);
-console.log(`\n  demo: ganador=${demo.winner} ciclos=${demo.cycles} eventos=${demo.log.length}`);
-
-console.log(failed ? `\n${failed} fallo(s)` : '\nOK');
-process.exit(failed ? 1 : 0);

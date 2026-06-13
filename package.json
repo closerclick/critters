@@ -8,8 +8,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test:core": "node tests/core.mjs",
-    "test": "playwright test"
+    "test:unit": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test": "vitest run"
   },
   "dependencies": {
     "@closerclick/closer-click-identity": "0.9.1",
@@ -25,6 +27,7 @@
   "devDependencies": {
     "@playwright/test": "^1.49.0",
     "@vitejs/plugin-vue": "^6.0.2",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "vitest": "4.1.8"
   }
 }

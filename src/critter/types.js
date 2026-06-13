@@ -17,16 +17,94 @@ export const ELEMENT_INFO = {
 export const ADV = 1.10;   // multiplicador con ventaja de tipo (suavizado: ventaja = edge, no auto-win)
 export const DIS = 0.93;   // multiplicador con desventaja
 
-// Un SUBELEMENTO (fruto de fusionar dos elementos distintos) se escribe "a+b".
-export const comps = (el) => String(el).split('+');
+// ===========================================================================================
+// INGREDIENTES POR NIVELES (sistema de mezcla por FUSIÓN)
+// ===========================================================================================
+// El "elemento" de una araña es un CONJUNTO DE INGREDIENTES, cada uno con un NIVEL:
+//   nivel 1 = base       (1 elemento base)        ej. fuego
+//   nivel 2 = sub        (par de 2 bases)          ej. FUEGO2 = fuego+fuego, Vapor = fuego+agua
+//   nivel 3 = sub-sub    (par de 2 subs = 4 bases) ej. par de FUEGO2
+// Un ingrediente de nivel N tiene 2^(N-1) bases (1, 2, 4...).
+//
+// SERIALIZACIÓN (string en el genoma):
+//   - las BASES de un mismo ingrediente van unidas por "."   → "fuego.fuego" = un FUEGO2 (sub)
+//   - los INGREDIENTES de la araña van unidos por "+", en orden FIFO (más viejo primero)
+//   - ej. "fuego.fuego+agua"  =  { FUEGO2 (sub),  agua (base) }
+//
+// NOMBRE y COMBATE: se APLANAN a las bases (no importa la estructura) → `comps` devuelve TODAS
+// las bases (parte por "+" y por "."). Así `elementInfo`/`typeMultiplier`/stats ven el multiset
+// de bases de siempre. La ESTRUCTURA por niveles SOLO la usa la fusión (cómo se emparejan) y la
+// devolución (qué se descarta).
+//
+// FUSIÓN (ver `fuseIngredients`): empareja las colas de cada nivel POSICIONALMENTE (1º con 1º,
+// 2º con 2º…), del nivel MÁS COMPLEJO al más simple, y cada pareja PROMUEVE al nivel siguiente
+// — pero SOLO si la rareza de la araña resultante permite ese nivel; si no, el emparejamiento se
+// IGNORA y los componentes quedan en su cola (no se descartan). El descarte solo ocurre al
+// DEGRADAR (la araña baja de rareza y pierde lo que ya no cabe).
+
+// `comps`: TODAS las bases del elemento (aplana "+" y "."). Lo usan nombre/combate/stats.
+export const comps = (el) => String(el).split(/[+.]/);
 // Subelemento = más de UN elemento base DISTINTO (fuego+fuego NO es sub: es puro acumulado).
 export const isSub = (el) => new Set(comps(el).filter(c => ELEMENTS.includes(c))).size > 1;
-// El elemento es la ACUMULACIÓN de ingredientes base de los ancestros (multiset, con
-// multiplicidad). Fusionar = unir TODOS los ingredientes (en profundidad se acumulan).
-// El NOMBRE se resume en un catálogo finito (arquetipo por ingredientes distintos +
-// GRADO por acumulación); el COMBATE usa los ingredientes base con la fórmula.
+
+// nº de bases de UN ingrediente (string dot-joined) = su "tamaño" (1, 2, 4…). nivel = log2+1.
+const ingSize = (ing) => String(ing).split('.').filter(b => ELEMENTS.includes(b)).length;
+// Agrupa los ingredientes del elemento por TAMAÑO (= nivel), preservando el orden FIFO.
+function parseQueues (el) {
+  const q = {};
+  for (const ing of String(el).split('+')) {
+    const s = ing.split('.').filter(b => ELEMENTS.includes(b)).join('.');
+    if (!s) continue;
+    const sz = ingSize(s);
+    (q[sz] = q[sz] || []).push(s);
+  }
+  return q;
+}
+// Vuelve a string: tamaños ascendentes, FIFO dentro de cada tamaño. 'fuego' si quedó vacío.
+function serializeQueues (q) {
+  const out = [];
+  for (const sz of Object.keys(q).map(Number).sort((a, b) => a - b)) for (const ing of q[sz]) out.push(ing);
+  return out.join('+') || 'fuego';
+}
+
+/** FUSIÓN de ingredientes (determinista). `maxNivel` = capacidad de la araña RESULTANTE
+ *  (1 base / 2 sub / 3 sub-sub). Empareja por nivel (posicional, FIFO), de complejo a simple;
+ *  una pareja promueve al nivel siguiente SOLO si ese nivel ≤ maxNivel; si no, no se empareja y
+ *  los componentes quedan en su cola. NO descarta (eso es la devolución). */
+export function fuseIngredients (elA, elB, maxNivel) {
+  const maxSize = 1 << (Math.max(1, maxNivel | 0) - 1);   // nivel 1/2/3 → tamaño 1/2/4
+  const qa = parseQueues(elA), qb = parseQueues(elB);
+  const res = {};
+  const push = (sz, ing) => { (res[sz] = res[sz] || []).push(ing); };
+  const sizes = [...new Set([...Object.keys(qa), ...Object.keys(qb)].map(Number))].sort((a, b) => b - a);
+  for (const sz of sizes) {                                  // de MAYOR a menor (complejo→simple)
+    const a = qa[sz] || [], b = qb[sz] || [];
+    const n = Math.min(a.length, b.length);
+    const promote = (sz * 2) <= maxSize;                     // ¿cabe el ingrediente promovido?
+    for (let i = 0; i < n; i++) {
+      if (promote) push(sz * 2, a[i] + '.' + b[i]);          // pareja → nivel siguiente (al FONDO = más nuevo)
+      else { push(sz, a[i]); push(sz, b[i]); }               // no cabe el sub → quedan en su cola
+    }
+    for (let i = n; i < a.length; i++) push(sz, a[i]);       // sin pareja (cola de A)
+    for (let i = n; i < b.length; i++) push(sz, b[i]);       // sin pareja (cola de B)
+  }
+  return serializeQueues(res);
+}
+
+/** DEVOLUCIÓN: une los ingredientes de ambas y DESCARTA los que superan `maxNivel` (la araña
+ *  bajó de rareza y ya no caben). No promueve. */
+export function degradeIngredients (elA, elB, maxNivel) {
+  const maxSize = 1 << (Math.max(1, maxNivel | 0) - 1);
+  const q = parseQueues(elA + '+' + elB);
+  const kept = {};
+  for (const sz of Object.keys(q).map(Number)) if (sz <= maxSize) kept[sz] = q[sz];
+  return serializeQueues(kept);
+}
+
+// COMPAT: unión PLANA de bases (sin estructura). Ya no la usa la fusión nueva; se conserva por
+// si algún consumidor viejo la necesita.
 export function mixElements (a, b) {
-  const cs = [...comps(a), ...comps(b)].filter(c => ELEMENTS.includes(c)).sort();
+  const cs = comps(a).concat(comps(b)).filter(c => ELEMENTS.includes(c)).sort();
   return (cs.length ? cs : ['fuego']).join('+');
 }
 
