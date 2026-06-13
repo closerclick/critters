@@ -6,20 +6,22 @@
 //    diferentes → la INTERSECCIÓN; el techo (9+9) pierde el tórax. Baja de rareza.
 // Rarezas distintas → no fusiona. Elemento: al evolucionar ACUMULA (foldElement); al degradar
 // descarta lo que no cabe (clampElement, destructivo).
-import { partsOf, genomeId, makeCritter, MAX_PARTS, clampElement, foldElement, rarityIndexFromParts, seedOfId } from '../critter/forge.js';
+import { partsOf, genomeId, makeCritter, MAX_PARTS, clampElement, foldElement, rarityIndexFromParts, seedOfId, legCount } from '../critter/forge.js';
 import { mixElements } from '../critter/types.js';
 import { hash32 } from '../lib/hash.js';
 
 // Piezas que cada apariencia tiene y la otra NO (patas anidadas + tórax + abdomen).
 function pieceDiff (a, b) {
-  const onlyA = Math.max(0, (a.legs || 0) - (b.legs || 0)) + (a.thorax >= 0 && b.thorax < 0 ? 1 : 0) + (a.abdomen >= 0 && b.abdomen < 0 ? 1 : 0);
-  const onlyB = Math.max(0, (b.legs || 0) - (a.legs || 0)) + (b.thorax >= 0 && a.thorax < 0 ? 1 : 0) + (b.abdomen >= 0 && a.abdomen < 0 ? 1 : 0);
+  // patas: por CELDA (máscara). Las que A tiene y B no = popcount(a & ~b).
+  const la = (a.legs | 0) & 63, lb = (b.legs | 0) & 63;
+  const onlyA = legCount(la & ~lb) + (a.thorax >= 0 && b.thorax < 0 ? 1 : 0) + (a.abdomen >= 0 && b.abdomen < 0 ? 1 : 0);
+  const onlyB = legCount(lb & ~la) + (b.thorax >= 0 && a.thorax < 0 ? 1 : 0) + (b.abdomen >= 0 && a.abdomen < 0 ? 1 : 0);
   return { onlyA, onlyB };
 }
 const bigger = (cA, cB) => (partsOf(cA.appearance) >= partsOf(cB.appearance) ? cA : cB);
 // Unión (todas las piezas de ambas) e intersección (solo las comunes).
-function unionApp (a, b) { return { ...a, thorax: a.thorax >= 0 ? a.thorax : (b.thorax >= 0 ? b.thorax : -1), abdomen: a.abdomen >= 0 ? a.abdomen : (b.abdomen >= 0 ? b.abdomen : -1), legs: Math.max(a.legs || 0, b.legs || 0) }; }
-function interApp (a, b) { return { ...a, thorax: (a.thorax >= 0 && b.thorax >= 0) ? a.thorax : -1, abdomen: (a.abdomen >= 0 && b.abdomen >= 0) ? a.abdomen : -1, legs: Math.min(a.legs || 0, b.legs || 0) }; }
+function unionApp (a, b) { return { ...a, thorax: a.thorax >= 0 ? a.thorax : (b.thorax >= 0 ? b.thorax : -1), abdomen: a.abdomen >= 0 ? a.abdomen : (b.abdomen >= 0 ? b.abdomen : -1), legs: ((a.legs | 0) | (b.legs | 0)) & 63 }; }
+function interApp (a, b) { return { ...a, thorax: (a.thorax >= 0 && b.thorax >= 0) ? a.thorax : -1, abdomen: (a.abdomen >= 0 && b.abdomen >= 0) ? a.abdomen : -1, legs: ((a.legs | 0) & (b.legs | 0)) & 63 }; }
 const fuseSeed = (cA, cB) => 's' + ((hash32(cA.id + '|' + cB.id) >>> 0).toString(36));
 
 /** 'evolve' | 'degrade' | null (ver cabecera). NO mira el nivel (eso lo valida la acción). */

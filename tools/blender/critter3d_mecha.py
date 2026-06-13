@@ -310,7 +310,8 @@ _rows = [y0] + ([y1] if hasTh else []) + ([y2] if hasAb else [])
 if len(_rows) == 3:   rowY = [y0, y1, y2]
 elif len(_rows) == 2: rowY = [_rows[0], (_rows[0] + _rows[1]) // 2, _rows[1]]
 else:                 rowY = [y0 - 8, y0, y0 + 8]
-legs_n = max(0, min(6, int(A.get("legs", 0))))
+_legmask = int(A.get("legs", 0)) & 63
+legs_n = bin(_legmask).count("1")
 seg_z0 = 0.42 if legs_n > 0 else 0.14
 zb = seg_z0 + 0.50
 hcx, hcy = P2(xC, y0); tcx, tcy = P2(xC, y1); acx, acy = P2(xC, y2)
@@ -454,7 +455,7 @@ knee_up = 0.92 if A.get("legStyle") == 1 else 0.62
 import os as _osL, sys as _sysL
 _sysL.path.append(_osL.path.dirname(_osL.path.abspath(__file__)))
 import critter3d_legs as _legmod
-_SEL = _legmod.leg_cells(spec.get("id", ""), legs_n)   # celdas por SEMILLA (igual que el SVG)
+_SEL = _legmod.cells_from_mask(_legmask)   # celdas desde la MASCARA (posicion genetica)
 if "legs" in PARTS:
     for i in range(legs_n):
         _lb = set(bpy.data.objects)   # taggear esta pata con su INDICE (para animarla en cams)

@@ -27,8 +27,12 @@ const BASE_BUDGET = 240;   // presupuesto de puntos (nivel 1, rareza común)
 const HP_FACTOR = 6;       // los puntos de HP "rinden" más (vida en cientos)
 export const MAX_PARTS = 9;   // grilla 3×3 llena (cabeza + tórax + abdomen + 6 patas)
 
+// `legs` es una MÁSCARA de 6 bits: qué celdas (de las 6 posiciones) tienen pata. Así la
+// POSICIÓN es genética (no derivada del seed): dos con patas en distinto lugar son distintas
+// y la fusión combina posiciones (OR). legCount = cuántas patas (popcount).
+export function legCount (m) { m = (m | 0) & 63; let n = 0; while (m) { n += m & 1; m >>= 1; } return n; }
 // Nº de PARTES ocupadas en la grilla 3×3: cabeza (siempre) + tórax? + abdomen? + patas.
-export function partsOf (a) { return 1 + (a.thorax >= 0 ? 1 : 0) + (a.abdomen >= 0 ? 1 : 0) + (a.legs || 0); }
+export function partsOf (a) { return 1 + (a.thorax >= 0 ? 1 : 0) + (a.abdomen >= 0 ? 1 : 0) + legCount(a.legs); }
 // La RAREZA la da el nº de partes: 1 parte = índice 0 (Cría) … 9 partes = índice 8 (Legendario).
 export function rarityIndexFromParts (parts) { return Math.max(0, Math.min(8, (parts | 0) - 1)); }
 export function rarityFromParts (parts) { return RARITIES[rarityIndexFromParts(parts)]; }
@@ -138,7 +142,7 @@ function buildBody (id, rng, element, role, appearance, nameTier) {
   const passive = pick(rng, ROLE_PASSIVE_POOL[role]);
   const active = pick(rng, ROLE_ACTIVE_POOL[role]);
   const flanks = rng() < (FLANK[role] ?? 0.5);
-  const name = raceName(appearance.thorax >= 0, appearance.abdomen >= 0, appearance.legs);   // RAZA por el ESQUELETO (28)
+  const name = raceName(appearance.thorax >= 0, appearance.abdomen >= 0, legCount(appearance.legs));   // RAZA por el ESQUELETO (28)
   return { id, name, element, role, rarity: rarity.key, rarityIndex, base, passive, active, flanks, appearance };
 }
 
@@ -165,7 +169,7 @@ export function makeCritter (id) {
   // cabeza + 1 pieza. La rareza alta se consigue FUSIONANDO.
   if (rng() < 0.6) {                                // ~60% trae una segunda pieza
     const piece = rint(rng, 0, 2);
-    if (piece === 0) appearance.legs = 1;
+    if (piece === 0) appearance.legs = 1 << rint(rng, 0, 5);   // UNA pata en una celda al azar (máscara)
     else if (piece === 1) appearance.thorax = rint(rng, 0, 2);
     else appearance.abdomen = rint(rng, 0, 3);
   }

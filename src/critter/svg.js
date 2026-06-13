@@ -150,15 +150,14 @@ export function critterSvg (critter, size = 96, opts = {}) {
 
   const hasTh = (a.thorax ?? -1) >= 0, hasAb = (a.abdomen ?? -1) >= 0;
   const xC = 50, y0 = 27, y1 = 48, y2 = 71, rowY = [y0, y1, y2];
-  const L = Math.max(0, Math.min(6, a.legs | 0));
   const articulated = a.legStyle === 1;                          // 1 = codo marcado (S), 0 = más recta
-  // DISPOSICIÓN de patas: el conteo (a.legs) dice CUÁNTAS; el SEED genético elige QUÉ celdas
-  // (cualquiera de los patrones). Determinista y estable; NO se guarda en el genoma.
+  // DISPOSICIÓN de patas: `a.legs` es una MÁSCARA de 6 bits (celdas ocupadas). La POSICIÓN es
+  // genética (no del seed), así dos con patas en distinto lugar son distintas y la fusión las
+  // combina. legCells = índices de bit en 1; L = cuántas.
   const LEG_CELLS = [[0, -1], [0, 1], [1, -1], [1, 1], [2, -1], [2, 1]];
-  const legRng = rngFrom('legcells:' + seedOfId(critter.id || ''));
-  const legOrder = [0, 1, 2, 3, 4, 5];
-  for (let k = 5; k > 0; k--) { const m = (legRng() * (k + 1)) | 0; const t = legOrder[k]; legOrder[k] = legOrder[m]; legOrder[m] = t; }
-  const legCells = legOrder.slice(0, L).sort((x, y) => x - y);
+  const _mask = (a.legs | 0) & 63;
+  const legCells = []; for (let c = 0; c < 6; c++) if (_mask & (1 << c)) legCells.push(c);
+  const L = legCells.length;
   const segYs = [y0]; if (hasTh) segYs.push(y1); if (hasAb) segYs.push(y2);   // segmentos REALES presentes (y de cada uno)
   const nearestSeg = (yy) => { let best = segYs[0], bd = Infinity; for (const sy of segYs) { const d = Math.abs(sy - yy); if (d < bd) { bd = d; best = sy; } } return best; };
 
