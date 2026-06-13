@@ -358,7 +358,7 @@ export function critterSvg (critter, size = 96, opts = {}) {
   const _o = xC + ' ' + y1;   // pivote ~centro del cuerpo
   const legsG = (opts.walk === true && hasLegs)
     ? '<g>' + legs + '<animateTransform attributeName=\"transform\" type=\"rotate\" calcMode=\"discrete\"' +
-      ' values=\"13 ' + _o + ';0 ' + _o + ';-13 ' + _o + ';0 ' + _o + '\" dur=\"0.8s\" repeatCount=\"indefinite\"/></g>'
+      ' values=\"13 ' + _o + ';-13 ' + _o + '\" dur=\"0.6s\" repeatCount=\"indefinite\"/></g>'
     : legs;
 
   return '<svg viewBox=\"0 0 100 100\" width=\"' + size + '\" height=\"' + size + '\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"' + (critter.name || 'critter') + '\">\n' +
