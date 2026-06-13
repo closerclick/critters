@@ -144,8 +144,9 @@ function doFuse () {
 .fsub{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;text-align:center;margin:10px 0 6px}
 .fcell{position:relative;cursor:pointer}
 .fcell.dim{opacity:.28;pointer-events:none;filter:grayscale(.6)}
-/* flecha de fusión en el borde DERECHO-centro (el top-center lo ocupan los puntos ✦) */
-.ftag{position:absolute;top:50%;right:5px;transform:translateY(-50%);z-index:3;font-family:var(--fmono);font-size:12px;font-weight:800;
+/* flecha de fusión en el borde derecho, a la altura del CENTRO de la circunferencia
+   (padding-top 12px + medio retrato 48 ≈ 60px), libre del badge de puntos ✦ del top-center */
+.ftag{position:absolute;top:60px;right:5px;transform:translateY(-50%);z-index:3;font-family:var(--fmono);font-size:12px;font-weight:800;
   padding:0 7px;border-radius:7px;line-height:1.5}
 .ftag.evolve{background:var(--good);color:#062b12}
 .ftag.merge{background:rgba(120,113,108,.9);color:#f5f5f4}
