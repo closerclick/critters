@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 import { game } from '../game/state.js';
 import { nodeById, enemyTeam, starCycleLimit } from '../game/campaign.js';
-import { setActiveLineup } from '../game/actions.js';
+import { setActiveLineup, TEAM_MAX } from '../game/actions.js';
 import { elementInfo } from '../critter/types.js';
 import { SPEEDS, speed, setSpeed } from '../speed.js';
 import { t, loc } from '../i18n.js';
@@ -48,7 +48,7 @@ const cycLimit = computed(() => node.value ? starCycleLimit(node.value) : 0);
       <div class="enc-lineup" data-testid="enc-lineup">
         <span class="enc-sub2">{{ t('tuAlineacion') }}</span>
         <select class="lu-select" :value="game.activeLineup" @change="e => setActiveLineup(e.target.value)">
-          <option v-for="l in game.lineups" :key="l.id" :value="l.id">{{ l.name }} ({{ l.team.filter(Boolean).length }}/5)</option>
+          <option v-for="l in game.lineups" :key="l.id" :value="l.id">{{ l.name }} ({{ l.team.filter(Boolean).length }}/{{ TEAM_MAX }})</option>
         </select>
       </div>
 

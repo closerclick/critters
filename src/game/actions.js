@@ -9,7 +9,7 @@ import { canFuse, fuse, fuseKind } from './fusion.js';
 export const SUMMON_COST = 100;   // monedas por invocación
 export const FEED_XP = 60;        // XP por alimentar
 export const FEED_COST = 5;       // fragmentos por alimentar
-export const TEAM_MAX = 5;        // criaturas en la rejilla
+export const TEAM_MAX = 3;        // criaturas en la rejilla (máximo por alineación)
 
 export function addCritter (id, level = 1) {
   const inst = { uid: newUid(), id, level, xp: 0 };
