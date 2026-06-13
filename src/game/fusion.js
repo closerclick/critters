@@ -5,7 +5,8 @@
 //    · EXTREMO piso: dos CABEZAS (1 parte) → cabeza+tórax (+tórax).
 //    · EXTREMO techo: dos LEGENDARIAS completas (9) → sin tórax (−tórax).
 //  - cada una aporta ≥1 (onlyA≥1 y onlyB≥1, total 2) → EVOLUCIÓN: UNIÓN (crece sobre ambas).
-//  - una contiene a la otra (1 ó 2 de diferencia, una aporta 0) → DEVOLUCIÓN: INTERSECCIÓN (la chica).
+//  - una CONTIENE a la otra por EXACTAMENTE 1 parte (la otra aporta 0) → DEVOLUCIÓN: INTERSECCIÓN.
+//    (si la contiene por 2, p.ej. cabeza vs cabeza-tórax-pata → INCOMPATIBLE.)
 //  - 3+ diferencias en total → INCOMPATIBLES (no fusiona).
 // Elemento (ingredientes): al evolucionar/reforzar ACUMULA (foldElement); al devolucionar
 // descarta lo que no cabe (clampElement, destructivo).
@@ -44,7 +45,9 @@ export function fuseKind (cA, cB) {
     return 'merge';                                        // resto → refuerzo
   }
   if (onlyA >= 1 && onlyB >= 1) return 'evolve';           // cada una aporta una parte → UNIÓN (crece)
-  return 'degrade';                                        // una contiene a la otra → INTERSECCIÓN (la chica)
+  // una CONTIENE a la otra (la otra aporta 0): solo vale si difieren por EXACTAMENTE 1 →
+  // DEVOLUCIÓN. Si difieren por 2 (p.ej. cabeza vs cabeza-tórax-pata) → INCOMPATIBLE.
+  return (onlyA + onlyB) === 1 ? 'degrade' : null;
 }
 export const canFuse = (cA, cB) => fuseKind(cA, cB) !== null;
 
