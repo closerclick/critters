@@ -20,6 +20,7 @@ export const game = reactive({
   stars: {},                 // nodeId → mejores estrellas (1 ganar · 2 rápido · 3 sin bajas)
   bonusStars: 0,             // estrellas-bonus por compartir (referidos)
   lastNode: null,            // último nodo enfrentado (botón "ir al último")
+  summons: 0,                // invocaciones hechas (el costo sube +1 por cada una)
 });
 
 export const totalStars = () => Object.values(game.stars || {}).reduce((a, b) => a + (b || 0), 0) + (game.bonusStars || 0);
@@ -40,7 +41,7 @@ export function critterOf (uid) { const i = instanceByUid(uid); return i ? critt
 export function newUid () { return 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
 // ---- persistencia ----
-function snapshot () { return { collection: game.collection, wallet: game.wallet, lineups: game.lineups, activeLineup: game.activeLineup, starterOptions: game.starterOptions, seed: game.seed, cleared: game.cleared, stars: game.stars, bonusStars: game.bonusStars, lastNode: game.lastNode }; }
+function snapshot () { return { collection: game.collection, wallet: game.wallet, lineups: game.lineups, activeLineup: game.activeLineup, starterOptions: game.starterOptions, seed: game.seed, cleared: game.cleared, stars: game.stars, bonusStars: game.bonusStars, lastNode: game.lastNode, summons: game.summons }; }
 let _t = null;
 export function persist () {
   try { localStorage.setItem(LS_KEY, JSON.stringify(snapshot())); } catch {}
@@ -62,6 +63,7 @@ function apply (d) {
   if (Array.isArray(d.cleared)) game.cleared = d.cleared;
   if (d.stars && typeof d.stars === 'object') game.stars = d.stars;
   if (typeof d.bonusStars === 'number') game.bonusStars = d.bonusStars;
+  if (typeof d.summons === 'number') game.summons = d.summons;
   if (d.lastNode) game.lastNode = d.lastNode;
 }
 

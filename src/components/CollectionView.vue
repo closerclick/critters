@@ -1,7 +1,7 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { game } from '../game/state.js';
-import { summon, SUMMON_COST } from '../game/actions.js';
+import { summon, summonCost } from '../game/actions.js';
 import { openCritter } from '../ui.js';
 import { t } from '../i18n.js';
 import CritterCard from './CritterCard.vue';
@@ -9,12 +9,13 @@ import CritterCard from './CritterCard.vue';
 // tocando el avatar. Invocar (gacha) vive acá arriba.
 
 const err = ref('');
+const cost = computed(() => summonCost());   // sube 1% por cada invocación
 function doSummon () { const r = summon(); if (r && r.error === 'coins') { err.value = t('sinMonedas'); return; } err.value = ''; if (r && r.instance) openCritter(r.instance.uid); }
 </script>
 
 <template>
   <div class="col-head">
-    <button class="btn col-summon" :disabled="game.wallet.coins < SUMMON_COST" @click="doSummon" data-testid="summon-btn">✦ {{ t('invocarBtn') }} · 🪙{{ SUMMON_COST }}</button>
+    <button class="btn col-summon" :disabled="game.wallet.coins < cost" @click="doSummon" data-testid="summon-btn">✦ {{ t('invocarBtn') }} · 🪙{{ cost }}</button>
   </div>
   <p class="hint" v-if="err" style="color:var(--bad)">{{ err }}</p>
   <p class="hint">{{ t('invocarHint') }}</p>

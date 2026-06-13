@@ -49,9 +49,15 @@ export function grantShareReward (kind) {
   else { game.bonusStars = (game.bonusStars || 0) + 1; game.wallet.coins += 40; }
   persist();
 }
+// Costo de la PRÓXIMA invocación: sube 1% COMPUESTO por cada invocación hecha (tope blando
+// que escala con el propio precio). Determinista al total de invocaciones. floor → entero.
+export function summonCost () { return Math.floor(SUMMON_COST * Math.pow(1.01, game.summons || 0)); }
+
 export function summon () {
-  if (game.wallet.coins < SUMMON_COST) return { error: 'coins' };
-  game.wallet.coins -= SUMMON_COST;
+  const cost = summonCost();
+  if (game.wallet.coins < cost) return { error: 'coins' };
+  game.wallet.coins -= cost;
+  game.summons = (game.summons || 0) + 1;
   const id = 'sm-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
   const inst = addCritter(id, 1);
   autoPlaceInTeam(inst.uid);
