@@ -25,9 +25,10 @@ function buildUnits (team, side, terrain) {
     const s = statsAtLevel(critter, lvl, m.alloc);
     const slot = m.slot != null ? m.slot : i;
     const srow = (slot / 3) | 0, scol = slot % 3;
-    // La alineación se ROTA 90° en el campo: ARRIBA en el editor = IZQUIERDA en el campo.
-    // Antes srow→fila y scol→columna; ahora srow→columna (lado) y scol→fila (vertical).
-    const brow = 2 - scol, bcol = srow;
+    // La alineación se ROTA 90° en el campo: ARRIBA en el editor = DERECHA en el campo
+    // (la fila de arriba, el frente/rival, queda en la columna del frente del jugador).
+    // Rotación horaria: srow→columna (invertida) y scol→fila.
+    const brow = scol, bcol = 2 - srow;
     const b = m.bonus || {};   // equipo en patas: { range, atk, def }
     const ranged = RANGED_ROLES.has(critter.role);
     return {
