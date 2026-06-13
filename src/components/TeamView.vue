@@ -9,7 +9,7 @@ import { pointsFree } from '../critter/forge.js';
 import { t } from '../i18n.js';
 
 const critterFor = (uid) => { const i = instanceByUid(uid); return i ? critterById(i.id) : null; };
-const svgFor = (uid, size) => { const c = critterFor(uid); return c ? critterSvg(c, size, { walk: true }) : ''; };
+const svgFor = (uid, size) => { const c = critterFor(uid); return c ? critterSvg(c, size) : ''; };
 const elColor = (uid) => { const c = critterFor(uid); return c ? elementInfo(c.element).color : 'var(--line)'; };
 const levelOf = (uid) => { const i = instanceByUid(uid); return i ? i.level : null; };
 const freePts = (uid) => { const i = instanceByUid(uid); return i ? pointsFree(i.level, i.alloc) : 0; };

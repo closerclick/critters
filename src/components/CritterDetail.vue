@@ -17,7 +17,7 @@ const emit = defineEmits(['close']);
 
 const inst = computed(() => instanceByUid(props.uid));
 const critter = computed(() => { const i = inst.value; return i ? critterById(i.id) : null; });
-const svgBig = computed(() => critter.value ? critterSvg(critter.value, 110, { walk: true }) : '');
+const svgBig = computed(() => critter.value ? critterSvg(critter.value, 110) : '');
 // En el PERFIL el 3D es la PERSPECTIVA animada (beauty1/beauty2), al lado del círculo;
 // el círculo conserva el esquema SVG y la circunferencia gira mientras se genera.
 const { src: art3d, ready: art3dReady, pending: art3dPending } = use3dRender(() => genomeOf(inst.value), { views: ['beauty1', 'beauty2'] });
