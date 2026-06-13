@@ -35,12 +35,14 @@ export function genomeOf (inst) {
 }
 
 const queued = new Set();   // no reencolar el mismo id dentro de la sesión
+let reqseq = 0;             // contador para el cache-buster del intake
 function requestRender (id, views) {
   const k = id + ':' + views.join(',');
   if (queued.has(k)) return;
   queued.add(k);
   // si el POST falla o lo throttlean (no-2xx), liberamos la clave para reintentar luego
-  fetch(INTAKE, {
+  // query única → evita que Cloudflare sirva un POST cacheado (p.ej. un 500 transitorio).
+  fetch(INTAKE + '?q=' + (++reqseq), {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ id, views, res: RES, samples: SAMPLES }),
   }).then(r => { if (!r.ok) queued.delete(k); }).catch(() => queued.delete(k));
