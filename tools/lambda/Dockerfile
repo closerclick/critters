@@ -23,7 +23,7 @@ RUN pip install --no-cache-dir pillow boto3
 # generador (los mismos scripts versionados del repo) + handler
 COPY tools/blender/critter3d.py tools/blender/critter3d_mecha.py tools/blender/critter3d_gundam.py \
      tools/blender/critter3d_zoids.py tools/blender/critter3d_panzer.py tools/blender/critter3d_chimera.py \
-     tools/blender/critter3d_cams.py ${LAMBDA_TASK_ROOT}/blender/
+     tools/blender/critter3d_cams.py tools/blender/critter3d_legs.py ${LAMBDA_TASK_ROOT}/blender/
 COPY tools/lambda/handler.py tools/lambda/spec_derive.py ${LAMBDA_TASK_ROOT}/
 
 ENV BLENDER=/opt/blender/blender \

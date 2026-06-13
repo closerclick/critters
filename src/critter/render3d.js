@@ -12,7 +12,7 @@ import { genomeId } from './forge.js';
 // Versión del render: bumpear (v2→v3…) cuando cambian los parámetros de Blender (swing,
 // encuadre, estilo) para invalidar el caché inmutable sin huérfanos. Debe coincidir con
 // el PREFIX de la Lambda (env PREFIX=critters/v2/).
-const IMG_BASE = 'https://s3.closer.click/critters/v5';
+const IMG_BASE = 'https://s3.closer.click/critters/v6';
 const RES = 384, SAMPLES = 96;   // imágenes chicas (iconos 40-128px) → render rápido y liviano
 const INTAKE = 'https://render.closer.click/';
 const RETRY_MS = 12000;    // re-chequea si la imagen ya existe cada ~12s (el render tarda ~60-90s)

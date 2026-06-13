@@ -411,11 +411,15 @@ if "abdomen" in PARTS and segA: detail_abdomen(segA)
 
 # ================= PATAS: struts hidráulicos + hombreras + faldones =================
 LEG_CELLS = [(0, -1), (0, 1), (1, -1), (1, 1), (2, -1), (2, 1)]
+import os as _osL, sys as _sysL
+_sysL.path.append(_osL.path.dirname(_osL.path.abspath(__file__)))
+import critter3d_legs as _legmod
+_SEL = _legmod.leg_cells(spec.get("id", ""), legs_n)   # celdas por SEMILLA (igual que el SVG)
 
 # HOMBRERA + FALDÓN: cuelgan SOBRE las patas pero están ANCLADOS a la superficie del
 # segmento de su fila (spos/snrm del cuerpo) → pertenecen a la masa dueña (head/thorax/abdomen)
 for i in range(legs_n):
-    r, side = LEG_CELLS[i]
+    r, side = _SEL[i]
     sg = seg_of_row[r]
     if sg["name"] not in PARTS: continue
     th_s = 0.0 if side > 0 else math.pi
@@ -429,7 +433,7 @@ for i in range(legs_n):
 
 for i in range(legs_n if "legs" in PARTS else 0):
     _lb = set(bpy.data.objects)   # taggear SOLO esta pata móvil (NO hombreras/faldones) con su indice
-    r, side = LEG_CELLS[i]; yy = rowY[r]
+    r, side = _SEL[i]; yy = rowY[r]
     rw = (50 - yy) * 0.1                       # y del mundo de la fila
     dyn = (0.45, 0.0, -0.45)[r]                # postura dinámica: delanteras adelante, traseras atrás
     knee_up = 0.74 if A.get("legStyle") == 1 else 0.54

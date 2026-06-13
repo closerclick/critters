@@ -446,10 +446,14 @@ def piston(nm, a, b, f0, f1, rbody, rrod):
     add_tube(nm + "_c", [(*a.lerp(b, f0),), (*a.lerp(b, fm),)], rbody, frame)
     add_tube(nm + "_r", [(*a.lerp(b, fm-0.04),), (*a.lerp(b, f1),)], rrod, rodm)
 
+import os as _osL, sys as _sysL
+_sysL.path.append(_osL.path.dirname(_osL.path.abspath(__file__)))
+import critter3d_legs as _legmod
+_SEL = _legmod.leg_cells(spec.get("id", ""), legs_n)   # celdas por SEMILLA (igual que el SVG)
 if "legs" in PARTS:
     for i in range(legs_n):
         _lb = set(bpy.data.objects)   # taggear esta pata con su INDICE (para animarla en cams)
-        r, side = LEG_CELLS[i]; yy = rowY[r]
+        r, side = _SEL[i]; yy = rowY[r]
         knee_up = 0.74 if A.get("legStyle") == 1 else 0.54
         hip   = Vector((*P2(xC + side*9,  yy),     zb*0.85))
         knee  = Vector((*P2(xC + side*22, yy-1),   seg_z0 + knee_up))

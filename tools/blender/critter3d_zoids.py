@@ -388,10 +388,14 @@ ROW_POSE = {  # postura AGRESIVA: delanteras estiradas al frente, traseras hacia
     1: {"knee":  0, "ank":  1, "foot":  2, "spread": 35},
     2: {"knee":  5, "ank":  8, "foot": 11, "spread": 34}}
 knee_up = 0.92 if A.get("legStyle") == 1 else 0.62
+import os as _osL, sys as _sysL
+_sysL.path.append(_osL.path.dirname(_osL.path.abspath(__file__)))
+import critter3d_legs as _legmod
+_SEL = _legmod.leg_cells(spec.get("id", ""), legs_n)   # celdas por SEMILLA (igual que el SVG)
 if "legs" in PARTS:
     for i in range(legs_n):
         _lb = set(bpy.data.objects)   # taggear esta pata con su INDICE (para animarla en cams)
-        r, side = LEG_CELLS[i]; yy = rowY[r]; pose = ROW_POSE[r]
+        r, side = _SEL[i]; yy = rowY[r]; pose = ROW_POSE[r]
         hip   = Vector((*P2(xC + side*9.5, yy), zb - 0.12))
         knee  = Vector((*P2(xC + side*20, yy + pose["knee"]), seg_z0 + knee_up))
         ankle = Vector((*P2(xC + side*29, yy + pose["ank"]),  seg_z0 + 0.10))

@@ -61,9 +61,12 @@ def _leg_groups(legs, ctr):
     for idx, objs in groups.items():
         hip = min(objs, key=lambda o: (o.matrix_world.translation.xy - ctr.xy).length)
         p = hip.matrix_world.translation
-        # signo TRIPODE: fila = idx//2, lado = idx%2 -> (fila+lado) par/impar alterna en cruz.
-        sign = 1.0 if ((idx // 2 + idx % 2) % 2 == 0) else -1.0
-        out.append((objs, Vector((p.x, p.y, 0.0)), sign))
+        # signo TRIPODE por POSICION de la cadera (las celdas se mezclan por semilla, así que
+        # el indice ya no es la fila/lado): patron DIAGONAL -> espejo izq/der siempre opuestas
+        # y delante/detras opuestas, conservando el equilibrio.
+        sx = 1.0 if p.x >= ctr.x else -1.0
+        sy = 1.0 if p.y >= ctr.y else -1.0
+        out.append((objs, Vector((p.x, p.y, 0.0)), sx * sy))
     return out
 
 def _pose_legs(groups, base_mw, theta):
