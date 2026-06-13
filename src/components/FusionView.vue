@@ -9,7 +9,7 @@ import { critterSvg } from '../critter/svg.js';
 import { t, loc } from '../i18n.js';
 import CritterCard from './CritterCard.vue';
 
-const svgFor = (inst) => inst ? critterSvg(critterById(inst.id), 58) : '';
+const svgFor = (inst) => inst ? critterSvg(critterById(inst.id), 58, { walk: true }) : '';
 const nameOf = (inst) => inst ? displayName(inst, critterById(inst.id)) : '';
 // Ingredientes (bases con multiplicidad) de un descriptor → [{key,n,info}].
 const ingOf = (critter) => {
@@ -29,7 +29,7 @@ const compatOf = (uid) => isCompatibleFuse(selA.value, uid);
 const kindOf = (uid) => fuseKindOf(selA.value, uid);   // 'evolve'|'merge'|'degrade'|null
 const kind = computed(() => (selA.value && selB.value) ? fuseKindOf(selA.value, selB.value) : null);
 const preview = computed(() => (selA.value && selB.value) ? fusePreview(selA.value, selB.value) : null);
-const svgPrev = computed(() => preview.value ? critterSvg(preview.value, 58) : '');
+const svgPrev = computed(() => preview.value ? critterSvg(preview.value, 58, { walk: true }) : '');
 const prevEl = computed(() => preview.value ? elementInfo(preview.value.element) : null);
 const prevRar = computed(() => preview.value ? RARITY_BY_KEY[preview.value.rarity] : null);
 const prevStats = computed(() => preview.value ? statsAtLevel(preview.value, instA.value ? instA.value.level : 1) : null);

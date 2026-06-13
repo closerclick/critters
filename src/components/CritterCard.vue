@@ -9,7 +9,7 @@ import { t, loc } from '../i18n.js';
 
 const props = defineProps({ instance: Object, size: { type: Number, default: 92 }, stats: { type: Boolean, default: true } });
 const critter = computed(() => critterById(props.instance.id));
-const svg = computed(() => critterSvg(critter.value, props.size));
+const svg = computed(() => critterSvg(critter.value, props.size, { walk: true }));   // patas animadas
 const st = computed(() => statsAtLevel(critter.value, props.instance.level || 1, props.instance.alloc));
 const free = computed(() => pointsFree(props.instance.level || 1, props.instance.alloc));
 const rar = computed(() => RARITY_BY_KEY[critter.value.rarity]);
