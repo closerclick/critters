@@ -25,11 +25,14 @@ function buildUnits (team, side, terrain) {
     const s = statsAtLevel(critter, lvl, m.alloc);
     const slot = m.slot != null ? m.slot : i;
     const srow = (slot / 3) | 0, scol = slot % 3;
+    // La alineación se ROTA 90° en el campo: ARRIBA en el editor = IZQUIERDA en el campo.
+    // Antes srow→fila y scol→columna; ahora srow→columna (lado) y scol→fila (vertical).
+    const brow = 2 - scol, bcol = srow;
     const b = m.bonus || {};   // equipo en patas: { range, atk, def }
     const ranged = RANGED_ROLES.has(critter.role);
     return {
       uid: side + ':' + slot, side, slot,
-      row: srow + ROW_OFFSET, col: side === 0 ? scol : (6 - scol),   // jugador 0-2, enemigo 4-6 (1 columna de separación: melee engancha más rápido)
+      row: brow + ROW_OFFSET, col: side === 0 ? bcol : (6 - bcol),   // jugador 0-2, enemigo 4-6 (1 columna de separación: melee engancha más rápido)
       id: m.id, level: lvl, critter, name: critter.name, element: critter.element, role: critter.role, rarity: critter.rarity,
       maxHp: s.HP, hp: s.HP, ATK: s.ATK + (b.atk || 0), DEF: s.DEF + (b.def || 0), SPD: s.SPD,
       range: (ranged ? 2 : 1) + (b.range || 0),
