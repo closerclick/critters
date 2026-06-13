@@ -8,7 +8,6 @@ import { RARITY_BY_KEY, statsAtLevel } from '../critter/forge.js';
 import { critterSvg } from '../critter/svg.js';
 import { t, loc } from '../i18n.js';
 import CritterCard from './CritterCard.vue';
-import CritterIcon from './CritterIcon.vue';
 
 const svgFor = (inst) => inst ? critterSvg(critterById(inst.id), 58) : '';
 const nameOf = (inst) => inst ? displayName(inst, critterById(inst.id)) : '';
@@ -71,19 +70,19 @@ function doFuse () {
   <template v-if="game.collection.length >= 2">
     <div class="fuse-bar" data-testid="fusion-bar">
       <div class="fslot" :class="{ on: selA }" @click="clearA">
-        <template v-if="instA"><CritterIcon class="fp" :instance="instA" :size="58" /><span class="fn">{{ nameOf(instA) }}</span>
+        <template v-if="instA"><div class="fp" v-html="svgFor(instA)"></div><span class="fn">{{ nameOf(instA) }}</span>
           <div class="fing"><span v-for="g in ingA" :key="g.key" class="fdot" :style="{ '--c': g.info.color }">{{ g.n }}</span></div></template>
         <span v-else class="q">A</span>
       </div>
       <span class="op">+</span>
       <div class="fslot" :class="{ on: selB }" @click="selB = null">
-        <template v-if="instB"><CritterIcon class="fp" :instance="instB" :size="58" /><span class="fn">{{ nameOf(instB) }}</span>
+        <template v-if="instB"><div class="fp" v-html="svgFor(instB)"></div><span class="fn">{{ nameOf(instB) }}</span>
           <div class="fing"><span v-for="g in ingB" :key="g.key" class="fdot" :style="{ '--c': g.info.color }">{{ g.n }}</span></div></template>
         <span v-else class="q">B</span>
       </div>
       <span class="op">=</span>
       <div class="fslot res">
-        <template v-if="preview"><CritterIcon class="fp" :instance="preview" :size="58" /><span class="fn">{{ preview.name }}</span>
+        <template v-if="preview"><div class="fp" v-html="svgPrev"></div><span class="fn">{{ preview.name }}</span>
           <div class="fing"><span v-for="g in ingRes" :key="g.key" class="fdot" :style="{ '--c': g.info.color }">{{ g.n }}</span></div></template>
         <span v-else class="q">?</span>
       </div>

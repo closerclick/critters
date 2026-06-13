@@ -4,7 +4,6 @@ import { game, instanceByUid, critterById, persist } from '../game/state.js';
 import { setActiveLineup, createLineup, renameLineup, deleteLineup, TEAM_MAX } from '../game/actions.js';
 import { openCritter } from '../ui.js';
 import { critterSvg } from '../critter/svg.js';
-import CritterIcon from './CritterIcon.vue';
 import { elementInfo } from '../critter/types.js';
 import { pointsFree } from '../critter/forge.js';
 import { t } from '../i18n.js';
@@ -98,7 +97,7 @@ function applyDrop (targetLid, targetSlot) {
              :class="{ has: lu.team[s - 1], over: isOver(lu.id, s - 1) }"
              @pointerdown="onDown($event, lu.team[s - 1], { type: 'lineup', id: lu.id, slot: s - 1 })">
           <template v-if="lu.team[s - 1] && !dragging(lu.id, s - 1)">
-            <CritterIcon class="mini-svg" :style="{ '--el': elColor(lu.team[s - 1]) }" :instance="instanceByUid(lu.team[s - 1])" :size="38" />
+            <div class="mini-svg" :style="{ '--el': elColor(lu.team[s - 1]) }" v-html="svgFor(lu.team[s - 1], 38)"></div>
             <span class="mini-lv">{{ t('nv') }}{{ levelOf(lu.team[s - 1]) }}</span>
             <span v-if="freePts(lu.team[s - 1]) > 0" class="mini-pts">✦{{ freePts(lu.team[s - 1]) }}</span>
           </template>
@@ -114,7 +113,7 @@ function applyDrop (targetLid, targetSlot) {
     <div class="bench">
       <div v-for="i in bench" :key="i.uid" class="bench-item" :style="{ '--el': elColor(i.uid), opacity: drag.active && drag.uid === i.uid ? 0.4 : 1 }"
            @pointerdown="onDown($event, i.uid, { type: 'bench' })">
-        <CritterIcon class="bench-svg" :instance="i" :size="48" />
+        <div class="bench-svg" v-html="svgFor(i.uid, 48)"></div>
         <span class="bench-lv">{{ t('nv') }}{{ levelOf(i.uid) }}</span>
         <span v-if="freePts(i.uid) > 0" class="bench-pts">✦{{ freePts(i.uid) }}</span>
       </div>

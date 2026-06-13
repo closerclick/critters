@@ -4,7 +4,6 @@ import { instanceByUid, critterById, game, displayName } from '../game/state.js'
 import { feed, FEED_COST, setRol, setTarget, adjustAlloc, resetAlloc, setNick } from '../game/actions.js';
 import { critterSvg } from '../critter/svg.js';
 import { use3dRender, genomeOf } from '../critter/render3d.js';
-import CritterIcon from './CritterIcon.vue';
 import { statsAtLevel, STAT_KEYS, pointsFree, xpForNext, RARITY_BY_KEY } from '../critter/forge.js';
 import { ACTIVES, PASSIVES } from '../critter/abilities.js';
 import { elementInfo, ELEMENT_INFO, comps } from '../critter/types.js';
@@ -77,10 +76,10 @@ function pickObj (k) { if (k === objSel.value) return; objSel.value = k; setTarg
   <div class="detail-modal" @click.self="emit('close')">
     <div class="detail-card" v-if="critter">
       <div class="d-portrait">
-        <!-- Círculo = vista TOP estática (SVG de fallback + spinner). A la DERECHA, la
-             perspectiva 3D ANIMADA (patas en movimiento) en cuanto existe. -->
+        <!-- Círculo = la hormiga SVG. A la DERECHA, la ÚNICA imagen 3D que conservamos: la
+             perspectiva animada (patas en movimiento), bajo demanda, en cuanto existe. -->
         <div class="d-stage">
-          <CritterIcon class="d-circle" :instance="inst" :size="120" />
+          <div class="d-circle" v-html="svgBig"></div>
           <img v-show="art3dReady" class="d-persp" :src="art3d" alt="" />
         </div>
         <span v-if="free > 0" class="d-pts" :title="t('lblLibres')">✦{{ free }}</span>
@@ -174,7 +173,7 @@ function pickObj (k) { if (k === objSel.value) return; objSel.value = k; setTarg
 .nick-in::placeholder{color:var(--muted)}
 .d-portrait{position:relative;width:max-content;margin:0 auto}
 .d-stage{display:flex;align-items:center;justify-content:center;gap:14px}
-.d-circle{flex:none}
+.d-circle{flex:none;display:flex;align-items:center;justify-content:center}
 /* Perspectiva 3D animada (moviendo las patas) a la derecha del círculo. */
 .d-persp{width:128px;height:128px;object-fit:contain;border-radius:14px;border:1px solid var(--line2);
   background:radial-gradient(circle at 50% 40%,rgba(167,139,250,.10),rgba(7,6,17,.55));animation:dfade .3s ease-out}
